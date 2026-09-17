@@ -1,0 +1,39 @@
+{
+  "baseline": {
+    "trades": 672,
+    "profit_factor": 1.1661139139438788,
+    "average_r": 0.1146702360021384,
+    "net_pnl": 2003.2551090629577,
+    "worst_segment_dd_percent": 5.582815889916689
+  },
+  "2025_failure": [
+    {
+      "descriptor": "atr_percent",
+      "losing_2025_count": 191,
+      "losing_2025_median": 0.2990793476180007,
+      "losing_2025_p25": 0.22443324009109555,
+      "losing_2025_p75": 0.3905764233791537,
+      "other_years_count": 402,
+      "other_years_median": 0.348015135335889,
+      "other_years_p25": 0.2614790138314422,
+      "other_years_p75": 0.45560100985691965,
+      "median_shift_over_reference_iqr": 0.2520878041634486,
+      "adequate_sample": true
+    },
+    {
+      "descriptor": "recent_volatility_24h_percent",
+      "losing_2025_count": 191,
+      "losing_2025_median": 1.9298339463675669,
+      "losing_2025_p25": 1.529209118261584,
+      "losing_2025_p75": 2.499236584729952,
+      "other_years_count": 402,
+      "other_years_median": 2.1930246499702597,
+      "other_years_p25": 1.6180251852955538,
+      "other_years_p75": 2.8989157935363563,
+      "median_shift_over_reference_iqr": 0.2054747703741567,
+      "adequate_sample": true
+    }
+  ],
+  "excursion_convention": "Conservative M15 OHLC path after actual fill; unknown intrabar sequence is excluded.",
+  "regime_bucket_rule": "Descriptive fixed ADX/stop bins and full-sample quartiles; sample <20 flagged. No bucket is applied to trading."
+}
