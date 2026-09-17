@@ -1,0 +1,129 @@
+{
+  "checkpoint": "btc-v2-exit-research-v1.0",
+  "control": {
+    "trades": 639,
+    "long_trades": 315,
+    "short_trades": 324,
+    "win_rate_percent": 26.917057902973397,
+    "profit_factor": 0.8742390593202349,
+    "average_r": -0.08926052339009705,
+    "expectancy_r": -0.08926052339009705,
+    "net_pnl": -1454.458894445869,
+    "worst_segment_dd_percent": 4.818466388198046,
+    "max_losing_streak": 13,
+    "zero_cost_pf": 1.0909267623371333,
+    "zero_cost_average_r": 0.058718065371992804
+  },
+  "shortlist": [
+    {
+      "parameter": "minimum_adx",
+      "value": 25.0,
+      "variant": "minimum_adx=25",
+      "evidence": "adjacent qualifying development settings"
+    },
+    {
+      "parameter": "maximum_extension_atr",
+      "value": 1.75,
+      "variant": "maximum_extension_atr=1.75",
+      "evidence": "adjacent qualifying development settings"
+    },
+    {
+      "parameter": "minimum_body_percent",
+      "value": 0.6,
+      "variant": "minimum_body_percent=0.6",
+      "evidence": "adjacent qualifying development settings"
+    },
+    {
+      "parameter": "minimum_h1_slope_percent",
+      "value": 0.07787868,
+      "variant": "minimum_h1_slope_percent=0.0778787",
+      "evidence": "adjacent qualifying development settings"
+    }
+  ],
+  "combinations": [
+    {
+      "id": "C1",
+      "changes": {
+        "minimum_adx": 25.0,
+        "maximum_extension_atr": 1.75
+      }
+    },
+    {
+      "id": "C2",
+      "changes": {
+        "minimum_adx": 25.0,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "C3",
+      "changes": {
+        "maximum_extension_atr": 1.75,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "C4",
+      "changes": {
+        "minimum_adx": 25.0,
+        "maximum_extension_atr": 1.75,
+        "minimum_body_percent": 0.6
+      }
+    }
+  ],
+  "frozen_candidates": [
+    {
+      "id": "C2",
+      "changes": {
+        "minimum_adx": 25.0,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "C3",
+      "changes": {
+        "maximum_extension_atr": 1.75,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "minimum_adx=25",
+      "changes": {
+        "minimum_adx": 25.0
+      }
+    }
+  ],
+  "factor_trends": {
+    "minimum_adx": "Stable adjacent-value plateau; not necessarily monotonic",
+    "maximum_extension_atr": "Broad monotonic improvement across tested values",
+    "minimum_body_percent": "Stable adjacent-value plateau; not necessarily monotonic",
+    "minimum_range_atr": "No joint PF and average-R improvement",
+    "maximum_range_atr": "Broad monotonic improvement across tested values",
+    "minimum_structure_break_atr": "No joint PF and average-R improvement",
+    "minimum_stop_atr": "No joint PF and average-R improvement",
+    "maximum_stop_atr": "POSSIBLE OVERFIT: isolated single-value improvement",
+    "long_rsi_min": "No joint PF and average-R improvement",
+    "long_rsi_max": "Broad monotonic improvement across tested values",
+    "short_rsi_max": "Stable adjacent-value plateau; not necessarily monotonic",
+    "short_rsi_min": "Stable adjacent-value plateau; not necessarily monotonic",
+    "minimum_h1_slope_percent": "Broad monotonic improvement across tested values"
+  },
+  "development_candles": 139290,
+  "development_segments": 18,
+  "protocol": {
+    "revision": "Development-only revision: evaluate adjacent plateaus with >=250 trades; initial >=50% retention screen was stricter than requested.",
+    "minimum_development_trades": 250,
+    "minimum_retention_percent": 50,
+    "minimum_pf_gain": 0.05,
+    "minimum_average_r_gain": 0.03,
+    "minimum_years_improved": 2,
+    "maximum_dd_multiple": 1.25,
+    "adjacent_qualifying_values": 2,
+    "shortlist_minimum_retention_percent": 40,
+    "shortlist_minimum_pf_gain": 0.02,
+    "shortlist_minimum_average_r_gain": 0.015,
+    "maximum_combinations": 5,
+    "maximum_modified_factors_per_combination": 3,
+    "maximum_frozen_candidates": 3
+  }
+}

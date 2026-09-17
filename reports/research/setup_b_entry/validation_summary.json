@@ -1,0 +1,331 @@
+{
+  "checkpoint": "btc-v2-exit-research-v1.0",
+  "control": {
+    "trades": 639,
+    "long_trades": 315,
+    "short_trades": 324,
+    "win_rate_percent": 26.917057902973397,
+    "profit_factor": 0.8742390593202349,
+    "average_r": -0.08926052339009705,
+    "expectancy_r": -0.08926052339009705,
+    "net_pnl": -1454.458894445869,
+    "worst_segment_dd_percent": 4.818466388198046,
+    "max_losing_streak": 13,
+    "zero_cost_pf": 1.0909267623371333,
+    "zero_cost_average_r": 0.058718065371992804
+  },
+  "shortlist": [
+    {
+      "parameter": "minimum_adx",
+      "value": 25.0,
+      "variant": "minimum_adx=25",
+      "evidence": "adjacent qualifying development settings"
+    },
+    {
+      "parameter": "maximum_extension_atr",
+      "value": 1.75,
+      "variant": "maximum_extension_atr=1.75",
+      "evidence": "adjacent qualifying development settings"
+    },
+    {
+      "parameter": "minimum_body_percent",
+      "value": 0.6,
+      "variant": "minimum_body_percent=0.6",
+      "evidence": "adjacent qualifying development settings"
+    },
+    {
+      "parameter": "minimum_h1_slope_percent",
+      "value": 0.07787868,
+      "variant": "minimum_h1_slope_percent=0.0778787",
+      "evidence": "adjacent qualifying development settings"
+    }
+  ],
+  "combinations": [
+    {
+      "id": "C1",
+      "changes": {
+        "minimum_adx": 25.0,
+        "maximum_extension_atr": 1.75
+      }
+    },
+    {
+      "id": "C2",
+      "changes": {
+        "minimum_adx": 25.0,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "C3",
+      "changes": {
+        "maximum_extension_atr": 1.75,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "C4",
+      "changes": {
+        "minimum_adx": 25.0,
+        "maximum_extension_atr": 1.75,
+        "minimum_body_percent": 0.6
+      }
+    }
+  ],
+  "frozen_candidates": [
+    {
+      "id": "C2",
+      "changes": {
+        "minimum_adx": 25.0,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "C3",
+      "changes": {
+        "maximum_extension_atr": 1.75,
+        "minimum_body_percent": 0.6
+      }
+    },
+    {
+      "id": "minimum_adx=25",
+      "changes": {
+        "minimum_adx": 25.0
+      }
+    }
+  ],
+  "factor_trends": {
+    "minimum_adx": "Stable adjacent-value plateau; not necessarily monotonic",
+    "maximum_extension_atr": "Broad monotonic improvement across tested values",
+    "minimum_body_percent": "Stable adjacent-value plateau; not necessarily monotonic",
+    "minimum_range_atr": "No joint PF and average-R improvement",
+    "maximum_range_atr": "Broad monotonic improvement across tested values",
+    "minimum_structure_break_atr": "No joint PF and average-R improvement",
+    "minimum_stop_atr": "No joint PF and average-R improvement",
+    "maximum_stop_atr": "POSSIBLE OVERFIT: isolated single-value improvement",
+    "long_rsi_min": "No joint PF and average-R improvement",
+    "long_rsi_max": "Broad monotonic improvement across tested values",
+    "short_rsi_max": "Stable adjacent-value plateau; not necessarily monotonic",
+    "short_rsi_min": "Stable adjacent-value plateau; not necessarily monotonic",
+    "minimum_h1_slope_percent": "Broad monotonic improvement across tested values"
+  },
+  "development_candles": 139290,
+  "development_segments": 18,
+  "protocol": {
+    "revision": "Development-only revision: evaluate adjacent plateaus with >=250 trades; initial >=50% retention screen was stricter than requested.",
+    "minimum_development_trades": 250,
+    "minimum_retention_percent": 50,
+    "minimum_pf_gain": 0.05,
+    "minimum_average_r_gain": 0.03,
+    "minimum_years_improved": 2,
+    "maximum_dd_multiple": 1.25,
+    "adjacent_qualifying_values": 2,
+    "shortlist_minimum_retention_percent": 40,
+    "shortlist_minimum_pf_gain": 0.02,
+    "shortlist_minimum_average_r_gain": 0.015,
+    "maximum_combinations": 5,
+    "maximum_modified_factors_per_combination": 3,
+    "maximum_frozen_candidates": 3
+  },
+  "forward_validation": [
+    {
+      "variant": "CONTROL",
+      "changes": "{}",
+      "trades": 316,
+      "long_trades": 151,
+      "short_trades": 165,
+      "win_rate_percent": 25.63291139240506,
+      "profit_factor": 0.792932506181356,
+      "average_r": -0.15266530649860863,
+      "expectancy_r": -0.15266530649860863,
+      "net_pnl": -1182.1620188295667,
+      "worst_segment_dd_percent": 9.068153899226852,
+      "max_losing_streak": 12,
+      "zero_cost_pf": 1.041397702471692,
+      "zero_cost_average_r": 0.026514581523297186
+    },
+    {
+      "variant": "CONTROL",
+      "changes": "{}",
+      "direction": "LONG",
+      "trades": 151,
+      "long_trades": 151,
+      "short_trades": 0,
+      "win_rate_percent": 25.82781456953642,
+      "profit_factor": 0.7587967698281648,
+      "average_r": -0.17432639545692888,
+      "expectancy_r": -0.17432639545692888,
+      "net_pnl": -656.9335791161225,
+      "worst_segment_dd_percent": 3.7691621716726473,
+      "max_losing_streak": 11,
+      "zero_cost_pf": 1.0331559017616057,
+      "zero_cost_average_r": 0.024698606223235563
+    },
+    {
+      "variant": "CONTROL",
+      "changes": "{}",
+      "direction": "SHORT",
+      "trades": 165,
+      "long_trades": 0,
+      "short_trades": 165,
+      "win_rate_percent": 25.454545454545453,
+      "profit_factor": 0.824073388990223,
+      "average_r": -0.13284212811857007,
+      "expectancy_r": -0.13284212811857007,
+      "net_pnl": -525.2284397134445,
+      "worst_segment_dd_percent": 5.950073045618264,
+      "max_losing_streak": 14,
+      "zero_cost_pf": 1.0486124147734157,
+      "zero_cost_average_r": 0.028176474070626338
+    },
+    {
+      "variant": "C2",
+      "changes": "{\"minimum_adx\": 25.0, \"minimum_body_percent\": 0.6}",
+      "trades": 163,
+      "long_trades": 75,
+      "short_trades": 88,
+      "win_rate_percent": 26.380368098159508,
+      "profit_factor": 0.8344611897600553,
+      "average_r": -0.12000794014309678,
+      "expectancy_r": -0.12000794014309678,
+      "net_pnl": -492.3311664921208,
+      "worst_segment_dd_percent": 4.218309236875009,
+      "max_losing_streak": 9,
+      "zero_cost_pf": 1.0821903374800987,
+      "zero_cost_average_r": 0.05193872313956301
+    },
+    {
+      "variant": "C2",
+      "changes": "{\"minimum_adx\": 25.0, \"minimum_body_percent\": 0.6}",
+      "direction": "LONG",
+      "trades": 75,
+      "long_trades": 75,
+      "short_trades": 0,
+      "win_rate_percent": 24.0,
+      "profit_factor": 0.7131016681978558,
+      "average_r": -0.21562901781831215,
+      "expectancy_r": -0.21562901781831215,
+      "net_pnl": -405.4836343879641,
+      "worst_segment_dd_percent": 1.7547791279588336,
+      "max_losing_streak": 7,
+      "zero_cost_pf": 0.9548382401076596,
+      "zero_cost_average_r": -0.025335707147759696
+    },
+    {
+      "variant": "C2",
+      "changes": "{\"minimum_adx\": 25.0, \"minimum_body_percent\": 0.6}",
+      "direction": "SHORT",
+      "trades": 88,
+      "long_trades": 0,
+      "short_trades": 88,
+      "win_rate_percent": 28.40909090909091,
+      "profit_factor": 0.9443562415411496,
+      "average_r": -0.03851270348808374,
+      "expectancy_r": -0.03851270348808374,
+      "net_pnl": -86.8475321041567,
+      "worst_segment_dd_percent": 3.2197822690890465,
+      "max_losing_streak": 11,
+      "zero_cost_pf": 1.1927846074905974,
+      "zero_cost_average_r": 0.11779761258898575
+    },
+    {
+      "variant": "C3",
+      "changes": "{\"maximum_extension_atr\": 1.75, \"minimum_body_percent\": 0.6}",
+      "trades": 176,
+      "long_trades": 85,
+      "short_trades": 91,
+      "win_rate_percent": 25.0,
+      "profit_factor": 0.7476922311788227,
+      "average_r": -0.18752713955038933,
+      "expectancy_r": -0.18752713955038933,
+      "net_pnl": -814.6071552789829,
+      "worst_segment_dd_percent": 5.8707889075997155,
+      "max_losing_streak": 11,
+      "zero_cost_pf": 0.9960072540825329,
+      "zero_cost_average_r": -0.0009197661240783725
+    },
+    {
+      "variant": "C3",
+      "changes": "{\"maximum_extension_atr\": 1.75, \"minimum_body_percent\": 0.6}",
+      "direction": "LONG",
+      "trades": 85,
+      "long_trades": 85,
+      "short_trades": 0,
+      "win_rate_percent": 23.52941176470588,
+      "profit_factor": 0.6651651087753323,
+      "average_r": -0.25365754511198885,
+      "expectancy_r": -0.25365754511198885,
+      "net_pnl": -531.9567062767749,
+      "worst_segment_dd_percent": 3.6481534228870753,
+      "max_losing_streak": 7,
+      "zero_cost_pf": 0.913791849085931,
+      "zero_cost_average_r": -0.05031314292196676
+    },
+    {
+      "variant": "C3",
+      "changes": "{\"maximum_extension_atr\": 1.75, \"minimum_body_percent\": 0.6}",
+      "direction": "SHORT",
+      "trades": 91,
+      "long_trades": 0,
+      "short_trades": 91,
+      "win_rate_percent": 26.373626373626376,
+      "profit_factor": 0.8276428598686468,
+      "average_r": -0.12575698050933484,
+      "expectancy_r": -0.12575698050933484,
+      "net_pnl": -282.65044900220795,
+      "worst_segment_dd_percent": 3.0956397715897332,
+      "max_losing_streak": 8,
+      "zero_cost_pf": 1.0727422773217137,
+      "zero_cost_average_r": 0.0452169045113119
+    },
+    {
+      "variant": "minimum_adx=25",
+      "changes": "{\"minimum_adx\": 25.0}",
+      "trades": 179,
+      "long_trades": 81,
+      "short_trades": 98,
+      "win_rate_percent": 26.256983240223462,
+      "profit_factor": 0.8261530060864305,
+      "average_r": -0.12659002318396004,
+      "expectancy_r": -0.12659002318396004,
+      "net_pnl": -569.4430526560312,
+      "worst_segment_dd_percent": 4.696619055123444,
+      "max_losing_streak": 9,
+      "zero_cost_pf": 1.0736279624214795,
+      "zero_cost_average_r": 0.04653110298556941
+    },
+    {
+      "variant": "minimum_adx=25",
+      "changes": "{\"minimum_adx\": 25.0}",
+      "direction": "LONG",
+      "trades": 81,
+      "long_trades": 81,
+      "short_trades": 0,
+      "win_rate_percent": 23.456790123456788,
+      "profit_factor": 0.6875763563785816,
+      "average_r": -0.2366735274996757,
+      "expectancy_r": -0.2366735274996757,
+      "net_pnl": -480.7743141304226,
+      "worst_segment_dd_percent": 2.213404230625001,
+      "max_losing_streak": 7,
+      "zero_cost_pf": 0.9282784033383251,
+      "zero_cost_average_r": -0.041601077048919494
+    },
+    {
+      "variant": "minimum_adx=25",
+      "changes": "{\"minimum_adx\": 25.0}",
+      "direction": "SHORT",
+      "trades": 98,
+      "long_trades": 0,
+      "short_trades": 98,
+      "win_rate_percent": 28.57142857142857,
+      "profit_factor": 0.9489437644821788,
+      "average_r": -0.03560263696382767,
+      "expectancy_r": -0.03560263696382767,
+      "net_pnl": -88.66873852560866,
+      "worst_segment_dd_percent": 3.2055781087352186,
+      "max_losing_streak": 11,
+      "zero_cost_pf": 1.1959473833792764,
+      "zero_cost_average_r": 0.11937504770795312
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "candidates": [],
+  "development_cutoff_utc": "2025-01-01 00:00:00+00:00",
+  "development_source_sha256": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+  "protocol": {
+    "adjacent_qualifying_values": 2,
+    "maximum_combinations": 5,
+    "maximum_dd_multiple": 1.25,
+    "maximum_frozen_candidates": 3,
+    "maximum_modified_factors_per_combination": 3,
+    "minimum_average_r_gain": 0.03,
+    "minimum_development_trades": 250,
+    "minimum_pf_gain": 0.05,
+    "minimum_retention_percent": 50,
+    "minimum_years_improved": 2
+  }
+}

@@ -1,0 +1,31 @@
+[
+  {
+    "id": "C1",
+    "changes": {
+      "minimum_adx": 25.0,
+      "maximum_extension_atr": 1.75
+    }
+  },
+  {
+    "id": "C2",
+    "changes": {
+      "minimum_adx": 25.0,
+      "minimum_body_percent": 0.6
+    }
+  },
+  {
+    "id": "C3",
+    "changes": {
+      "maximum_extension_atr": 1.75,
+      "minimum_body_percent": 0.6
+    }
+  },
+  {
+    "id": "C4",
+    "changes": {
+      "minimum_adx": 25.0,
+      "maximum_extension_atr": 1.75,
+      "minimum_body_percent": 0.6
+    }
+  }
+]

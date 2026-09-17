@@ -1,0 +1,42 @@
+{
+  "candidates": [
+    {
+      "changes": {
+        "minimum_adx": 25.0,
+        "minimum_body_percent": 0.6
+      },
+      "id": "C2"
+    },
+    {
+      "changes": {
+        "maximum_extension_atr": 1.75,
+        "minimum_body_percent": 0.6
+      },
+      "id": "C3"
+    },
+    {
+      "changes": {
+        "minimum_adx": 25.0
+      },
+      "id": "minimum_adx=25"
+    }
+  ],
+  "development_cutoff_utc": "2025-01-01 00:00:00+00:00",
+  "development_source_sha256": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+  "protocol": {
+    "adjacent_qualifying_values": 2,
+    "maximum_combinations": 5,
+    "maximum_dd_multiple": 1.25,
+    "maximum_frozen_candidates": 3,
+    "maximum_modified_factors_per_combination": 3,
+    "minimum_average_r_gain": 0.03,
+    "minimum_development_trades": 250,
+    "minimum_pf_gain": 0.05,
+    "minimum_retention_percent": 50,
+    "minimum_years_improved": 2,
+    "revision": "Development-only revision: evaluate adjacent plateaus with >=250 trades; initial >=50% retention screen was stricter than requested.",
+    "shortlist_minimum_average_r_gain": 0.015,
+    "shortlist_minimum_pf_gain": 0.02,
+    "shortlist_minimum_retention_percent": 40
+  }
+}

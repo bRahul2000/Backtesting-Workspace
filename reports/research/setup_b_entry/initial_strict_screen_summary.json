@@ -1,0 +1,49 @@
+{
+  "checkpoint": "btc-v2-exit-research-v1.0",
+  "control": {
+    "trades": 639,
+    "long_trades": 315,
+    "short_trades": 324,
+    "win_rate_percent": 26.917057902973397,
+    "profit_factor": 0.8742390593202349,
+    "average_r": -0.08926052339009705,
+    "expectancy_r": -0.08926052339009705,
+    "net_pnl": -1454.458894445869,
+    "worst_segment_dd_percent": 4.818466388198046,
+    "max_losing_streak": 13,
+    "zero_cost_pf": 1.0909267623371333,
+    "zero_cost_average_r": 0.058718065371992804
+  },
+  "shortlist": [],
+  "combinations": [],
+  "frozen_candidates": [],
+  "factor_trends": {
+    "minimum_adx": "Mixed/non-monotonic results",
+    "maximum_extension_atr": "Broad improvement across tested values",
+    "minimum_body_percent": "Broad improvement across tested values",
+    "minimum_range_atr": "No joint PF and average-R improvement",
+    "maximum_range_atr": "Broad improvement across tested values",
+    "minimum_structure_break_atr": "No joint PF and average-R improvement",
+    "minimum_stop_atr": "No joint PF and average-R improvement",
+    "maximum_stop_atr": "POSSIBLE OVERFIT: isolated single-value improvement",
+    "long_rsi_min": "No joint PF and average-R improvement",
+    "long_rsi_max": "Broad improvement across tested values",
+    "short_rsi_max": "Mixed/non-monotonic results",
+    "short_rsi_min": "Mixed/non-monotonic results",
+    "minimum_h1_slope_percent": "Broad improvement across tested values"
+  },
+  "development_candles": 139290,
+  "development_segments": 18,
+  "protocol": {
+    "minimum_development_trades": 250,
+    "minimum_retention_percent": 50,
+    "minimum_pf_gain": 0.05,
+    "minimum_average_r_gain": 0.03,
+    "minimum_years_improved": 2,
+    "maximum_dd_multiple": 1.25,
+    "adjacent_qualifying_values": 2,
+    "maximum_combinations": 5,
+    "maximum_modified_factors_per_combination": 3,
+    "maximum_frozen_candidates": 3
+  }
+}

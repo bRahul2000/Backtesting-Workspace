@@ -1,0 +1,12 @@
+{
+  "minimum_development_trades": 250,
+  "minimum_retention_percent": 50,
+  "minimum_pf_gain": 0.05,
+  "minimum_average_r_gain": 0.03,
+  "minimum_years_improved": 2,
+  "maximum_dd_multiple": 1.25,
+  "adjacent_qualifying_values": 2,
+  "maximum_combinations": 5,
+  "maximum_modified_factors_per_combination": 3,
+  "maximum_frozen_candidates": 3
+}
