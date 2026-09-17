@@ -22,9 +22,12 @@ class ExnessStandardBTCUSDm:
     mt5_symbol: str = "BTCUSDm"
     digits: int = 2
     btc_per_lot: float = 1.0
+    minimum_volume_lots: float = 0.01
     volume_step_lots: float = 0.01
     maximum_volume_lots: float = 200.0
     spread_model: str = "Floating historical Bid/Ask ticks"
+    server_timezone: str = "UTC+0 / GMT+0"
+    server_timezone_source: str = "https://get.exness.help/hc/en-us/articles/4405235684498-Instrument-trading-hours"
     stops_level_points: int = 0
     margin_currency: str = "BTC"
     profit_currency: str = "USD"

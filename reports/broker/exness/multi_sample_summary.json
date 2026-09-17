@@ -1,6 +1,8 @@
 {
   "status": "mt5_samples_reconstructed",
-  "timezone_status": "EXNESS_MT5_SERVER_TIME_UNVERIFIED",
+  "timezone_status": "EXNESS_MT5_SERVER_TIME_UTC_PLUS_0_CONFIRMED",
+  "server_timezone": "UTC+0 / GMT+0",
+  "server_timezone_source": "https://get.exness.help/hc/en-us/articles/4405235684498-Instrument-trading-hours",
   "broker": "Exness",
   "account_type": "Standard",
   "symbol": "BTCUSDm",
@@ -176,5 +178,5 @@
     "p99": 10.0,
     "maximum": 10.0
   },
-  "processed_at_utc": "2026-09-17T16:37:41.874634+00:00"
+  "processed_at_utc": "2026-09-17T16:59:31.203226+00:00"
 }

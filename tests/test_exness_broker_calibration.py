@@ -18,6 +18,8 @@ def test_standard_commission_and_known_contract_terms():
     assert PROFILE.commission_per_side_usd == 0
     assert PROFILE.btc_per_lot == 1
     assert PROFILE.volume_step_lots == .01
+    assert PROFILE.minimum_volume_lots == .01
+    assert PROFILE.server_timezone == "UTC+0 / GMT+0"
     assert PROFILE.swap_usd_conversion == "PENDING VERIFICATION"
 
 

@@ -14,8 +14,8 @@
   "median_spread_bps": 1.5866466548213016,
   "time_weighted_spread": null,
   "time_weighted_spread_note": "Not calculated: quote validity between irregular ticks and across tick gaps is unverified.",
-  "status": "imported_server_time_unverified",
-  "timezone_status": "UNVERIFIED MT5 BROKER-SERVER TIME",
+  "status": "superseded_by_multi_sample_reconstruction",
+  "timezone_status": "EXNESS_MT5_SERVER_TIME_UTC_PLUS_0_CONFIRMED",
   "broker": "Exness",
   "account_type": "Standard",
   "symbol": "BTCUSDm",
@@ -47,5 +47,8 @@
   "ask_15m_candles": 96,
   "missing_15m_intervals": 0,
   "gap_count": 0,
-  "imported_at_utc": "2026-09-17T13:45:37.095691+00:00"
+  "imported_at_utc": "2026-09-17T13:45:37.095691+00:00",
+  "server_timezone": "UTC+0 / GMT+0",
+  "server_timezone_source": "https://get.exness.help/hc/en-us/articles/4405235684498-Instrument-trading-hours",
+  "superseded_by": "multi_sample_summary.json"
 }

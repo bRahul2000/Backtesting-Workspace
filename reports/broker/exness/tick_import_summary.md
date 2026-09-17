@@ -1,6 +1,6 @@
 # Exness BTCUSDm multi-sample quote reconstruction
 
-Timezone status: **EXNESS_MT5_SERVER_TIME_UNVERIFIED**. Timestamps, weekdays, and hours are MT5 server wall time; no UTC conversion was made.
+Timezone status: **EXNESS_MT5_SERVER_TIME_UTC_PLUS_0_CONFIRMED**. Exness states its trading servers use UTC+0. The original MT5 wall-clock strings are preserved and correspond to UTC timestamps. Source: https://get.exness.help/hc/en-us/articles/4405235684498-Instrument-trading-hours.
 
 Each CSV was reconstructed independently in original row order. Bid-only and Ask-only updates carry the last known opposite side within the same file and continuous 15-minute sequence. No quote is carried across files, missing 15-minute intervals, or before that side first appears.
 

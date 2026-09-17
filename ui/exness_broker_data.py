@@ -22,7 +22,7 @@ def _money(value) -> str:
 
 
 def _render_mt5_samples(summary: dict, report_dir: Path) -> None:
-    st.info("MT5 SERVER TIMEZONE — UNVERIFIED. All sample dates and hours are broker-server wall time, not UTC.")
+    st.info("MT5 SERVER TIMEZONE — UTC+0 CONFIRMED by Exness. Original MT5 date/time strings are preserved in the processed ticks.")
     cards = st.columns(4)
     cards[0].metric("Samples", f"{summary['sample_count']:,}")
     cards[1].metric("Reconstructed ticks", f"{summary['total_ticks']:,}")
@@ -38,6 +38,7 @@ def _render_mt5_samples(summary: dict, report_dir: Path) -> None:
                f"Both-side {summary['both_side_updates']:,} · "
                f"Missing 15m intervals {summary['total_missing_15m_intervals']:,}")
     st.caption("Quote state resets at each file and missing 15-minute interval. Raw Bid/Ask fields remain separate from reconstructed values in the processed tick files.")
+    st.caption(f"Server timezone source: {summary.get('server_timezone_source', PROFILE.server_timezone_source)}")
     coverage_path = report_dir / "sample_coverage.csv"
     if coverage_path.exists():
         coverage = pd.read_csv(coverage_path)
@@ -189,7 +190,7 @@ def render_exness_broker_data(report_dir: Path = REPORT_DIR,
                 st.dataframe(pd.DataFrame(schema.sample), hide_index=True, width="stretch")
         mt5_columns = ("<DATE>", "<TIME>", "<BID>", "<ASK>", "<LAST>", "<VOLUME>", "<FLAGS>")
         if all(schema.member is None and schema.columns == mt5_columns for schema in schemas):
-            st.caption("MT5 mode reconstructs partial Bid/Ask updates in original row order. Each file is a separate sample; time remains unverified broker-server time.")
+            st.caption("MT5 mode reconstructs partial Bid/Ask updates in original row order. Each file is separate; Exness server time is UTC+0.")
             if st.button("Reconstruct MT5 BTCUSDm Samples", type="primary"):
                 try:
                     with st.spinner("Reconstructing independent MT5 quote samples…"):

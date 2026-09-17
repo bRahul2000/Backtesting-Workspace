@@ -29,6 +29,7 @@ from ui.long_history_research import render_long_history_research
 from ui.setup_b_diagnostics import render_setup_b_diagnostics
 from ui.setup_b_exit_research import render_exit_research
 from ui.setup_b_entry_research import render_entry_research
+from ui.exness_cost_calibration import render_exness_cost_calibration
 from ui.exness_broker_data import render_exness_broker_data
 
 
@@ -331,3 +332,4 @@ with diagnostics_tab:
     render_setup_b_diagnostics()
     render_exit_research()
     render_entry_research()
+    render_exness_cost_calibration()

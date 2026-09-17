@@ -93,5 +93,6 @@ def test_gap_resets_quote_state_and_never_fabricates_bar(tmp_path):
 
 
 def test_historical_spread_rejects_invalid_quote():
+    assert TIMEZONE_STATUS == "EXNESS_MT5_SERVER_TIME_UTC_PLUS_0_CONFIRMED"
     with pytest.raises(ValueError):
         historical_spread_price(bid=100, ask=99)

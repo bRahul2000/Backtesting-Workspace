@@ -2,7 +2,8 @@
 
 This research data path never supplies prices to the audited strategy engine.
 The MT5 clock offset is unknown, so all timestamps here are explicitly server
-time, and quote state is reset at each file and missing 15-minute interval.
+time (officially UTC+0), and quote state is reset at each file and missing
+15-minute interval. Original MT5 date/time strings remain available.
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ from brokers.exness_standard_btcusdm import PROFILE, historical_spread_price
 from services.exness_ticks import PROCESSED_DIR, RAW_DIR, REPORT_DIR, TickImportError, inspect_tick_source
 
 
-TIMEZONE_STATUS = "EXNESS_MT5_SERVER_TIME_UNVERIFIED"
+TIMEZONE_STATUS = "EXNESS_MT5_SERVER_TIME_UTC_PLUS_0_CONFIRMED"
 STEP = timedelta(minutes=15)
 TICK_COLUMNS = ["sample_id", "source_row", "timestamp_raw", "timestamp_server",
                 "bid_raw", "ask_raw", "bid", "ask", "bid_carried", "ask_carried",
@@ -267,6 +268,8 @@ def process_mt5_samples(paths: list[Path], *, processed_dir: Path = PROCESSED_DI
         combined = _distribution(all_spreads)
         summary = {"status": "mt5_samples_reconstructed",
                    "timezone_status": TIMEZONE_STATUS,
+                   "server_timezone": PROFILE.server_timezone,
+                   "server_timezone_source": PROFILE.server_timezone_source,
                    "broker": PROFILE.broker, "account_type": PROFILE.account_type,
                    "symbol": PROFILE.mt5_symbol, "commission_per_side_usd": 0,
                    "spread_source": "Historical reconstructed Bid/Ask quote states",
@@ -331,7 +334,7 @@ def _write_reports(folder: Path, summary: dict, hourly: dict[int, list[float]],
         writer.writerows(gaps)
     spread = summary["combined_spread"]
     lines = ["# Exness BTCUSDm multi-sample quote reconstruction", "",
-             f"Timezone status: **{TIMEZONE_STATUS}**. Timestamps, weekdays, and hours are MT5 server wall time; no UTC conversion was made.",
+             f"Timezone status: **{TIMEZONE_STATUS}**. Exness states its trading servers use UTC+0. The original MT5 wall-clock strings are preserved and correspond to UTC timestamps. Source: {PROFILE.server_timezone_source}.",
              "", "Each CSV was reconstructed independently in original row order. Bid-only and Ask-only updates carry the last known opposite side within the same file and continuous 15-minute sequence. No quote is carried across files, missing 15-minute intervals, or before that side first appears.",
              "", f"Samples: {summary['sample_count']}; raw rows: {summary['total_raw_rows']:,}; reconstructed complete ticks: {summary['total_ticks']:,}; 15-minute bars: {summary['total_15m_intervals']:,}; observed bar-hours: {summary['total_observed_hours']:g}.",
              f"Partial updates: Bid-only {summary['bid_only_updates']:,}; Ask-only {summary['ask_only_updates']:,}; both {summary['both_side_updates']:,}. Duplicate full rows {summary['duplicate_full_rows']:,}; duplicate timestamps {summary['duplicate_timestamps']:,}; malformed rows {summary['malformed_rows']:,}.",
