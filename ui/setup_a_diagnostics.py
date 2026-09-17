@@ -7,6 +7,7 @@ import streamlit as st
 
 from research.setup_a_regime_diagnostics import REPORT
 from ui.setup_a_regime_research import render_setup_a_regime_research
+from ui.setup_a_long_history import render_setup_a_long_history
 
 
 def render_setup_a_diagnostics() -> None:
@@ -106,3 +107,4 @@ def render_setup_a_diagnostics() -> None:
     st.dataframe(feeds.loc[feeds.year.isin([2024, 2025, 2026])].round(2),
                  hide_index=True, width="stretch")
     render_setup_a_regime_research()
+    render_setup_a_long_history()
