@@ -32,6 +32,7 @@ from ui.setup_b_entry_research import render_entry_research
 from ui.exness_cost_calibration import render_exness_cost_calibration
 from ui.exness_m15_data import render_exness_m15_data
 from ui.exness_native_validation import render_exness_native_validation
+from ui.setup_a_native_validation import render_setup_a_native_validation
 from ui.exness_broker_data import render_exness_broker_data
 
 
@@ -337,3 +338,4 @@ with diagnostics_tab:
     render_entry_research()
     render_exness_cost_calibration()
     render_exness_native_validation()
+    render_setup_a_native_validation()
