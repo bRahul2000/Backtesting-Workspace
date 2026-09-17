@@ -30,6 +30,8 @@ from ui.setup_b_diagnostics import render_setup_b_diagnostics
 from ui.setup_b_exit_research import render_exit_research
 from ui.setup_b_entry_research import render_entry_research
 from ui.exness_cost_calibration import render_exness_cost_calibration
+from ui.exness_m15_data import render_exness_m15_data
+from ui.exness_native_validation import render_exness_native_validation
 from ui.exness_broker_data import render_exness_broker_data
 
 
@@ -316,6 +318,7 @@ def render_market_data() -> pd.DataFrame:
     else:
         st.info("No local BTC/USD dataset is available yet. Select a date range and download it above.")
     render_exness_broker_data()
+    render_exness_m15_data()
     return active_data
 
 
@@ -333,3 +336,4 @@ with diagnostics_tab:
     render_exit_research()
     render_entry_research()
     render_exness_cost_calibration()
+    render_exness_native_validation()

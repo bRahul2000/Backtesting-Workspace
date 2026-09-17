@@ -1,0 +1,38 @@
+{
+  "raw_rows": 100180,
+  "first_timestamp_utc": "2023-11-09 00:00:00+00:00",
+  "last_timestamp_utc": "2026-09-17 17:15:00+00:00",
+  "duplicate_full_rows": 0,
+  "duplicate_timestamps": 0,
+  "invalid_ohlc_rows": 0,
+  "off_grid_timestamps": 0,
+  "source_sha256": "f75f09935fe5dcf68f8ad545ae3d9733ee07c672a6bac83bdaa74ee3658a0f45",
+  "source_file": "BTCUSDm_M15_202311090000_202609171715.csv",
+  "point_size": 0.01,
+  "source_timezone": "Exness server UTC+0",
+  "expected_intervals": 100198,
+  "missing_intervals": 18,
+  "gap_count": 6,
+  "largest_gap": 10,
+  "segments": 7,
+  "tick_validation": {
+    "overlapping_candles": 480,
+    "exact_ohlc_matches": 480,
+    "ohlc_mismatches": 0,
+    "spread_min_matches": 480,
+    "spread_min_mismatches": 0
+  },
+  "spread_overall": {
+    "group_type": "overall",
+    "group": "all",
+    "candles": 100180,
+    "minimum": 2.43,
+    "median": 21.6,
+    "mean": 24.006348872030348,
+    "p75": 28.96,
+    "p90": 33.95,
+    "p95": 45.31,
+    "p99": 64.42,
+    "maximum": 88.09
+  }
+}
