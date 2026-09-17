@@ -36,6 +36,7 @@ from ui.setup_a_native_validation import render_setup_a_native_validation
 from ui.setup_a_v1_candidate import render_setup_a_v1_candidate
 from ui.setup_a_diagnostics import render_setup_a_diagnostics
 from ui.exness_broker_data import render_exness_broker_data
+from ui.live_chart import render_live_chart
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -325,8 +326,8 @@ def render_market_data() -> pd.DataFrame:
     return active_data
 
 
-market_tab, backtest_tab, research_tab, diagnostics_tab = st.tabs(
-    ["Market Data", "Backtest", "Long-History Research", "Diagnostics"]
+market_tab, backtest_tab, research_tab, diagnostics_tab, live_chart_tab = st.tabs(
+    ["Market Data", "Backtest", "Long-History Research", "Diagnostics", "Live Chart"]
 )
 with market_tab:
     active_data = render_market_data()
@@ -343,3 +344,5 @@ with diagnostics_tab:
     render_setup_a_v1_candidate()
     render_setup_a_native_validation()
     render_setup_a_diagnostics()
+with live_chart_tab:
+    render_live_chart()
