@@ -1,0 +1,21 @@
+{
+  "candidates": [
+    {
+      "candidate_id": "C1_ATR_P20",
+      "development_reason": "Adjacent 20th and 30th percentile settings improve aggregate PF and average R with adequate samples; 20th also lowers DD and improves both directions. Strongest gain is localized, so overfit risk remains.",
+      "label": "ATR% above development 20th percentile",
+      "rules": [
+        {
+          "feature": "atr_percent",
+          "percentile": 20,
+          "threshold": 0.2643797440641696
+        }
+      ]
+    }
+  ],
+  "development_end": "2024-12-31T23:45:00Z",
+  "development_start": "2023-11-09T00:00:00Z",
+  "freeze_hash_sha256": "5729d9ea26d2493da0afdc55d3a8f57eb2be545c3ec67e07626ba190487e7ac9",
+  "validation_start": "2025-01-01T00:00:00Z",
+  "validation_status": "previously observed; validation set for Phase 4K"
+}

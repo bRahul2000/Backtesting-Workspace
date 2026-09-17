@@ -1,0 +1,9 @@
+feature,percentile,candidate_id,pf_improves,average_r_improves,mfe_improves,fewer_never_reaching_half_r,adequate_sample,neighboring_pf_and_r_improvement,possible_overfit
+atr_percent,10,atr_percent_p10,False,False,True,True,True,True,False
+atr_percent,20,atr_percent_p20,True,True,True,True,True,True,False
+atr_percent,30,atr_percent_p30,True,True,True,True,True,True,False
+atr_percent,40,atr_percent_p40,False,True,True,True,True,True,False
+recent_volatility_24h_percent,10,recent_volatility_24h_percent_p10,False,False,True,True,True,False,False
+recent_volatility_24h_percent,20,recent_volatility_24h_percent_p20,False,False,False,True,True,False,False
+recent_volatility_24h_percent,30,recent_volatility_24h_percent_p30,False,False,False,True,True,False,False
+recent_volatility_24h_percent,40,recent_volatility_24h_percent_p40,False,False,True,True,False,False,False
