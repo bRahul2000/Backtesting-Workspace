@@ -1,0 +1,181 @@
+{
+  "source_baseline_commit": "bb8da1ab65130acbf1d53b37f6a672fc813fb320",
+  "source_baseline_trade_sha256": "f17c2929897828b83e26da092a9fc9448ea72739d2a50f7307e0c1c9e6c396f8",
+  "source_candles_sha256": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+  "baseline": {
+    "trades": 955,
+    "wins": 253,
+    "losses": 702,
+    "breakeven": 0,
+    "win_rate_percent": 26.49214659685864,
+    "gross_profit": 14635.364389240152,
+    "gross_loss": -17271.799954168437,
+    "net_pnl": -2636.435564928284,
+    "profit_factor": 0.8473560617929692,
+    "average_r": -0.11024053539249458,
+    "expectancy_r": -0.11024053539249458
+  },
+  "costs_and_breakeven": {
+    "All": {
+      "population": "All",
+      "trades": 955,
+      "wins": 253,
+      "losses": 702,
+      "breakeven": 0,
+      "win_rate_percent": 26.49214659685864,
+      "gross_profit": 14635.364389240152,
+      "gross_loss": -17271.799954168437,
+      "net_pnl": -2636.435564928284,
+      "profit_factor": 0.8473560617929692,
+      "average_r": -0.11024053539249458,
+      "expectancy_r": -0.11024053539249458,
+      "gross_price_movement_pnl": 1091.740628627356,
+      "commission_cost": 3728.1761935556488,
+      "slippage_cost": 0.0,
+      "total_transaction_cost": 3728.1761935556488,
+      "cost_per_trade": 3.903849417335758,
+      "cost_r_per_trade": 0.15830278830774624,
+      "cost_percent_of_absolute_gross_pnl": 12.344542698677943,
+      "average_winner_r": 2.3464835722330872,
+      "average_loser_r": -0.9956411040951616,
+      "required_breakeven_win_rate_percent": 29.790663141537877,
+      "win_rate_gap_pp": -3.298516544679238,
+      "small_sample": false
+    },
+    "Long": {
+      "population": "Long",
+      "trades": 466,
+      "wins": 123,
+      "losses": 343,
+      "breakeven": 0,
+      "win_rate_percent": 26.394849785407725,
+      "gross_profit": 6988.012731437847,
+      "gross_loss": -8459.738248530059,
+      "net_pnl": -1471.7255170922133,
+      "profit_factor": 0.8260317903632616,
+      "average_r": -0.12454531389287682,
+      "expectancy_r": -0.12454531389287682,
+      "gross_price_movement_pnl": 456.2112375115431,
+      "commission_cost": 1927.9367546037636,
+      "slippage_cost": 0.0,
+      "total_transaction_cost": 1927.9367546037636,
+      "cost_per_trade": 4.137203336059579,
+      "cost_r_per_trade": 0.16798408828003442,
+      "cost_percent_of_absolute_gross_pnl": 13.238948836601669,
+      "average_winner_r": 2.3114797718691955,
+      "average_loser_r": -0.9981053300699465,
+      "required_breakeven_win_rate_percent": 30.158019791820422,
+      "win_rate_gap_pp": -3.7631700064126967,
+      "small_sample": false
+    },
+    "Short": {
+      "population": "Short",
+      "trades": 489,
+      "wins": 130,
+      "losses": 359,
+      "breakeven": 0,
+      "win_rate_percent": 26.58486707566462,
+      "gross_profit": 7647.351657802306,
+      "gross_loss": -8812.061705638378,
+      "net_pnl": -1164.710047836071,
+      "profit_factor": 0.8678277471558291,
+      "average_r": -0.09660857878476838,
+      "expectancy_r": -0.09660857878476838,
+      "gross_price_movement_pnl": 635.5293911158128,
+      "commission_cost": 1800.2394389518847,
+      "slippage_cost": 0.0,
+      "total_transaction_cost": 1800.2394389518847,
+      "cost_per_trade": 3.681471245300378,
+      "cost_r_per_trade": 0.14907684600286625,
+      "cost_percent_of_absolute_gross_pnl": 11.511663770518247,
+      "average_winner_r": 2.3796025525773854,
+      "average_loser_r": -0.9932867043476653,
+      "required_breakeven_win_rate_percent": 29.449134812484512,
+      "win_rate_gap_pp": -2.864267736819894,
+      "small_sample": false
+    }
+  },
+  "stopped_trades": {
+    "trades": 701,
+    "median_mfe_r": 0.5438230580385331,
+    "average_mfe_r": 0.8283848773234381,
+    "never_reached_0.25r_percent": 29.814550641940084,
+    "never_reached_0.5r_percent": 47.07560627674751,
+    "median_stop_distance_atr": 1.8596839990579437,
+    "reached_0.5r_percent": 52.92439372325249,
+    "reached_1r_percent": 33.238231098430816,
+    "reached_1.5r_percent": 21.112696148359486,
+    "reached_2r_percent": 11.554921540656206
+  },
+  "excursion_summary": {
+    "All": {
+      "trades": 955,
+      "average_mfe_r": 1.4059662816792988,
+      "median_mfe_r": 1.0326563835937486,
+      "average_mae_r": 0.8482315560094305,
+      "median_mae_r": 1.0,
+      "average_bars_to_mfe": 16.05235602094241,
+      "average_bars_to_mae": 18.390575916230368
+    },
+    "Long": {
+      "trades": 466,
+      "average_mfe_r": 1.4190666991791445,
+      "median_mfe_r": 1.1276578879251666,
+      "average_mae_r": 0.8539711430883642,
+      "median_mae_r": 1.0,
+      "average_bars_to_mfe": 18.103004291845494,
+      "average_bars_to_mae": 20.233905579399142
+    },
+    "Short": {
+      "trades": 489,
+      "average_mfe_r": 1.3934820392356828,
+      "median_mfe_r": 0.9828363097376277,
+      "average_mae_r": 0.842761929058954,
+      "median_mae_r": 1.0,
+      "average_bars_to_mfe": 14.098159509202453,
+      "average_bars_to_mae": 16.63394683026585
+    }
+  },
+  "descriptive_differences": [
+    {
+      "descriptor": "Bars held",
+      "winner_median": 18.0,
+      "loser_median": 9.0,
+      "median_difference": 9.0,
+      "difference_over_pooled_iqr": 0.47368421052631576
+    },
+    {
+      "descriptor": "RSI",
+      "winner_median": 45.967920500175175,
+      "loser_median": 48.569736713485895,
+      "median_difference": -2.6018162133107197,
+      "difference_over_pooled_iqr": -0.10120968152383686
+    },
+    {
+      "descriptor": "Structure breakout distance ATR",
+      "winner_median": 0.3905702188565919,
+      "loser_median": 0.3464458182701828,
+      "median_difference": 0.044124400586409096,
+      "difference_over_pooled_iqr": 0.09761507382757707
+    },
+    {
+      "descriptor": "EMA20 extension ATR",
+      "winner_median": 1.4420613875550095,
+      "loser_median": 1.5324838026981151,
+      "median_difference": -0.09042241514310567,
+      "difference_over_pooled_iqr": -0.09443918721198902
+    },
+    {
+      "descriptor": "Stop distance ATR",
+      "winner_median": 1.9087377552328277,
+      "loser_median": 1.8589230700038302,
+      "median_difference": 0.04981468522899757,
+      "difference_over_pooled_iqr": 0.07239119284016561
+    }
+  ],
+  "mfe_method": "Conservative path-known excursions. Normal entry-bar opposite extreme and exit-bar extremes are excluded when their order relative to fill/exit is unknown. Excursion R uses actual fill-to-structural-stop price distance; realized R uses the engine's planned dollar risk. Threshold rates are lower bounds.",
+  "development_set": "2021-01-01 through 2024-12-31 UTC",
+  "forward_validation_set": "2025-01-01 through latest 2026 data; previously observed, not pristine",
+  "small_sample_threshold": 20,
+  "cost_method": "Per-trade quantity is recovered from recorded net PnL, fill prices, and the frozen 0.05% per-side commission model. Raw price PnL reverses the audited slippage formula; this frozen baseline uses 0% slippage."
+}

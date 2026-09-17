@@ -138,3 +138,20 @@ ADX for descriptive research only.
 Reports and downloads are written to `reports/long_history/segment_aware/`.
 The Streamlit Long-History Research section reads these reports and keeps the
 interactive backtest interface unchanged.
+
+## Frozen Setup B failure diagnostics
+
+`python -m research.setup_b_failure_diagnostics` reads the saved Phase 4B
+completed-trade export and the original continuous M15 candles. It does not
+rerun the backtester. Indicator values are replayed only through each signal
+candle and checked against the frozen ADX, ATR%, H1 slope, and structural stop.
+The reports are written to `reports/diagnostics/setup_b/` and displayed in
+Streamlit's Diagnostics tab.
+
+Excursion R uses actual fill-to-structural-stop price distance. Entry-bar and
+exit-bar extremes whose order relative to the fill or exit is unknown are
+excluded, so MFE reach rates are conservative lower bounds. The frozen
+baseline uses 0% slippage and 0.05% commission per side; per-trade quantity is
+recovered from recorded net PnL under the audited engine formula. The
+2025–2026 forward-validation set is intended for future changes but has
+already been observed and is not an untouched holdout.
