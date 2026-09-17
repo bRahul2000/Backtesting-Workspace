@@ -1,0 +1,3 @@
+server_weekday,weekday_name,tick_count,minimum_spread_price,median_spread_price,mean_spread_price,p95_spread_price,maximum_spread_price
+5,Saturday,44378,10.0,10.0,10.0,10.0,10.0
+6,Sunday,44962,10.0,10.0,10.0,10.0,10.0

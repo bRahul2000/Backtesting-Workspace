@@ -131,6 +131,37 @@ def test_zip_member_import_and_schema_inspection(tmp_path):
     assert _import(archive, tmp_path)["tick_count"] == 5
 
 
+def test_unverified_server_time_keeps_utc_labels_absent(tmp_path):
+    source = tmp_path / "server.tsv"
+    pd.DataFrame([
+        ["2026-08-01 12:00:00", 100, 110],
+        ["2026-08-01 12:00:00", 100, 110],
+        ["2026-08-01 12:00:00", 101, 111],
+        ["2026-08-01 12:15:00", 102, 112],
+    ], columns=["Date", "Bid", "Ask"]).to_csv(source, sep="\t", index=False)
+    # The format, not the filename extension, is inspected before import.
+    source = source.rename(tmp_path / "server.csv")
+    summary = import_tick_sources(
+        [source], TickColumns("Date", "Bid", "Ask"),
+        server_time_unverified=True, processed_dir=tmp_path / "processed",
+        report_dir=tmp_path / "reports")
+    assert summary["status"] == "imported_server_time_unverified"
+    assert summary["input_rows"] == 4
+    assert summary["duplicate_full_rows"] == 1
+    assert summary["duplicate_timestamps_raw"] == 2
+    assert summary["same_timestamp_distinct_quotes"] == 1
+    assert summary["first_tick_server"] == "2026-08-01T12:00:00"
+    assert "first_tick_utc" not in summary
+    assert summary["bid_15m_candles"] == 2
+    ticks = pd.read_csv(tmp_path / "processed/btcusdm_ticks_server_time.csv")
+    assert ticks.columns[0] == "timestamp_server"
+    assert not (tmp_path / "processed/btcusdm_ticks.csv").exists()
+    assert (tmp_path / "processed/btcusdm_bid_15m_server_time.csv").exists()
+    assert (tmp_path / "processed/btcusdm_ask_15m_server_time.csv").exists()
+    assert (tmp_path / "reports/spread_by_server_hour.csv").exists()
+    assert not (tmp_path / "reports/spread_by_hour.csv").exists()
+
+
 def test_unknown_mapping_and_invalid_import_do_not_write_processed_data(tmp_path):
     source = tmp_path / "bad.csv"
     pd.DataFrame({"When": ["2026-01-01T00:00:00Z"], "Bid": [100],

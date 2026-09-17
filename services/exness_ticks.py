@@ -45,6 +45,7 @@ class TickColumns:
     timestamp: str
     bid: str
     ask: str
+    time: str | None = None
 
 
 @dataclass(frozen=True)
@@ -109,12 +110,17 @@ def inspect_tick_source(path: Path) -> list[SourceSchema]:
 
 
 def _parse_timestamps(values: pd.Series, *, source_timezone: str | None,
-                      timestamp_unit: str | None) -> pd.Series:
+                      timestamp_unit: str | None,
+                      server_time_unverified: bool = False) -> pd.Series:
     text = values.astype("string").str.strip()
     if text.isna().any() or text.eq("").any():
         raise TickImportError("Tick timestamp is blank.")
     numeric = bool(text.str.fullmatch(r"[+-]?\d+(?:\.\d+)?").all())
+    if server_time_unverified and (source_timezone is not None or timestamp_unit is not None):
+        raise TickImportError("Unverified server-time mode cannot also claim a timezone or epoch unit.")
     if numeric:
+        if server_time_unverified:
+            raise TickImportError("Numeric timestamps cannot be treated as unverified server wall time.")
         if timestamp_unit not in ("s", "ms", "us", "ns"):
             raise TickImportError("Numeric timestamps require explicit --timestamp-unit s/ms/us/ns.")
         parsed = pd.to_datetime(pd.to_numeric(text, errors="coerce"), unit=timestamp_unit,
@@ -127,15 +133,20 @@ def _parse_timestamps(values: pd.Series, *, source_timezone: str | None,
         except (TypeError, ValueError) as exc:
             raise TickImportError("Timestamp format could not be parsed.") from exc
         if isinstance(parsed.dtype, pd.DatetimeTZDtype):
+            if server_time_unverified:
+                raise TickImportError("Offset-aware timestamps do not need unverified server-time mode.")
             parsed = parsed.dt.tz_convert("UTC")
         elif pd.api.types.is_datetime64_any_dtype(parsed):
-            if source_timezone is None:
+            if server_time_unverified:
+                parsed = parsed.astype("datetime64[ns]")
+            elif source_timezone is None:
                 raise TickImportError("Naive timestamps require an explicit source timezone.")
-            try:
-                parsed = parsed.dt.tz_localize(source_timezone, ambiguous="raise",
-                                               nonexistent="raise").dt.tz_convert("UTC")
-            except (TypeError, ValueError) as exc:
-                raise TickImportError("Source timezone is invalid or has ambiguous local times.") from exc
+            else:
+                try:
+                    parsed = parsed.dt.tz_localize(source_timezone, ambiguous="raise",
+                                                   nonexistent="raise").dt.tz_convert("UTC")
+                except (TypeError, ValueError, KeyError) as exc:
+                    raise TickImportError("Source timezone is invalid or has ambiguous local times.") from exc
         else:
             raise TickImportError("Mixed timezone formats need a normalized source file.")
     if parsed.isna().any():
@@ -145,16 +156,24 @@ def _parse_timestamps(values: pd.Series, *, source_timezone: str | None,
 
 def normalize_tick_chunk(chunk: pd.DataFrame, columns: TickColumns, *,
                          source_timezone: str | None = None,
-                         timestamp_unit: str | None = None) -> pd.DataFrame:
-    if len({columns.timestamp, columns.bid, columns.ask}) != 3:
-        raise TickImportError("Timestamp, Bid, and Ask must map to three distinct columns.")
-    missing = [name for name in (columns.timestamp, columns.bid, columns.ask)
+                         timestamp_unit: str | None = None,
+                         server_time_unverified: bool = False) -> pd.DataFrame:
+    mapped = [columns.timestamp, columns.bid, columns.ask]
+    if columns.time is not None:
+        mapped.append(columns.time)
+    if len(set(mapped)) != len(mapped):
+        raise TickImportError("Timestamp/date, optional time, Bid, and Ask must map to distinct columns.")
+    missing = [name for name in mapped
                if name not in chunk.columns]
     if missing:
         raise TickImportError("Mapped tick column(s) absent: " + ", ".join(missing))
-    timestamps = _parse_timestamps(chunk[columns.timestamp],
+    stamp_values = (chunk[columns.timestamp].astype("string").str.strip() + " " +
+                    chunk[columns.time].astype("string").str.strip()
+                    if columns.time is not None else chunk[columns.timestamp])
+    timestamps = _parse_timestamps(stamp_values,
                                    source_timezone=source_timezone,
-                                   timestamp_unit=timestamp_unit)
+                                   timestamp_unit=timestamp_unit,
+                                   server_time_unverified=server_time_unverified)
     bid = pd.to_numeric(chunk[columns.bid], errors="coerce")
     ask = pd.to_numeric(chunk[columns.ask], errors="coerce")
     if (bid.isna().any() or ask.isna().any() or not np.isfinite(bid).all()
@@ -164,8 +183,10 @@ def normalize_tick_chunk(chunk: pd.DataFrame, columns: TickColumns, *,
     spread = ask - bid
     # Pandas may infer microsecond resolution from CSV strings. Force ns before
     # converting to integer SQLite keys and 15-minute UTC bucket boundaries.
-    timestamps = timestamps.astype("datetime64[ns, UTC]")
-    result = pd.DataFrame({"timestamp_utc": timestamps,
+    time_column = "timestamp_server" if server_time_unverified else "timestamp_utc"
+    timestamps = timestamps.astype("datetime64[ns]" if server_time_unverified
+                                   else "datetime64[ns, UTC]")
+    result = pd.DataFrame({time_column: timestamps,
                            "bid": bid.astype(float), "ask": ask.astype(float)})
     result["spread_price"] = spread.astype(float)
     result["spread_pct"] = result.spread_price / result.bid * 100
@@ -175,8 +196,11 @@ def normalize_tick_chunk(chunk: pd.DataFrame, columns: TickColumns, *,
 
 def _insert_chunks(connection: sqlite3.Connection, paths: list[Path],
                    columns: TickColumns, source_timezone: str | None,
-                   timestamp_unit: str | None, chunk_rows: int) -> tuple[int, int, list[dict]]:
+                   timestamp_unit: str | None, chunk_rows: int,
+                   server_time_unverified: bool,
+                   skip_incomplete_quotes: bool) -> tuple[int, int, int, int, int, list[dict]]:
     input_rows = 0
+    invalid_quotes = 0
     sources = []
     sql = ("INSERT OR IGNORE INTO ticks "
            "(timestamp_ns,bid,ask,spread_price,spread_pct,spread_bps,utc_hour,utc_weekday,bucket_ns) "
@@ -189,7 +213,7 @@ def _insert_chunks(connection: sqlite3.Connection, paths: list[Path],
         digest = hasher.hexdigest()
         for schema in inspect_tick_source(path):
             if any(name not in schema.columns for name in
-                   (columns.timestamp, columns.bid, columns.ask)):
+                   (columns.timestamp, columns.bid, columns.ask, *([columns.time] if columns.time else []))):
                 raise TickImportError(f"Mapped columns do not match {path.name}/{schema.member or ''}.")
             member_rows = 0
             with _source_stream(path, schema.member) as binary:
@@ -197,10 +221,37 @@ def _insert_chunks(connection: sqlite3.Connection, paths: list[Path],
                     chunks = pd.read_csv(binary, sep=schema.delimiter, chunksize=chunk_rows,
                                          encoding="utf-8-sig", dtype=str)
                     for chunk in chunks:
+                        stamp_values = (chunk[columns.timestamp].astype("string").str.strip() + " " +
+                                        chunk[columns.time].astype("string").str.strip()
+                                        if columns.time is not None else chunk[columns.timestamp])
+                        raw_timestamps = _parse_timestamps(
+                            stamp_values, source_timezone=source_timezone,
+                            timestamp_unit=timestamp_unit,
+                            server_time_unverified=server_time_unverified)
+                        raw_ns = raw_timestamps.astype("datetime64[ns]" if server_time_unverified
+                                                       else "datetime64[ns, UTC]").astype("int64")
+                        fingerprints = (hashlib.sha256(json.dumps(
+                            [None if pd.isna(value) else value for value in row],
+                            separators=(",", ":"), ensure_ascii=False).encode()).digest()
+                            for row in chunk.itertuples(index=False, name=None))
+                        connection.executemany(
+                            "INSERT OR IGNORE INTO raw_events(timestamp_ns,full_row_hash) VALUES (?,?)",
+                            zip(raw_ns.astype(int), fingerprints))
+                        incomplete = (chunk[columns.bid].isna() |
+                                      chunk[columns.ask].isna() |
+                                      chunk[columns.bid].astype("string").str.strip().eq("") |
+                                      chunk[columns.ask].astype("string").str.strip().eq(""))
+                        count_incomplete = int(incomplete.sum())
+                        if count_incomplete and not skip_incomplete_quotes:
+                            raise TickImportError(
+                                f"{count_incomplete} rows have incomplete Bid/Ask quotes; "
+                                "explicitly enable skipping incomplete quotes to retain only complete pairs.")
+                        invalid_quotes += count_incomplete
                         normalized = normalize_tick_chunk(
-                            chunk, columns, source_timezone=source_timezone,
-                            timestamp_unit=timestamp_unit)
-                        time = normalized.timestamp_utc
+                            chunk.loc[~incomplete], columns, source_timezone=source_timezone,
+                            timestamp_unit=timestamp_unit,
+                            server_time_unverified=server_time_unverified)
+                        time = normalized.timestamp_server if server_time_unverified else normalized.timestamp_utc
                         ns = time.astype("int64")
                         values = zip(
                             ns.astype(int), normalized.bid, normalized.ask,
@@ -216,9 +267,14 @@ def _insert_chunks(connection: sqlite3.Connection, paths: list[Path],
             sources.append({"file": path.name, "member": schema.member,
                             "sha256": digest, "input_rows": member_rows,
                             "columns": asdict(columns), "source_timezone": source_timezone,
-                            "timestamp_unit": timestamp_unit})
+                            "timestamp_unit": timestamp_unit,
+                            "server_time_unverified": server_time_unverified})
     unique = int(connection.execute("SELECT COUNT(*) FROM ticks").fetchone()[0])
-    return input_rows, input_rows - unique, sources
+    full_unique, raw_unique_times = connection.execute(
+        "SELECT COUNT(*),COUNT(DISTINCT timestamp_ns) FROM raw_events").fetchone()
+    return (input_rows, input_rows - invalid_quotes - unique,
+            input_rows - full_unique, input_rows - raw_unique_times,
+            invalid_quotes, sources)
 
 
 def _percentile(connection: sqlite3.Connection, column: str, percentile: float,
@@ -236,15 +292,21 @@ def _percentile(connection: sqlite3.Connection, column: str, percentile: float,
     return float(first + (second - first) * (rank - lower))
 
 
-def _stats(connection: sqlite3.Connection) -> dict:
+def _clock_stamp(ns: int, server_time_unverified: bool) -> str:
+    return pd.Timestamp(ns, unit="ns").isoformat() if server_time_unverified else pd.Timestamp(
+        ns, unit="ns", tz="UTC").isoformat()
+
+
+def _stats(connection: sqlite3.Connection, server_time_unverified: bool) -> dict:
     count, first_ns, last_ns, minimum, average, maximum = connection.execute(
         "SELECT COUNT(*),MIN(timestamp_ns),MAX(timestamp_ns),"
         "MIN(spread_price),AVG(spread_price),MAX(spread_price) FROM ticks").fetchone()
     if not count:
         raise TickImportError("Source contains no valid ticks.")
+    suffix = "server" if server_time_unverified else "utc"
     values = {"tick_count": count,
-              "first_tick_utc": pd.Timestamp(first_ns, unit="ns", tz="UTC").isoformat(),
-              "last_tick_utc": pd.Timestamp(last_ns, unit="ns", tz="UTC").isoformat(),
+              f"first_tick_{suffix}": _clock_stamp(first_ns, server_time_unverified),
+              f"last_tick_{suffix}": _clock_stamp(last_ns, server_time_unverified),
               "minimum_spread_price": minimum, "mean_spread_price": average,
               "maximum_spread_price": maximum}
     for name, fraction in (("median", .5), ("p75", .75), ("p90", .9),
@@ -277,12 +339,15 @@ def _group_spreads(connection: sqlite3.Connection, group: str, count: int) -> li
     return rows
 
 
-def _write_sorted_ticks_and_bars(connection: sqlite3.Connection, folder: Path) -> tuple[int, list[dict]]:
-    ticks_path = folder / "btcusdm_ticks.csv"
-    bid_path = folder / "btcusdm_bid_15m.csv"
-    ask_path = folder / "btcusdm_ask_15m.csv"
-    header = ["timestamp_utc", "bid", "ask", "spread_price", "spread_pct", "spread_bps"]
-    bar_header = ["timestamp_utc", "open", "high", "low", "close", "tick_count",
+def _write_sorted_ticks_and_bars(connection: sqlite3.Connection, folder: Path,
+                                 server_time_unverified: bool) -> tuple[int, list[dict]]:
+    suffix = "_server_time" if server_time_unverified else ""
+    ticks_path = folder / f"btcusdm_ticks{suffix}.csv"
+    bid_path = folder / f"btcusdm_bid_15m{suffix}.csv"
+    ask_path = folder / f"btcusdm_ask_15m{suffix}.csv"
+    stamp_label = "timestamp_server" if server_time_unverified else "timestamp_utc"
+    header = [stamp_label, "bid", "ask", "spread_price", "spread_pct", "spread_bps"]
+    bar_header = [stamp_label, "open", "high", "low", "close", "tick_count",
                   "spread_open", "spread_median", "spread_mean", "spread_max"]
     gaps = []
     count = 0
@@ -293,7 +358,7 @@ def _write_sorted_ticks_and_bars(connection: sqlite3.Connection, folder: Path) -
         nonlocal count, current, previous_bucket
         if current is None:
             return
-        stamp = pd.Timestamp(current["bucket"], unit="ns", tz="UTC").isoformat()
+        stamp = _clock_stamp(current["bucket"], server_time_unverified)
         spread = current["spreads"]
         descriptors = [len(spread), spread[0], statistics.median(spread),
                        statistics.fmean(spread), max(spread)]
@@ -305,8 +370,10 @@ def _write_sorted_ticks_and_bars(connection: sqlite3.Connection, folder: Path) -
     with (ticks_path.open("w", newline="") as tick_file,
           bid_path.open("w", newline="") as bid_file,
           ask_path.open("w", newline="") as ask_file):
-        tick_writer, bid_writer, ask_writer = (csv.writer(tick_file), csv.writer(bid_file),
-                                               csv.writer(ask_file))
+        tick_writer, bid_writer, ask_writer = (
+            csv.writer(tick_file, lineterminator="\n"),
+            csv.writer(bid_file, lineterminator="\n"),
+            csv.writer(ask_file, lineterminator="\n"))
         tick_writer.writerow(header)
         bid_writer.writerow(bar_header)
         ask_writer.writerow(bar_header)
@@ -314,15 +381,16 @@ def _write_sorted_ticks_and_bars(connection: sqlite3.Connection, folder: Path) -
             "SELECT timestamp_ns,bid,ask,spread_price,spread_pct,spread_bps,bucket_ns "
             "FROM ticks ORDER BY timestamp_ns,seq")
         for ns, bid, ask, spread_price, spread_pct, spread_bps, bucket in cursor:
-            stamp = pd.Timestamp(ns, unit="ns", tz="UTC").isoformat()
+            stamp = _clock_stamp(ns, server_time_unverified)
             tick_writer.writerow([stamp, bid, ask, spread_price, spread_pct, spread_bps])
             if current is None or bucket != current["bucket"]:
                 flush(bid_writer, ask_writer)
                 if previous_bucket is not None and bucket - previous_bucket > STEP_NS:
                     missing = (bucket - previous_bucket) // STEP_NS - 1
+                    gap_suffix = "server" if server_time_unverified else "utc"
                     gaps.append({
-                        "gap_start_utc": pd.Timestamp(previous_bucket + STEP_NS, unit="ns", tz="UTC").isoformat(),
-                        "gap_end_utc": pd.Timestamp(bucket - STEP_NS, unit="ns", tz="UTC").isoformat(),
+                        f"gap_start_{gap_suffix}": _clock_stamp(previous_bucket + STEP_NS, server_time_unverified),
+                        f"gap_end_{gap_suffix}": _clock_stamp(bucket - STEP_NS, server_time_unverified),
                         "missing_15m_intervals": int(missing),
                     })
                 current = {"bucket": bucket, "bid": [bid, bid, bid, bid],
@@ -340,13 +408,14 @@ def _write_sorted_ticks_and_bars(connection: sqlite3.Connection, folder: Path) -
 
 def _write_csv(path: Path, rows: list[dict], columns: list[str]) -> None:
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
 
 def _write_reports(summary: dict, connection: sqlite3.Connection,
-                   report_folder: Path, gaps: list[dict]) -> None:
+                   report_folder: Path, gaps: list[dict],
+                   server_time_unverified: bool) -> None:
     report_folder.mkdir(parents=True, exist_ok=True)
     spread_rows = [{"metric": key, "value": summary[key], "unit": unit}
                    for key, unit in (("minimum_spread_price", "USD/BTC"),
@@ -363,38 +432,59 @@ def _write_reports(summary: dict, connection: sqlite3.Connection,
                ["metric", "value", "unit"])
     hourly = _group_spreads(connection, "utc_hour", 24)
     weekdays = _group_spreads(connection, "utc_weekday", 7)
-    _write_csv(report_folder / "spread_by_hour.csv", hourly,
-               ["utc_hour", "tick_count", "minimum_spread_price", "median_spread_price",
+    hour_label = "server_hour" if server_time_unverified else "utc_hour"
+    weekday_label = "server_weekday" if server_time_unverified else "utc_weekday"
+    _write_csv(report_folder / ("spread_by_server_hour.csv" if server_time_unverified else "spread_by_hour.csv"),
+               [{hour_label: row["utc_hour"], **{k: v for k, v in row.items() if k != "utc_hour"}}
+                for row in hourly],
+               [hour_label, "tick_count", "minimum_spread_price", "median_spread_price",
                 "mean_spread_price", "p95_spread_price", "maximum_spread_price"])
-    _write_csv(report_folder / "spread_by_weekday.csv",
-               [{**row, "weekday_name": WEEKDAYS[row["utc_weekday"]]} for row in weekdays],
-               ["utc_weekday", "weekday_name", "tick_count", "minimum_spread_price",
+    _write_csv(report_folder / ("spread_by_server_weekday.csv" if server_time_unverified else "spread_by_weekday.csv"),
+               [{weekday_label: row["utc_weekday"],
+                 "weekday_name": WEEKDAYS[row["utc_weekday"]],
+                 **{k: v for k, v in row.items() if k != "utc_weekday"}}
+                for row in weekdays],
+               [weekday_label, "weekday_name", "tick_count", "minimum_spread_price",
                 "median_spread_price", "mean_spread_price", "p95_spread_price",
                 "maximum_spread_price"])
-    _write_csv(report_folder / "data_gaps.csv", gaps,
-               ["gap_start_utc", "gap_end_utc", "missing_15m_intervals"])
+    gap_suffix = "server" if server_time_unverified else "utc"
+    _write_csv(report_folder / ("data_gaps_server_time.csv" if server_time_unverified else "data_gaps.csv"),
+               gaps, [f"gap_start_{gap_suffix}", f"gap_end_{gap_suffix}",
+                      "missing_15m_intervals"])
     p99 = summary["p99_spread_price"]
-    extreme = [dict(bucket_utc=pd.Timestamp(bucket, unit="ns", tz="UTC").isoformat(),
+    extreme_column = "bucket_server" if server_time_unverified else "bucket_utc"
+    extreme = [dict(**{extreme_column: _clock_stamp(bucket, server_time_unverified)},
                     extreme_ticks=ticks, maximum_spread_price=maximum)
                for bucket, ticks, maximum in connection.execute(
                    "SELECT bucket_ns,COUNT(*),MAX(spread_price) FROM ticks "
                    "WHERE spread_price>? GROUP BY bucket_ns ORDER BY bucket_ns", (p99,))]
-    _write_csv(report_folder / "extreme_spread_periods.csv", extreme,
-               ["bucket_utc", "extreme_ticks", "maximum_spread_price"])
+    _write_csv(report_folder / ("extreme_spread_periods_server_time.csv" if server_time_unverified
+                                else "extreme_spread_periods.csv"), extreme,
+               [extreme_column, "extreme_ticks", "maximum_spread_price"])
     (report_folder / "tick_import_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     source_names = ", ".join(item["file"] + (f"/{item['member']}" if item["member"] else "")
                              for item in summary["sources"])
+    clock_suffix = "server" if server_time_unverified else "utc"
+    clock_name = "Unverified MT5 broker-server time" if server_time_unverified else "UTC"
     (report_folder / "tick_import_summary.md").write_text(
         "# Exness BTCUSDm tick import\n\n"
         f"Sources: {source_names}\n\n"
-        f"Unique ticks: {summary['tick_count']:,}; exact duplicates removed: {summary['duplicates_removed']:,}.\n\n"
-        f"UTC range: {summary['first_tick_utc']} to {summary['last_tick_utc']}.\n\n"
+        f"Raw rows: {summary['input_rows']:,}; unique ticks: {summary['tick_count']:,}; "
+        f"invalid Bid/Ask rows: {summary['invalid_bid_ask_rows']:,}; "
+        f"duplicate full rows: {summary['duplicate_full_rows']:,}; "
+        f"duplicate timestamps (including full-row duplicates): "
+        f"{summary['duplicate_timestamps_raw']:,}; distinct quotes sharing a timestamp: "
+        f"{summary['same_timestamp_distinct_quotes']:,}.\n\n"
+        f"{clock_name} range: {summary[f'first_tick_{clock_suffix}']} to "
+        f"{summary[f'last_tick_{clock_suffix}']}.\n\n"
         f"Median spread: ${summary['median_spread_price']:.4f}/BTC "
         f"({summary['median_spread_bps']:.3f} bps); mean ${summary['mean_spread_price']:.4f}; "
         f"P95 ${summary['p95_spread_price']:.4f}; maximum ${summary['maximum_spread_price']:.4f}.\n\n"
         f"15-minute Bid and Ask bars: {summary['bid_15m_candles']:,}; "
         f"missing intervals within range: {summary['missing_15m_intervals']:,}.\n\n"
-        "Extreme spread periods above the imported P99 are retained in `extreme_spread_periods.csv`.\n\n"
+        "Extreme spread periods above the imported P99 are retained; none were removed.\n\n" +
+        ("UTC conversion, UTC-hour analysis, and canonical UTC bars are pending timezone verification.\n\n"
+         if server_time_unverified else "") +
         f"Time-weighted spread: {summary['time_weighted_spread_note']}\n"
     )
 
@@ -402,6 +492,8 @@ def _write_reports(summary: dict, connection: sqlite3.Connection,
 def import_tick_sources(paths: list[Path], columns: TickColumns, *,
                         source_timezone: str | None = None,
                         timestamp_unit: str | None = None,
+                        server_time_unverified: bool = False,
+                        skip_incomplete_quotes: bool = False,
                         processed_dir: Path = PROCESSED_DIR,
                         report_dir: Path = REPORT_DIR,
                         chunk_rows: int = 100_000) -> dict:
@@ -424,32 +516,50 @@ def import_tick_sources(paths: list[Path], columns: TickColumns, *,
                 "spread_bps REAL NOT NULL,utc_hour INTEGER NOT NULL,"
                 "utc_weekday INTEGER NOT NULL,bucket_ns INTEGER NOT NULL,"
                 "UNIQUE(timestamp_ns,bid,ask))")
-            input_rows, duplicates, sources = _insert_chunks(
-                connection, paths, columns, source_timezone, timestamp_unit, chunk_rows)
+            connection.execute(
+                "CREATE TABLE raw_events (timestamp_ns INTEGER NOT NULL, "
+                "full_row_hash BLOB NOT NULL UNIQUE)")
+            input_rows, duplicates, full_duplicates, duplicate_timestamps, invalid_quotes, sources = _insert_chunks(
+                connection, paths, columns, source_timezone, timestamp_unit,
+                chunk_rows, server_time_unverified, skip_incomplete_quotes)
             connection.commit()
             connection.execute("CREATE INDEX ticks_time ON ticks(timestamp_ns,seq)")
             connection.execute("CREATE INDEX ticks_spread ON ticks(spread_price)")
             connection.execute("CREATE INDEX ticks_spread_pct ON ticks(spread_pct)")
             connection.execute("CREATE INDEX ticks_hour_spread ON ticks(utc_hour,spread_price)")
             connection.execute("CREATE INDEX ticks_weekday_spread ON ticks(utc_weekday,spread_price)")
-            summary = _stats(connection)
-            candle_count, gaps = _write_sorted_ticks_and_bars(connection, temp)
-            summary.update({"status": "imported", "broker": PROFILE.broker,
+            summary = _stats(connection, server_time_unverified)
+            distinct_valid_timestamps = connection.execute(
+                "SELECT COUNT(DISTINCT timestamp_ns) FROM ticks").fetchone()[0]
+            candle_count, gaps = _write_sorted_ticks_and_bars(
+                connection, temp, server_time_unverified)
+            summary.update({"status": ("imported_server_time_unverified" if server_time_unverified
+                                       else "imported"),
+                            "timezone_status": ("UNVERIFIED MT5 BROKER-SERVER TIME" if server_time_unverified
+                                                else "UTC NORMALIZED"),
+                            "broker": PROFILE.broker,
                             "account_type": PROFILE.account_type,
                             "symbol": PROFILE.mt5_symbol,
                             "source_file": ", ".join(path.name for path in paths),
                             "sources": sources, "input_rows": input_rows,
                             "duplicates_removed": duplicates,
+                            "duplicate_full_rows": full_duplicates,
+                            "duplicate_timestamps_raw": duplicate_timestamps,
+                            "same_timestamp_distinct_quotes": summary["tick_count"] - distinct_valid_timestamps,
+                            "invalid_bid_ask_rows": invalid_quotes,
                             "bid_15m_candles": candle_count,
                             "ask_15m_candles": candle_count,
                             "missing_15m_intervals": sum(g["missing_15m_intervals"] for g in gaps),
                             "gap_count": len(gaps),
                             "imported_at_utc": datetime.now(timezone.utc).isoformat()})
             report_temp = temp / "reports"
-            _write_reports(summary, connection, report_temp, gaps)
+            _write_reports(summary, connection, report_temp, gaps,
+                           server_time_unverified)
         finally:
             connection.close()
-        for name in ("btcusdm_ticks.csv", "btcusdm_bid_15m.csv", "btcusdm_ask_15m.csv"):
+        suffix = "_server_time" if server_time_unverified else ""
+        for name in (f"btcusdm_ticks{suffix}.csv", f"btcusdm_bid_15m{suffix}.csv",
+                     f"btcusdm_ask_15m{suffix}.csv"):
             os.replace(temp / name, processed_dir / name)
         for file in report_temp.iterdir():
             os.replace(file, report_dir / file.name)
@@ -465,8 +575,13 @@ def main() -> None:
     ingest.add_argument("files", nargs="+", type=Path)
     for name in ("timestamp", "bid", "ask"):
         ingest.add_argument(f"--{name}-column", required=True)
+    ingest.add_argument("--time-column", help="Optional separate time-of-day column to combine with date.")
     ingest.add_argument("--source-timezone")
     ingest.add_argument("--timestamp-unit", choices=["s", "ms", "us", "ns"])
+    ingest.add_argument("--server-time-unverified", action="store_true",
+                        help="Preserve naive MT5 wall time without claiming UTC; write provisional outputs.")
+    ingest.add_argument("--skip-incomplete-quotes", action="store_true",
+                        help="Explicitly exclude rows missing Bid or Ask; never forward-fill quotes.")
     args = parser.parse_args()
     if args.command == "inspect":
         for path in args.files:
@@ -475,9 +590,11 @@ def main() -> None:
     else:
         result = import_tick_sources(args.files,
                                      TickColumns(args.timestamp_column, args.bid_column,
-                                                 args.ask_column),
+                                                 args.ask_column, args.time_column),
                                      source_timezone=args.source_timezone,
-                                     timestamp_unit=args.timestamp_unit)
+                                     timestamp_unit=args.timestamp_unit,
+                                     server_time_unverified=args.server_time_unverified,
+                                     skip_incomplete_quotes=args.skip_incomplete_quotes)
         print(json.dumps(result, indent=2))
 
 
