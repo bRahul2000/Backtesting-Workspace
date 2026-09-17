@@ -1,0 +1,1 @@
+model,trades,wins,losses,breakeven,win_rate_percent,gross_pnl,costs,net_pnl,profit_factor,average_r,median_r,expectancy_r,max_dd_percent,maximum_consecutive_losses,average_bars_held,full_stop_percent,breakeven_exit_percent,partial_exit_percent,frozen_entries,open_at_segment_end,development_robust

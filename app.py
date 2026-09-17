@@ -27,6 +27,7 @@ from utils.data_validation import (
 from ui.backtest_dashboard import render_backtest_panel
 from ui.long_history_research import render_long_history_research
 from ui.setup_b_diagnostics import render_setup_b_diagnostics
+from ui.setup_b_exit_research import render_exit_research
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -325,3 +326,4 @@ with research_tab:
     render_long_history_research()
 with diagnostics_tab:
     render_setup_b_diagnostics()
+    render_exit_research()
