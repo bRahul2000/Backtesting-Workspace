@@ -55,3 +55,15 @@ venv/bin/python -m services.exness_ticks import data/exness/raw/your_file.csv --
 When a CSV has naive MT5 timestamps and the server timezone is still unknown, use `--server-time-unverified` with the inspected column names. If date and time are separate, map them with `--timestamp-column` and `--time-column`. This writes separate `*_server_time.csv` tick and bar files. Their timestamps and hour/weekday reports remain broker-server wall time and must **not** be interpreted as UTC. The canonical UTC files are withheld until the offset is verified. The raw file remains unchanged and can be reimported after verification.
 
 The importer preserves the raw file, rejects malformed quotes and timestamps, removes only exact duplicate `(timestamp, bid, ask)` ticks, retains different quotes at the same timestamp, sorts ticks chronologically, and leaves missing 15-minute buckets absent. Some MT5 exports have quote updates with a missing Bid or Ask. These can be explicitly excluded with `--skip-incomplete-quotes`; their count is reported, and no missing quote is forward-filled. Duplicate full raw rows and repeated timestamps are audited separately. The importer writes normalized ticks and Bid/Ask M15 bars under `data/exness/processed/`, plus the broker audit files here. Server-time outputs stay provisional until timezone verification. It does not touch the Bitstamp dataset or reports.
+
+## MT5 multi-sample quote reconstruction
+
+For the verified BTCUSDm MT5 export schema (`<DATE>`, `<TIME>`, `<BID>`, `<ASK>`, `<LAST>`, `<VOLUME>`, `<FLAGS>`), use:
+
+```sh
+venv/bin/python -m services.exness_mt5_samples
+```
+
+This processes each raw CSV independently and preserves file order, including distinct updates with the same timestamp. A populated Bid or Ask replaces only that side of the quote. A blank side retains its latest known value **within the same file and continuous 15-minute sequence**. The state resets at each file boundary and missing 15-minute interval, and no paired quote is emitted before both sides are known. Output tick rows include original raw Bid/Ask, reconstructed Bid/Ask, carry indicators, original MT5 timestamp, and source row number. Each sample has separate Bid and Ask bars. The source timezone remains `EXNESS_MT5_SERVER_TIME_UNVERIFIED`; server-hour and server-calendar summaries are not UTC analysis.
+
+The research-only `historical_spread_price` helper reads spread directly from a reconstructed Bid/Ask quote. The generic execution engine and the frozen strategy remain unchanged. The earlier single-file output records the initial import that excluded partial updates; the multi-sample outputs and reports are the authoritative reconstruction for these five MT5 samples.

@@ -14,10 +14,68 @@ from services.exness_ticks import (
     RAW_DIR, REPORT_DIR, TickColumns, TickImportError, import_tick_sources,
     inspect_tick_source,
 )
+from services.exness_mt5_samples import process_mt5_samples
 
 
 def _money(value) -> str:
     return "—" if value is None else f"${value:,.2f}"
+
+
+def _render_mt5_samples(summary: dict, report_dir: Path) -> None:
+    st.info("MT5 SERVER TIMEZONE — UNVERIFIED. All sample dates and hours are broker-server wall time, not UTC.")
+    cards = st.columns(4)
+    cards[0].metric("Samples", f"{summary['sample_count']:,}")
+    cards[1].metric("Reconstructed ticks", f"{summary['total_ticks']:,}")
+    cards[2].metric("Median spread", _money(summary['combined_spread']['median']))
+    cards[3].metric("P95 spread", _money(summary['combined_spread']['p95']))
+    cards = st.columns(4)
+    cards[0].metric("Maximum spread", _money(summary['combined_spread']['maximum']))
+    cards[1].metric("Median spread bps", f"{summary['median_spread_bps']:.3f}")
+    cards[2].metric("15m intervals", f"{summary['total_15m_intervals']:,}")
+    cards[3].metric("Observed bar-hours", f"{summary['total_observed_hours']:g}")
+    st.caption(f"Commission $0 · Spread from reconstructed historical Bid/Ask quotes · "
+               f"Bid-only {summary['bid_only_updates']:,} · Ask-only {summary['ask_only_updates']:,} · "
+               f"Both-side {summary['both_side_updates']:,} · "
+               f"Missing 15m intervals {summary['total_missing_15m_intervals']:,}")
+    st.caption("Quote state resets at each file and missing 15-minute interval. Raw Bid/Ask fields remain separate from reconstructed values in the processed tick files.")
+    coverage_path = report_dir / "sample_coverage.csv"
+    if coverage_path.exists():
+        coverage = pd.read_csv(coverage_path)
+        st.markdown("**Sample coverage**")
+        view = coverage[["sample_date", "day_type", "filename", "tick_count", "bid_15m_bars",
+                         "missing_15m_intervals", "spread_median", "spread_p95",
+                         "spread_maximum", "median_spread_bps"]]
+        st.dataframe(view, hide_index=True, width="stretch")
+        groups = coverage.groupby("day_type", as_index=False).agg(
+            samples=("sample_id", "count"), ticks=("tick_count", "sum"),
+            intervals=("bid_15m_bars", "sum"))
+        st.markdown("**Weekend vs weekday observations (server calendar)**")
+        st.dataframe(groups, hide_index=True, width="stretch")
+    hourly_path = report_dir / "spread_by_hour.csv"
+    if hourly_path.exists():
+        hourly = pd.read_csv(hourly_path)
+        if not hourly.empty:
+            fig = px.line(hourly, x="server_hour", y="median_spread_price", markers=True,
+                          title="Median spread by MT5 server hour", template="plotly_dark")
+            fig.update_xaxes(dtick=1)
+            st.plotly_chart(fig, width="stretch")
+    distribution_path = report_dir / "spread_distribution.csv"
+    if distribution_path.exists():
+        distribution = pd.read_csv(distribution_path)
+        price = distribution.loc[distribution.unit == "USD/BTC"]
+        if not price.empty:
+            fig = px.bar(price, x="metric", y="value",
+                         title="Combined historical spread distribution", template="plotly_dark")
+            fig.update_xaxes(tickangle=-30)
+            st.plotly_chart(fig, width="stretch")
+    gaps_path = report_dir / "sample_data_gaps.csv"
+    if gaps_path.exists():
+        with st.expander("Sample gaps and import details", expanded=False):
+            gaps = pd.read_csv(gaps_path)
+            st.caption(f"{len(gaps):,} internal gaps across {summary['sample_count']} separate samples.")
+            if not gaps.empty:
+                st.dataframe(gaps, hide_index=True, width="stretch")
+            st.dataframe(pd.DataFrame(summary["samples"]), hide_index=True, width="stretch")
 
 
 def render_exness_broker_data(report_dir: Path = REPORT_DIR,
@@ -34,10 +92,13 @@ def render_exness_broker_data(report_dir: Path = REPORT_DIR,
                f"Commission $0 · Spread: floating historical Bid/Ask · Chart: Bid · "
                f"Swap dollar conversion: {PROFILE.swap_usd_conversion}")
 
-    summary_path = report_dir / "tick_import_summary.json"
+    multi_path = report_dir / "multi_sample_summary.json"
+    summary_path = multi_path if multi_path.exists() else report_dir / "tick_import_summary.json"
     summary = json.loads(summary_path.read_text()) if summary_path.exists() else {"status": "not_imported"}
     server_time = summary.get("status") == "imported_server_time_unverified"
-    if summary.get("status") in ("imported", "imported_server_time_unverified"):
+    if summary.get("status") == "mt5_samples_reconstructed":
+        _render_mt5_samples(summary, report_dir)
+    elif summary.get("status") in ("imported", "imported_server_time_unverified"):
         clock = "server" if server_time else "utc"
         clock_label = "unverified MT5 broker-server time" if server_time else "UTC"
         if server_time:
@@ -126,6 +187,19 @@ def render_exness_broker_data(report_dir: Path = REPORT_DIR,
             st.caption(f"{label}: {', '.join(schema.columns)} · delimiter {schema.delimiter!r}")
             if schema.sample:
                 st.dataframe(pd.DataFrame(schema.sample), hide_index=True, width="stretch")
+        mt5_columns = ("<DATE>", "<TIME>", "<BID>", "<ASK>", "<LAST>", "<VOLUME>", "<FLAGS>")
+        if all(schema.member is None and schema.columns == mt5_columns for schema in schemas):
+            st.caption("MT5 mode reconstructs partial Bid/Ask updates in original row order. Each file is a separate sample; time remains unverified broker-server time.")
+            if st.button("Reconstruct MT5 BTCUSDm Samples", type="primary"):
+                try:
+                    with st.spinner("Reconstructing independent MT5 quote samples…"):
+                        imported = process_mt5_samples(paths)
+                    st.success(f"Processed {imported['sample_count']} samples and "
+                               f"{imported['total_ticks']:,} complete quote states.")
+                    st.rerun()
+                except (TickImportError, OSError, ValueError) as exc:
+                    st.error(f"MT5 sample processing stopped: {exc}")
+            return
         common = sorted(set.intersection(*(set(schema.columns) for schema in schemas)))
         options = ["Choose column", *common]
         cols = st.columns(2)

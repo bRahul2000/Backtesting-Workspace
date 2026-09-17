@@ -7,5 +7,4 @@ p90_spread_price,10.0,USD/BTC
 p95_spread_price,10.0,USD/BTC
 p99_spread_price,10.0,USD/BTC
 maximum_spread_price,10.0,USD/BTC
-median_spread_pct,0.015866466548213016,%
-median_spread_bps,1.5866466548213016,bps
+median_spread_bps,1.3275018830614211,bps

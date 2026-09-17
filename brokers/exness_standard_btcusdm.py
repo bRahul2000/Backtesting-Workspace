@@ -7,6 +7,7 @@ unfilled deliberately.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Literal
 
 
@@ -40,6 +41,13 @@ class ExnessStandardBTCUSDm:
 
 
 PROFILE = ExnessStandardBTCUSDm()
+
+
+def historical_spread_price(*, bid: float, ask: float) -> float:
+    """Read spread from a reconstructed historical quote; never assume a fixed value."""
+    if not math.isfinite(bid) or not math.isfinite(ask) or bid <= 0 or ask < bid:
+        raise ValueError("A valid historical Bid/Ask quote is required.")
+    return ask - bid
 
 
 def quote_side(direction: TradeSide, event: Literal["entry", "close", "pending_trigger", "stop_target"]) -> QuoteSide:
