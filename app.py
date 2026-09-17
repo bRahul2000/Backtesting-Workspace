@@ -150,7 +150,7 @@ def display_dataset(data: pd.DataFrame) -> None:
 
 
 st.title("BTC Strategy Backtester")
-st.caption("Download and validate BTC/USD data, then run the demo engine test strategy.")
+st.caption("Download and validate BTC/USD data, then run the demo or BTC V2.2 Setup B backtest.")
 
 st.subheader("Market Data")
 symbol_col, timeframe_col, location_col = st.columns([1, 1, 2])

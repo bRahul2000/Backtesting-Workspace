@@ -1,11 +1,17 @@
-"""Chronological backtest loop with close-confirmed signals and next-open fills."""
+"""Chronological backtest loop with next-open and pending-stop entries."""
 from __future__ import annotations
+
+from dataclasses import replace
 
 import pandas as pd
 
-from engine.execution import close_position, exit_decision, open_position, validate_settings
+from engine.execution import (
+    close_position, create_pending_order, exit_decision, fill_pending_order,
+    open_position, validate_settings,
+)
 from engine.models import (
-    BacktestIssue, BacktestResult, BacktestSettings, Candle, EquityPoint, Signal,
+    BacktestIssue, BacktestResult, BacktestSettings, CancelPendingOrder, Candle,
+    EntryModel, EquityPoint, ExecutionState, OrderEvent, PendingOrder, Signal,
 )
 from strategies.base import Strategy
 from utils.data_validation import OHLCV_COLUMNS, invalid_ohlcv_mask
@@ -36,6 +42,19 @@ def _utc_timestamp(value: pd.Timestamp | None) -> pd.Timestamp | None:
     if pd.isna(timestamp):
         raise ValueError("Trading window boundaries must be valid timestamps.")
     return timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+
+
+def _order_event(order: PendingOrder, status: str, *, reason: str | None = None,
+                 fill_time: pd.Timestamp | None = None,
+                 fill_price: float | None = None) -> OrderEvent:
+    return OrderEvent(
+        signal_time=order.signal_time, created_time=order.created_time,
+        direction=order.direction,
+        trigger_price=order.trigger_price, stop_price=order.stop_price,
+        expiry_time=order.expiry_time, expiry_bar_index=order.expiry_bar_index,
+        status=status, cancel_reason=reason, fill_time=fill_time,
+        fill_price=fill_price, setup_id=order.setup_id,
+    )
 
 
 def run_backtest(data: pd.DataFrame, strategy: Strategy,
@@ -71,7 +90,9 @@ def run_backtest(data: pd.DataFrame, strategy: Strategy,
     peak = balance
     result.equity_curve.append(EquityPoint(None, None, balance, peak, 0.0, 0.0))
     strategy.reset()
-    pending: tuple[Signal, pd.Timestamp] | None = None
+    strategy.on_backtest_window(start, end)
+    pending_next: tuple[Signal, pd.Timestamp] | None = None
+    pending_stop: PendingOrder | None = None
     position = None
     previous_time = None
     for index, candle in enumerate(candles):
@@ -81,29 +102,69 @@ def run_backtest(data: pd.DataFrame, strategy: Strategy,
                     f"An open position crosses missing candles before {candle.timestamp}; "
                     "its exit cannot be determined. Select a contiguous date range."
                 )
-            if pending is not None:
+            if pending_next is not None:
                 result.issues.append(BacktestIssue(candle.timestamp, "Pending signal cancelled across a data gap."))
-                pending = None
-            strategy.reset()
+                pending_next = None
+            if pending_stop is not None:
+                result.order_events.append(_order_event(
+                    pending_stop, "cancelled", reason="Data gap before trigger."))
+                result.issues.append(BacktestIssue(candle.timestamp, "Pending stop order cancelled across a data gap."))
+                pending_stop = None
+            strategy.on_data_gap()
             result.issues.append(BacktestIssue(candle.timestamp, "Dataset has a time gap; indicators restarted without invented candles."))
         previous_time = candle.timestamp
 
-        if pending is not None:
-            signal, signal_time = pending
-            pending = None
+        entered_intrabar = False
+        opened_position = None
+        closed_trade = None
+        if pending_next is not None:
+            signal, signal_time = pending_next
+            pending_next = None
             try:
                 position = open_position(signal, signal_time, candle.timestamp,
                                          candle.open, index,
                                          len(result.trades) + 1, balance, settings)
             except (ValueError, TypeError, OverflowError) as exc:
                 result.issues.append(BacktestIssue(candle.timestamp, f"Signal rejected at entry: {exc}"))
+            else:
+                opened_position = position
+        elif pending_stop is not None:
+            order = pending_stop
+            if index > order.expiry_bar_index:
+                result.order_events.append(_order_event(
+                    order, "expired", reason="Expiry bar passed without a trigger."))
+                pending_stop = None
+            else:
+                try:
+                    position = fill_pending_order(order, candle, index,
+                                                  len(result.trades) + 1, settings)
+                except (ValueError, TypeError, OverflowError) as exc:
+                    result.order_events.append(_order_event(order, "cancelled", reason=str(exc)))
+                    result.issues.append(BacktestIssue(candle.timestamp, f"Pending fill rejected: {exc}"))
+                    pending_stop = None
+                else:
+                    if position is not None:
+                        opened_position = position
+                        entered_intrabar = (not position.gap_through_trigger and
+                            ((position.direction.value == "LONG" and candle.open < order.trigger_price)
+                             or (position.direction.value == "SHORT" and candle.open > order.trigger_price)))
+                        result.order_events.append(_order_event(
+                            order, "triggered", fill_time=candle.timestamp,
+                            fill_price=position.entry_price))
+                        pending_stop = None
+                    elif index == order.expiry_bar_index:
+                        result.order_events.append(_order_event(
+                            order, "expired", reason="Not triggered by the end of the expiry bar."))
+                        pending_stop = None
 
         if position is not None:
-            decision = exit_decision(position, candle, settings.same_bar_resolution)
+            decision = exit_decision(position, candle, settings.same_bar_resolution,
+                                     entered_intrabar=entered_intrabar)
             if decision is not None:
                 raw_exit, reason = decision
                 trade = close_position(position, candle, index, raw_exit, reason, settings)
                 result.trades.append(trade)
+                closed_trade = trade
                 balance += trade.pnl
                 peak = max(peak, balance)
                 drawdown = peak - balance
@@ -115,20 +176,57 @@ def run_backtest(data: pd.DataFrame, strategy: Strategy,
 
         # This call occurs only after execution for this candle. The strategy
         # receives exactly this completed candle, never future rows.
+        strategy.on_execution_state(ExecutionState(
+            balance=balance, pending_order=pending_stop, position=position,
+            opened_position=opened_position, closed_trade=closed_trade,
+        ))
         signal = strategy.on_candle(candle)
         if start is not None and candle.timestamp < start:
             continue
-        if signal is not None:
+        if isinstance(signal, CancelPendingOrder):
+            if not signal.reason.strip():
+                result.issues.append(BacktestIssue(candle.timestamp, "Pending cancellation requires a reason."))
+            elif pending_stop is None:
+                result.issues.append(BacktestIssue(candle.timestamp, "No pending stop order exists to cancel."))
+            elif signal.setup_id is not None and signal.setup_id != pending_stop.setup_id:
+                result.issues.append(BacktestIssue(candle.timestamp, "Cancellation setup ID did not match the pending order."))
+            else:
+                result.order_events.append(_order_event(pending_stop, "cancelled", reason=signal.reason))
+                pending_stop = None
+        elif signal is not None:
             if not isinstance(signal, Signal):
                 result.issues.append(BacktestIssue(candle.timestamp, "Strategy returned an invalid signal object."))
-            elif position is not None or pending is not None:
+            elif position is not None:
                 result.issues.append(BacktestIssue(candle.timestamp, "Signal ignored while a position is open."))
-            elif index == len(candles) - 1:
+            elif pending_next is not None or pending_stop is not None:
+                result.issues.append(BacktestIssue(candle.timestamp, "Signal ignored while an entry order is pending."))
+            elif index == len(candles) - 1 and signal.entry_model is EntryModel.NEXT_OPEN:
                 result.issues.append(BacktestIssue(candle.timestamp + pd.Timedelta(minutes=15), "Final signal has no next candle for entry."))
+            elif signal.entry_model is EntryModel.NEXT_OPEN:
+                signal = replace(signal, setup_id=signal.setup_id or type(strategy).__name__)
+                pending_next = (signal, candle.timestamp + pd.Timedelta(minutes=15))
+            elif signal.entry_model is EntryModel.STOP_ENTRY_PENDING:
+                signal = replace(signal, setup_id=signal.setup_id or type(strategy).__name__)
+                try:
+                    pending_stop = create_pending_order(signal, candle, index, balance, settings)
+                except (ValueError, TypeError, OverflowError) as exc:
+                    result.issues.append(BacktestIssue(candle.timestamp, f"Pending order rejected: {exc}"))
             else:
-                pending = (signal, candle.timestamp + pd.Timedelta(minutes=15))
+                result.issues.append(BacktestIssue(candle.timestamp, "Unknown entry model in strategy signal."))
 
     result.open_position = position
+    if pending_stop is not None:
+        final_action = strategy.on_backtest_end(pending_stop)
+        if isinstance(final_action, CancelPendingOrder) and final_action.reason.strip():
+            if final_action.setup_id is None or final_action.setup_id == pending_stop.setup_id:
+                result.order_events.append(_order_event(
+                    pending_stop, "cancelled", reason=final_action.reason))
+                pending_stop = None
+    result.pending_order = pending_stop
+    if pending_stop is not None:
+        result.order_events.append(_order_event(
+            pending_stop, "active_at_end", reason="Dataset ended before fill or expiry."))
+        result.issues.append(BacktestIssue(candles[-1].timestamp, "Pending order remains active at dataset end."))
     if position is not None:
         result.issues.append(BacktestIssue(candles[-1].timestamp, "Position remains open at dataset end; unrealized PnL is excluded."))
     return result

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from math import ceil, isinf
+from dataclasses import replace
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -11,9 +12,33 @@ from engine.backtester import run_backtest
 from engine.metrics import calculate_metrics
 from engine.models import BacktestResult, BacktestSettings, RiskCalculation, RiskMode, SameBarResolution
 from strategies.demo_strategy import DemoEmaCrossover, DemoParameters
+from strategies.btc_v2_setup_b import BtcV2SetupB, STAGES
+from ui.btc_setup_b_controls import render_setup_b_controls
 
 
 MAX_CHART_CANDLES = 2_000
+STRATEGY_OPTIONS = ("Demo EMA Strategy", "BTC V2.2 — Setup B Trend Breakout")
+
+
+def selected_strategy(name: str, btc_params: object, demo_params: object):
+    if name == STRATEGY_OPTIONS[1]:
+        return BtcV2SetupB(btc_params)
+    if name == STRATEGY_OPTIONS[0]:
+        return DemoEmaCrossover(demo_params)
+    raise ValueError(f"Unknown strategy: {name}")
+
+
+def setup_b_diagnostic_counts(result: BacktestResult,
+                              diagnostics: dict[str, int]) -> dict[str, int]:
+    counts = {stage: diagnostics.get(stage, 0) for stage in STAGES}
+    counts.update({
+        "Pending Orders Created": len(result.order_events),
+        "Pending Filled": sum(e.status == "triggered" for e in result.order_events),
+        "Pending Expired": sum(e.status == "expired" for e in result.order_events),
+        "Pending Cancelled": sum(e.status == "cancelled" for e in result.order_events),
+        "Completed Trades": len(result.trades),
+    })
+    return counts
 
 
 def trades_table(result: BacktestResult) -> pd.DataFrame:
@@ -21,7 +46,10 @@ def trades_table(result: BacktestResult) -> pd.DataFrame:
                "Stop", "Target", "Exit Time", "Exit Price", "Exit Reason", "Quantity",
                "Risk $", "Net PnL $", "Net PnL %", "R Multiple", "Bars Held",
                "Planned Risk $", "Estimated Stop Loss $", "Realized PnL $",
-               "Realized R", "Leverage Capped"]
+               "Realized R", "Leverage Capped", "Entry Model",
+               "Pending Trigger Price", "Pending Created Time", "Pending Expiry Time",
+               "Pending Expiry Bar", "Actual Fill Time", "Actual Fill Price",
+               "Gap Through Trigger", "Entry Gap Amount", "Setup / Strategy ID"]
     rows = []
     for trade in result.trades:
         rows.append([
@@ -31,8 +59,26 @@ def trades_table(result: BacktestResult) -> pd.DataFrame:
             trade.pnl, trade.pnl_percent, trade.r_multiple, trade.bars_held,
             trade.planned_risk, trade.estimated_stop_loss, trade.pnl,
             trade.realized_r, trade.leverage_capped,
+            trade.entry_model.value, trade.pending_trigger_price,
+            trade.pending_created_time, trade.pending_expiry_time,
+            trade.pending_expiry_bar_index, trade.actual_fill_time,
+            trade.actual_fill_price, trade.gap_through_trigger,
+            trade.entry_gap_amount, trade.setup_id,
         ])
     return pd.DataFrame(rows, columns=columns)
+
+
+def order_events_table(result: BacktestResult) -> pd.DataFrame:
+    columns = ["Signal Time", "Direction", "Trigger", "Stop", "Pending Created Time",
+               "Expiry Time", "Expiry Bar", "Status", "Cancel Reason",
+               "Fill Time", "Fill Price", "Setup / Strategy ID"]
+    return pd.DataFrame([
+        [event.signal_time, event.direction.value, event.trigger_price,
+         event.stop_price, event.created_time, event.expiry_time,
+         event.expiry_bar_index, event.status, event.cancel_reason,
+         event.fill_time, event.fill_price, event.setup_id]
+        for event in result.order_events
+    ], columns=columns)
 
 
 def equity_figure(result: BacktestResult, first_time: pd.Timestamp) -> go.Figure:
@@ -101,10 +147,12 @@ def _money(value: float) -> str:
     return f"${value:,.2f}"
 
 
-def render_results(result: BacktestResult, data: pd.DataFrame, start, end) -> None:
+def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
+                   strategy_name: str = "Demo EMA Strategy",
+                   diagnostics: dict[str, int] | None = None) -> None:
     metrics = calculate_metrics(result)
     st.header("Backtest Results")
-    st.caption(f"DEMO / ENGINE TEST STRATEGY · {start} to {end} UTC · Closed-trade equity")
+    st.caption(f"{strategy_name} · {start} to {end} UTC · Closed-trade equity")
     top = st.columns(3)
     top[0].metric("Total Trades", f"{metrics.total_trades:,}")
     top[1].metric("Win Rate", f"{metrics.win_rate_percent:.2f}%")
@@ -170,6 +218,23 @@ def render_results(result: BacktestResult, data: pd.DataFrame, start, end) -> No
     st.download_button("Download Trades CSV", table.to_csv(index=False).encode("utf-8"),
                        file_name="demo_backtest_trades.csv", mime="text/csv",
                        disabled=table.empty)
+    if result.order_events:
+        st.subheader("Pending Order Diagnostics")
+        st.caption("Triggered, expired, cancelled, and still-active orders are listed separately from completed trades.")
+        st.dataframe(order_events_table(result), width="stretch", hide_index=True)
+    if diagnostics is not None:
+        st.subheader("Signal Diagnostics / Filter Funnel")
+        counts = setup_b_diagnostic_counts(result, diagnostics)
+        labels = [*STAGES, "Pending Orders Created", "Pending Filled",
+                  "Pending Expired", "Pending Cancelled", "Completed Trades"]
+        diagnostic_table = pd.DataFrame(
+            [(label, counts.get(label, 0)) for label in labels],
+            columns=["Stage", "Candles / Orders / Trades"],
+        )
+        st.dataframe(diagnostic_table, width="stretch", hide_index=True)
+        st.download_button("Download Signal Diagnostics CSV",
+                           diagnostic_table.to_csv(index=False).encode("utf-8"),
+                           file_name="btc_setup_b_diagnostics.csv", mime="text/csv")
 
 
 def render_backtest_panel(data: pd.DataFrame) -> None:
@@ -182,6 +247,10 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
     latest = data["timestamp"].iloc[-1].date()
     recent_start = max(earliest, latest - pd.Timedelta(days=30))
     with st.form("backtest_form"):
+        strategy_name = st.selectbox(
+            "Strategy", STRATEGY_OPTIONS,
+        )
+        btc_selected = strategy_name.startswith("BTC")
         date_cols = st.columns(2)
         start = date_cols[0].date_input("Backtest Start Date", value=recent_start,
                                        min_value=earliest, max_value=latest)
@@ -190,11 +259,17 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
         a, b, c = st.columns(3)
         starting_balance = a.number_input("Starting Balance ($)", min_value=0.01, value=10000.0)
         risk_mode = b.selectbox("Risk Mode", [mode.value for mode in RiskMode])
-        risk_percent = c.number_input("Risk Per Trade (%)", min_value=0.001, value=1.0)
+        risk_percent = c.number_input("Risk Per Trade (%)", min_value=0.001,
+                                      value=0.25 if btc_selected else 1.0,
+                                      key="btc_risk_percent" if btc_selected else "demo_risk_percent")
         d, e, f = st.columns(3)
         fixed_risk = d.number_input("Fixed Risk ($)", min_value=0.01, value=100.0)
-        rr = e.number_input("Risk Reward Ratio", min_value=0.01, value=2.0)
-        commission = f.number_input("Commission (%)", min_value=0.0, max_value=99.0, value=0.0)
+        rr = e.number_input("Risk Reward Ratio", min_value=0.01,
+                            value=3.0 if btc_selected else 2.0,
+                            key="btc_reward" if btc_selected else "demo_reward")
+        commission = f.number_input("Commission (%)", min_value=0.0, max_value=99.0,
+                                     value=0.05 if btc_selected else 0.0,
+                                     key="btc_commission" if btc_selected else "demo_commission")
         g, h = st.columns(2)
         slippage = g.number_input("Slippage (%)", min_value=0.0, max_value=99.0, value=0.0)
         same_bar = h.selectbox("Same-Bar Resolution", [mode.value for mode in SameBarResolution])
@@ -214,13 +289,17 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
             "including configured costs, near the selected risk amount. "
             "An adverse gap can still cause a larger loss."
         )
-        st.subheader("DEMO STRATEGY PARAMETERS")
-        st.warning("DEMO / ENGINE TEST STRATEGY. EMA crossover is used to validate the engine, not as a profitable trading strategy.")
-        p1, p2, p3, p4 = st.columns(4)
-        fast = p1.number_input("Fast EMA", min_value=1, value=20, step=1)
-        slow = p2.number_input("Slow EMA", min_value=2, value=50, step=1)
-        atr_length = p3.number_input("ATR Length", min_value=1, value=14, step=1)
-        stop_multiple = p4.number_input("Stop ATR Multiplier", min_value=0.01, value=1.5)
+        if btc_selected:
+            st.caption("Pine commission defaults to 0.05%. Its two-tick slippage cannot be expressed exactly by the audited percentage-slippage model; set a percentage above if desired.")
+            btc_params = render_setup_b_controls()
+        else:
+            st.subheader("DEMO STRATEGY PARAMETERS")
+            st.warning("DEMO / ENGINE TEST STRATEGY. EMA crossover is used to validate the engine, not as a profitable trading strategy.")
+            p1, p2, p3, p4 = st.columns(4)
+            fast = p1.number_input("Fast EMA", min_value=1, value=20, step=1)
+            slow = p2.number_input("Slow EMA", min_value=2, value=50, step=1)
+            atr_length = p3.number_input("ATR Length", min_value=1, value=14, step=1)
+            stop_multiple = p4.number_input("Stop ATR Multiplier", min_value=0.01, value=1.5)
         clicked = st.form_submit_button("RUN BACKTEST", type="primary")
 
     if clicked:
@@ -231,7 +310,12 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
                                 (data["timestamp"].dt.date <= end)].reset_index(drop=True)
             if selected.empty:
                 raise ValueError("The selected dates have no saved candles.")
-            params = DemoParameters(int(fast), int(slow), int(atr_length), float(stop_multiple))
+            if btc_selected:
+                params = replace(btc_params, reward_multiple=float(rr))
+                strategy = selected_strategy(strategy_name, params, None)
+            else:
+                params = DemoParameters(int(fast), int(slow), int(atr_length), float(stop_multiple))
+                strategy = selected_strategy(strategy_name, None, params)
             settings = BacktestSettings(
                 starting_balance=float(starting_balance), risk_mode=RiskMode(risk_mode),
                 risk_percent=float(risk_percent), fixed_risk_dollars=float(fixed_risk),
@@ -242,9 +326,11 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
             )
             start_time = pd.Timestamp(start, tz="UTC")
             end_time = pd.Timestamp(end, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(minutes=15)
-            result = run_backtest(data, DemoEmaCrossover(params), settings,
+            result = run_backtest(data, strategy, settings,
                                   trade_start=start_time, trade_end=end_time)
-            st.session_state["demo_backtest"] = (result, selected, start, end)
+            diagnostics = dict(strategy.diagnostics) if btc_selected else None
+            st.session_state["demo_backtest"] = (result, selected, start, end,
+                                                  strategy_name, diagnostics)
         except ValueError as exc:
             st.error(f"Backtest could not run: {exc}")
     if "demo_backtest" in st.session_state:

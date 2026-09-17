@@ -1,0 +1,4483 @@
+//@version=6
+
+strategy(
+
+     "BTC Pullback + Trend Breakout 3R — V2.2.0",
+
+     shorttitle = "BTC Pullback + Breakout V2.2",
+
+     overlay = true,
+
+     initial_capital = 100000,
+
+     currency = currency.USD,
+
+     default_qty_type = strategy.fixed,
+
+     default_qty_value = 1,
+
+     commission_type = strategy.commission.percent,
+
+     commission_value = 0.05,
+
+     slippage = 2,
+
+     pyramiding = 0,
+
+     process_orders_on_close = false,
+
+     calc_on_order_fills = true,
+
+     calc_on_every_tick = false,
+
+     max_labels_count = 500,
+
+     max_lines_count = 500
+
+ )
+
+// ============================================================================
+
+// BTC PULLBACK + TREND BREAKOUT 3R
+
+// VERSION 2.2.0
+
+// ============================================================================
+
+//
+
+// SETUP A:
+
+// Existing optimized pullback/rejection model.
+
+// FROZEN.
+
+//
+
+// SETUP B:
+
+// New higher-frequency trend breakout:
+
+//
+
+// H1 confirmed trend
+
+//        ↓
+
+// M15 EMA20 / EMA50 alignment
+
+//        ↓
+
+// ADX filter
+
+//        ↓
+
+// Break previous N-bar structure
+
+//        ↓
+
+// Strong directional candle
+
+//        ↓
+
+// RSI / anti-chase checks
+
+//        ↓
+
+// Stop-entry above/below breakout candle
+
+//        ↓
+
+// Structural stop
+
+//        ↓
+
+// Fixed 3R
+
+//
+
+// ============================================================================
+
+
+
+// ============================================================================
+
+// 01 — INPUT GROUPS
+
+// ============================================================================
+
+string GRP_GENERAL = "01 — General"
+
+string GRP_HTF     = "02 — Higher Timeframe"
+
+string GRP_M15     = "03 — M15 Indicators"
+
+string GRP_A       = "04 — Setup A: Pullback"
+
+string GRP_B       = "05 — Setup B: Trend Breakout"
+
+string GRP_EXIT    = "06 — Stop / Target"
+
+string GRP_RISK    = "07 — Position Sizing"
+
+string GRP_DAILY   = "08 — Daily Equity Risk"
+
+string GRP_MONTHLY = "09 — Monthly Equity Risk"
+
+string GRP_SESSION = "10 — Session"
+
+string GRP_TEST    = "11 — Internal Backtest"
+
+string GRP_VISUAL  = "12 — Visuals"
+
+
+
+// ============================================================================
+
+// 02 — GENERAL
+
+// ============================================================================
+
+bool enableLongs =
+
+     input.bool(
+
+         true,
+
+         "Enable Longs",
+
+         group = GRP_GENERAL
+
+     )
+
+bool enableShorts =
+
+     input.bool(
+
+         true,
+
+         "Enable Shorts",
+
+         group = GRP_GENERAL
+
+     )
+
+bool enableSetupA =
+
+     input.bool(
+
+         true,
+
+         "Enable Setup A — Pullback",
+
+         group = GRP_GENERAL
+
+     )
+
+bool enableSetupB =
+
+     input.bool(
+
+         true,
+
+         "Enable Setup B — Trend Breakout",
+
+         group = GRP_GENERAL
+
+     )
+
+
+
+// ============================================================================
+
+// 03 — HIGHER TIMEFRAME
+
+// ============================================================================
+
+string higherTF =
+
+     input.timeframe(
+
+         "60",
+
+         "Higher Timeframe",
+
+         group = GRP_HTF
+
+     )
+
+int htfFastLength =
+
+     input.int(
+
+         50,
+
+         "H1 Fast EMA",
+
+         minval = 1,
+
+         group = GRP_HTF
+
+     )
+
+int htfSlowLength =
+
+     input.int(
+
+         200,
+
+         "H1 Slow EMA",
+
+         minval = 2,
+
+         group = GRP_HTF
+
+     )
+
+int htfSlopeLookback =
+
+     input.int(
+
+         5,
+
+         "EMA200 Slope Lookback",
+
+         minval = 1,
+
+         maxval = 50,
+
+         group = GRP_HTF
+
+     )
+
+
+
+// ============================================================================
+
+// 04 — M15 INDICATORS
+
+// ============================================================================
+
+int fastEmaLength =
+
+     input.int(
+
+         20,
+
+         "Fast EMA",
+
+         minval = 1,
+
+         group = GRP_M15
+
+     )
+
+int slowEmaLength =
+
+     input.int(
+
+         50,
+
+         "Slow EMA",
+
+         minval = 2,
+
+         group = GRP_M15
+
+     )
+
+int rsiLength =
+
+     input.int(
+
+         14,
+
+         "RSI Length",
+
+         minval = 2,
+
+         group = GRP_M15
+
+     )
+
+int diLength =
+
+     input.int(
+
+         14,
+
+         "DI Length",
+
+         minval = 2,
+
+         group = GRP_M15
+
+     )
+
+int adxSmoothing =
+
+     input.int(
+
+         14,
+
+         "ADX Smoothing",
+
+         minval = 2,
+
+         group = GRP_M15
+
+     )
+
+float minimumAdx =
+
+     input.float(
+
+         18.0,
+
+         "Minimum ADX",
+
+         minval = 0,
+
+         step = 0.5,
+
+         group = GRP_M15
+
+     )
+
+int atrLength =
+
+     input.int(
+
+         14,
+
+         "ATR Length",
+
+         minval = 2,
+
+         group = GRP_M15
+
+     )
+
+
+
+// ============================================================================
+
+// 05 — SETUP A: FROZEN PULLBACK MODEL
+
+// ============================================================================
+
+int aTouchLookback =
+
+     input.int(
+
+         5,
+
+         "EMA Touch Lookback",
+
+         minval = 1,
+
+         maxval = 20,
+
+         group = GRP_A
+
+     )
+
+float aLongRsiMin =
+
+     input.float(
+
+         54,
+
+         "Long RSI Minimum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_A
+
+     )
+
+float aLongRsiMax =
+
+     input.float(
+
+         68,
+
+         "Long RSI Maximum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_A
+
+     )
+
+float aShortRsiMin =
+
+     input.float(
+
+         32,
+
+         "Short RSI Minimum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_A
+
+     )
+
+float aShortRsiMax =
+
+     input.float(
+
+         46,
+
+         "Short RSI Maximum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_A
+
+     )
+
+float aLongCloseLocation =
+
+     input.float(
+
+         0.60,
+
+         "Long Close Location Minimum",
+
+         minval = 0.50,
+
+         maxval = 1.00,
+
+         step = 0.05,
+
+         group = GRP_A
+
+     )
+
+float aShortCloseLocation =
+
+     input.float(
+
+         0.40,
+
+         "Short Close Location Maximum",
+
+         minval = 0,
+
+         maxval = 0.50,
+
+         step = 0.05,
+
+         group = GRP_A
+
+     )
+
+float aEma50ToleranceATR =
+
+     input.float(
+
+         0.50,
+
+         "EMA50 Rejection Tolerance ATR",
+
+         minval = 0,
+
+         step = 0.05,
+
+         group = GRP_A
+
+     )
+
+bool aUseLargeCandleFilter =
+
+     input.bool(
+
+         true,
+
+         "Use Large Candle Filter",
+
+         group = GRP_A
+
+     )
+
+float aMaximumRangeATR =
+
+     input.float(
+
+         2.50,
+
+         "Maximum Rejection Range ATR",
+
+         minval = 0.5,
+
+         step = 0.1,
+
+         group = GRP_A
+
+     )
+
+float aEntryBufferATR =
+
+     input.float(
+
+         0.20,
+
+         "Entry Buffer ATR",
+
+         minval = 0,
+
+         step = 0.01,
+
+         group = GRP_A
+
+     )
+
+float aStopBufferATR =
+
+     input.float(
+
+         0.30,
+
+         "Stop Buffer ATR",
+
+         minval = 0,
+
+         step = 0.01,
+
+         group = GRP_A
+
+     )
+
+int aPendingBars =
+
+     input.int(
+
+         2,
+
+         "Pending Trigger Bars",
+
+         minval = 1,
+
+         maxval = 10,
+
+         group = GRP_A
+
+     )
+
+
+
+// ============================================================================
+
+// 06 — SETUP B: NEW TREND BREAKOUT
+
+// ============================================================================
+
+int bBreakoutLookback =
+
+     input.int(
+
+         5,
+
+         "Structure Break Lookback",
+
+         minval = 3,
+
+         maxval = 12,
+
+         group = GRP_B
+
+     )
+
+float bMinimumBodyPct =
+
+     input.float(
+
+         0.50,
+
+         "Breakout Candle Minimum Body %",
+
+         minval = 0.30,
+
+         maxval = 1.00,
+
+         step = 0.05,
+
+         group = GRP_B
+
+     )
+
+float bMinimumRangeATR =
+
+     input.float(
+
+         0.60,
+
+         "Breakout Candle Minimum Range ATR",
+
+         minval = 0.10,
+
+         maxval = 5,
+
+         step = 0.10,
+
+         group = GRP_B
+
+     )
+
+float bMaximumRangeATR =
+
+     input.float(
+
+         2.75,
+
+         "Breakout Candle Maximum Range ATR",
+
+         minval = 0.50,
+
+         maxval = 10,
+
+         step = 0.25,
+
+         group = GRP_B
+
+     )
+
+float bLongRsiMin =
+
+     input.float(
+
+         50,
+
+         "Long RSI Minimum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_B
+
+     )
+
+float bLongRsiMax =
+
+     input.float(
+
+         75,
+
+         "Long RSI Maximum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_B
+
+     )
+
+float bShortRsiMin =
+
+     input.float(
+
+         25,
+
+         "Short RSI Minimum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_B
+
+     )
+
+float bShortRsiMax =
+
+     input.float(
+
+         50,
+
+         "Short RSI Maximum",
+
+         minval = 0,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_B
+
+     )
+
+float bMaximumExtensionATR =
+
+     input.float(
+
+         2.50,
+
+         "Maximum Distance From EMA20 ATR",
+
+         minval = 0.25,
+
+         maxval = 10,
+
+         step = 0.25,
+
+         group = GRP_B
+
+     )
+
+float bEntryBufferATR =
+
+     input.float(
+
+         0.05,
+
+         "Entry Buffer ATR",
+
+         minval = 0,
+
+         maxval = 1,
+
+         step = 0.01,
+
+         group = GRP_B
+
+     )
+
+int bStructureStopBars =
+
+     input.int(
+
+         2,
+
+         "Structure Stop Lookback",
+
+         minval = 1,
+
+         maxval = 10,
+
+         group = GRP_B
+
+     )
+
+float bStopBufferATR =
+
+     input.float(
+
+         0.20,
+
+         "Stop Buffer ATR",
+
+         minval = 0,
+
+         maxval = 2,
+
+         step = 0.01,
+
+         group = GRP_B
+
+     )
+
+int bPendingBars =
+
+     input.int(
+
+         2,
+
+         "Pending Trigger Bars",
+
+         minval = 1,
+
+         maxval = 5,
+
+         group = GRP_B
+
+     )
+
+
+
+// ============================================================================
+
+// 07 — UNIVERSAL STOP / TARGET
+
+// ============================================================================
+
+float minimumStopATR =
+
+     input.float(
+
+         0.60,
+
+         "Minimum Stop Distance ATR",
+
+         minval = 0.10,
+
+         step = 0.10,
+
+         group = GRP_EXIT
+
+     )
+
+float maximumStopATR =
+
+     input.float(
+
+         3.00,
+
+         "Maximum Stop Distance ATR",
+
+         minval = 0.20,
+
+         step = 0.10,
+
+         group = GRP_EXIT
+
+     )
+
+float rewardMultiple =
+
+     input.float(
+
+         3.0,
+
+         "Reward Multiple",
+
+         minval = 0.5,
+
+         step = 0.25,
+
+         group = GRP_EXIT
+
+     )
+
+
+
+// ============================================================================
+
+// 08 — POSITION SIZING
+
+// ============================================================================
+
+string sizingMode =
+
+     input.string(
+
+         "Risk %",
+
+         "Sizing Mode",
+
+         options = [
+
+             "Risk %",
+
+             "Fixed Quantity"
+
+         ],
+
+         group = GRP_RISK
+
+     )
+
+float riskPercent =
+
+     input.float(
+
+         0.25,
+
+         "Approx. Risk Per Trade (%)",
+
+         minval = 0.01,
+
+         maxval = 10,
+
+         step = 0.05,
+
+         group = GRP_RISK
+
+     )
+
+float fixedQuantity =
+
+     input.float(
+
+         0.01,
+
+         "Fixed Quantity",
+
+         minval = 0.000001,
+
+         step = 0.001,
+
+         group = GRP_RISK
+
+     )
+
+float minimumQuantity =
+
+     input.float(
+
+         0.000001,
+
+         "Minimum Quantity",
+
+         minval = 0.000001,
+
+         step = 0.000001,
+
+         group = GRP_RISK
+
+     )
+
+
+
+// ============================================================================
+
+// 09 — DAILY RISK
+
+// ============================================================================
+
+int maximumTradesPerDay =
+
+     input.int(
+
+         3,
+
+         "Maximum Trades Per UTC Day",
+
+         minval = 1,
+
+         maxval = 20,
+
+         group = GRP_DAILY
+
+     )
+
+float maximumDailyEquityDdPct =
+
+     input.float(
+
+         1.0,
+
+         "Maximum Daily Equity Drawdown %",
+
+         minval = 0.1,
+
+         maxval = 100,
+
+         step = 0.1,
+
+         group = GRP_DAILY
+
+     )
+
+int maximumDailyLossStreak =
+
+     input.int(
+
+         3,
+
+         "Maximum Consecutive Closed Losses",
+
+         minval = 1,
+
+         maxval = 20,
+
+         group = GRP_DAILY
+
+     )
+
+
+
+// ============================================================================
+
+// 10 — MONTHLY RISK
+
+// ============================================================================
+
+float maximumMonthlyEquityDdPct =
+
+     input.float(
+
+         6.0,
+
+         "Maximum Monthly Equity Drawdown %",
+
+         minval = 0.5,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_MONTHLY
+
+     )
+
+bool useAllTimeProtection =
+
+     input.bool(
+
+         false,
+
+         "Enable All-Time Equity Protection",
+
+         group = GRP_MONTHLY
+
+     )
+
+float maximumAllTimeDrawdownPct =
+
+     input.float(
+
+         10.0,
+
+         "Maximum All-Time Equity Drawdown %",
+
+         minval = 1,
+
+         maxval = 100,
+
+         step = 0.5,
+
+         group = GRP_MONTHLY
+
+     )
+
+
+
+// ============================================================================
+
+// 11 — SESSION
+
+// ============================================================================
+
+string tradingSession =
+
+     input.session(
+
+         "0700-2000",
+
+         "Trading Session UTC",
+
+         group = GRP_SESSION
+
+     )
+
+bool monday =
+
+     input.bool(true, "Monday", group = GRP_SESSION)
+
+bool tuesday =
+
+     input.bool(true, "Tuesday", group = GRP_SESSION)
+
+bool wednesday =
+
+     input.bool(true, "Wednesday", group = GRP_SESSION)
+
+bool thursday =
+
+     input.bool(true, "Thursday", group = GRP_SESSION)
+
+bool friday =
+
+     input.bool(true, "Friday", group = GRP_SESSION)
+
+bool saturday =
+
+     input.bool(true, "Saturday", group = GRP_SESSION)
+
+bool sunday =
+
+     input.bool(true, "Sunday", group = GRP_SESSION)
+
+
+
+// ============================================================================
+
+// 12 — INTERNAL BACKTEST
+
+// ============================================================================
+
+int backtestStart =
+
+     input.time(
+
+         timestamp("01 Jan 2026 00:00 +0000"),
+
+         "Internal Backtest Start",
+
+         group = GRP_TEST
+
+     )
+
+int backtestEnd =
+
+     input.time(
+
+         timestamp("30 Jun 2026 23:59 +0000"),
+
+         "Internal Backtest End",
+
+         group = GRP_TEST
+
+     )
+
+
+
+// ============================================================================
+
+// 13 — VISUALS
+
+// ============================================================================
+
+bool showEma =
+
+     input.bool(
+
+         true,
+
+         "Show EMA20 / EMA50",
+
+         group = GRP_VISUAL
+
+     )
+
+bool showSetupMarkers =
+
+     input.bool(
+
+         true,
+
+         "Show Setup Markers",
+
+         group = GRP_VISUAL
+
+     )
+
+bool showLevels =
+
+     input.bool(
+
+         true,
+
+         "Show Active Entry / SL / TP",
+
+         group = GRP_VISUAL
+
+     )
+
+bool showTable =
+
+     input.bool(
+
+         true,
+
+         "Show Status Table",
+
+         group = GRP_VISUAL
+
+     )
+
+
+
+// ============================================================================
+
+// 14 — INDICATORS
+
+// ============================================================================
+
+float emaFast =
+
+     ta.ema(
+
+         close,
+
+         fastEmaLength
+
+     )
+
+float emaSlow =
+
+     ta.ema(
+
+         close,
+
+         slowEmaLength
+
+     )
+
+float rsiValue =
+
+     ta.rsi(
+
+         close,
+
+         rsiLength
+
+     )
+
+float atrValue =
+
+     ta.atr(
+
+         atrLength
+
+     )
+
+[plusDI, minusDI, adxValue] =
+
+     ta.dmi(
+
+         diLength,
+
+         adxSmoothing
+
+     )
+
+
+
+// ============================================================================
+
+// 15 — CONFIRMED H1 DATA
+
+// ============================================================================
+
+[htfClose,
+
+ htfFast,
+
+ htfSlow,
+
+ htfSlowPast] =
+
+     request.security(
+
+         syminfo.tickerid,
+
+         higherTF,
+
+         [
+
+             close[1],
+
+             ta.ema(close, htfFastLength)[1],
+
+             ta.ema(close, htfSlowLength)[1],
+
+             ta.ema(close, htfSlowLength)[1 + htfSlopeLookback]
+
+         ],
+
+         gaps = barmerge.gaps_off,
+
+         lookahead = barmerge.lookahead_on
+
+     )
+
+
+
+// ============================================================================
+
+// 16 — H1 TREND
+
+// ============================================================================
+
+bool htfReady =
+
+     not na(htfClose) and
+
+     not na(htfFast) and
+
+     not na(htfSlow) and
+
+     not na(htfSlowPast)
+
+bool htfLong =
+
+     htfReady and
+
+     htfClose > htfSlow and
+
+     htfFast > htfSlow and
+
+     htfSlow > htfSlowPast
+
+bool htfShort =
+
+     htfReady and
+
+     htfClose < htfSlow and
+
+     htfFast < htfSlow and
+
+     htfSlow < htfSlowPast
+
+
+
+// ============================================================================
+
+// 17 — SESSION / DAYS
+
+// ============================================================================
+
+bool insideSession =
+
+     not na(
+
+         time(
+
+             timeframe.period,
+
+             tradingSession,
+
+             "UTC"
+
+         )
+
+     )
+
+int utcDow =
+
+     dayofweek(
+
+         time,
+
+         "UTC"
+
+     )
+
+bool allowedDay =
+
+     (utcDow == dayofweek.monday and monday) or
+
+     (utcDow == dayofweek.tuesday and tuesday) or
+
+     (utcDow == dayofweek.wednesday and wednesday) or
+
+     (utcDow == dayofweek.thursday and thursday) or
+
+     (utcDow == dayofweek.friday and friday) or
+
+     (utcDow == dayofweek.saturday and saturday) or
+
+     (utcDow == dayofweek.sunday and sunday)
+
+bool insideBacktest =
+
+     time >= backtestStart and
+
+     time <= backtestEnd
+
+bool testStartEvent =
+
+     insideBacktest and
+
+     not insideBacktest[1]
+
+
+
+// ============================================================================
+
+// 18 — DATE KEYS
+
+// ============================================================================
+
+int utcYear =
+
+     year(
+
+         time,
+
+         "UTC"
+
+     )
+
+int utcMonth =
+
+     month(
+
+         time,
+
+         "UTC"
+
+     )
+
+int utcDay =
+
+     dayofmonth(
+
+         time,
+
+         "UTC"
+
+     )
+
+int utcDayKey =
+
+     utcYear * 10000 +
+
+     utcMonth * 100 +
+
+     utcDay
+
+int utcMonthKey =
+
+     utcYear * 100 +
+
+     utcMonth
+
+
+
+// ============================================================================
+
+// 19 — RISK STATE
+
+// ============================================================================
+
+var int storedDayKey = na
+
+var int storedMonthKey = na
+
+var float dayStartEquity = na
+
+var float monthStartEquity = na
+
+var float allTimeHighEquity = na
+
+var int tradesToday = 0
+
+var int consecutiveLossesToday = 0
+
+var bool dailyEquityLocked = false
+
+var bool dailyStreakLocked = false
+
+var bool monthlyLocked = false
+
+var bool allTimeLocked = false
+
+
+
+// ============================================================================
+
+// 20 — PENDING STATE
+
+// ============================================================================
+
+var bool longPending = false
+
+var bool shortPending = false
+
+var string pendingModel = ""
+
+var int pendingSetupBar = na
+
+var int pendingExpiryBars = na
+
+var float pendingEntry = na
+
+var float pendingStop = na
+
+var float pendingQty = na
+
+
+
+// ============================================================================
+
+// 21 — ACTIVE TRADE STATE
+
+// ============================================================================
+
+var bool tradeInitialized = false
+
+var float activeEntry = na
+
+var float activeStop = na
+
+var float activeTarget = na
+
+var float activeInitialRisk = na
+
+var float activeRiskCash = na
+
+var string activeModel = ""
+
+var string activeSide = ""
+
+
+
+// ============================================================================
+
+// 22 — STATISTICS STATE
+
+// ============================================================================
+
+var int processedClosedTrades = 0
+
+var int setupATrades = 0
+
+var int setupAWins = 0
+
+var float setupAGrossProfit = 0
+
+var float setupAGrossLoss = 0
+
+var float setupAPnl = 0
+
+var int setupBTrades = 0
+
+var int setupBWins = 0
+
+var float setupBGrossProfit = 0
+
+var float setupBGrossLoss = 0
+
+var float setupBPnl = 0
+
+var int unknownTrades = 0
+
+var float unknownPnl = 0
+
+var int tpCount = 0
+
+var int slCount = 0
+
+var int otherExitCount = 0
+
+var float totalR = 0
+
+
+
+// ============================================================================
+
+// 23 — RESET AT TEST START
+
+// ============================================================================
+
+if testStartEvent
+
+    storedDayKey :=
+
+         utcDayKey
+
+    storedMonthKey :=
+
+         utcMonthKey
+
+    dayStartEquity :=
+
+         strategy.equity
+
+    monthStartEquity :=
+
+         strategy.equity
+
+    allTimeHighEquity :=
+
+         strategy.equity
+
+    tradesToday := 0
+
+    consecutiveLossesToday := 0
+
+    dailyEquityLocked := false
+
+    dailyStreakLocked := false
+
+    monthlyLocked := false
+
+    allTimeLocked := false
+
+    processedClosedTrades :=
+
+         strategy.closedtrades
+
+    setupATrades := 0
+
+    setupAWins := 0
+
+    setupAGrossProfit := 0
+
+    setupAGrossLoss := 0
+
+    setupAPnl := 0
+
+    setupBTrades := 0
+
+    setupBWins := 0
+
+    setupBGrossProfit := 0
+
+    setupBGrossLoss := 0
+
+    setupBPnl := 0
+
+    unknownTrades := 0
+
+    unknownPnl := 0
+
+    tpCount := 0
+
+    slCount := 0
+
+    otherExitCount := 0
+
+    totalR := 0
+
+
+
+if insideBacktest and
+
+   na(storedDayKey)
+
+    storedDayKey :=
+
+         utcDayKey
+
+    storedMonthKey :=
+
+         utcMonthKey
+
+    dayStartEquity :=
+
+         strategy.equity
+
+    monthStartEquity :=
+
+         strategy.equity
+
+    allTimeHighEquity :=
+
+         strategy.equity
+
+
+
+// ============================================================================
+
+// 24 — DAY / MONTH RESET
+
+// ============================================================================
+
+bool newDay =
+
+     insideBacktest and
+
+     not na(storedDayKey) and
+
+     utcDayKey != storedDayKey
+
+if newDay
+
+    storedDayKey :=
+
+         utcDayKey
+
+    dayStartEquity :=
+
+         strategy.equity
+
+    tradesToday := 0
+
+    consecutiveLossesToday := 0
+
+    dailyEquityLocked := false
+
+    dailyStreakLocked := false
+
+
+
+bool newMonth =
+
+     insideBacktest and
+
+     not na(storedMonthKey) and
+
+     utcMonthKey != storedMonthKey
+
+if newMonth
+
+    storedMonthKey :=
+
+         utcMonthKey
+
+    monthStartEquity :=
+
+         strategy.equity
+
+    monthlyLocked := false
+
+
+
+// ============================================================================
+
+// 25 — EQUITY PROTECTION
+
+// ============================================================================
+
+if insideBacktest
+
+    allTimeHighEquity :=
+
+         math.max(
+
+             nz(
+
+                 allTimeHighEquity,
+
+                 strategy.equity
+
+             ),
+
+             strategy.equity
+
+         )
+
+
+
+float dailyEquityDdPct =
+
+     insideBacktest and
+
+     not na(dayStartEquity) and
+
+     dayStartEquity > 0 ?
+
+     (
+
+         dayStartEquity -
+
+         strategy.equity
+
+     ) /
+
+     dayStartEquity *
+
+     100 :
+
+     0
+
+
+
+float monthlyEquityDdPct =
+
+     insideBacktest and
+
+     not na(monthStartEquity) and
+
+     monthStartEquity > 0 ?
+
+     (
+
+         monthStartEquity -
+
+         strategy.equity
+
+     ) /
+
+     monthStartEquity *
+
+     100 :
+
+     0
+
+
+
+float allTimeEquityDdPct =
+
+     insideBacktest and
+
+     not na(allTimeHighEquity) and
+
+     allTimeHighEquity > 0 ?
+
+     (
+
+         allTimeHighEquity -
+
+         strategy.equity
+
+     ) /
+
+     allTimeHighEquity *
+
+     100 :
+
+     0
+
+
+
+if insideBacktest and
+
+   dailyEquityDdPct >= maximumDailyEquityDdPct
+
+    dailyEquityLocked := true
+
+
+
+if insideBacktest and
+
+   monthlyEquityDdPct >= maximumMonthlyEquityDdPct
+
+    monthlyLocked := true
+
+
+
+if insideBacktest and
+
+   useAllTimeProtection and
+
+   allTimeEquityDdPct >= maximumAllTimeDrawdownPct
+
+    allTimeLocked := true
+
+
+
+bool tradeCountLocked =
+
+     tradesToday >= maximumTradesPerDay
+
+bool dailyLocked =
+
+     tradeCountLocked or
+
+     dailyEquityLocked or
+
+     dailyStreakLocked
+
+
+
+// ============================================================================
+
+// 26 — COMMON CONDITIONS
+
+// ============================================================================
+
+bool m15Long =
+
+     emaFast > emaSlow
+
+bool m15Short =
+
+     emaFast < emaSlow
+
+bool adxAllowed =
+
+     adxValue >= minimumAdx
+
+float candleRange =
+
+     high - low
+
+float candleBody =
+
+     math.abs(
+
+         close -
+
+         open
+
+     )
+
+bool validRange =
+
+     candleRange > 0
+
+float bodyPct =
+
+     validRange ?
+
+     candleBody /
+
+     candleRange :
+
+     0
+
+float closeLocation =
+
+     validRange ?
+
+     (
+
+         close -
+
+         low
+
+     ) /
+
+     candleRange :
+
+     na
+
+
+
+// ============================================================================
+
+// 27 — PERMISSION
+
+// ============================================================================
+
+bool noPosition =
+
+     strategy.position_size == 0
+
+bool noPending =
+
+     not longPending and
+
+     not shortPending
+
+bool riskAllowed =
+
+     not dailyLocked and
+
+     not monthlyLocked and
+
+     not allTimeLocked
+
+bool timeAllowed =
+
+     insideSession and
+
+     allowedDay and
+
+     insideBacktest
+
+bool canSearch =
+
+     barstate.isconfirmed and
+
+     noPosition and
+
+     noPending and
+
+     riskAllowed and
+
+     timeAllowed
+
+bool pendingPermission =
+
+     insideSession and
+
+     allowedDay and
+
+     insideBacktest and
+
+     riskAllowed
+
+
+
+// ============================================================================
+
+// 28 — CANCEL INVALID PENDING
+
+// ============================================================================
+
+if strategy.position_size == 0 and
+
+   (
+
+       longPending or
+
+       shortPending
+
+   ) and
+
+   not pendingPermission
+
+    if longPending
+
+        strategy.cancel("Long")
+
+    if shortPending
+
+        strategy.cancel("Short")
+
+    longPending := false
+
+    shortPending := false
+
+    pendingModel := ""
+
+    pendingSetupBar := na
+
+    pendingExpiryBars := na
+
+    pendingEntry := na
+
+    pendingStop := na
+
+    pendingQty := na
+
+
+
+// ============================================================================
+
+// 29 — EXACT PENDING EXPIRY
+
+// ============================================================================
+
+bool pendingExpiryReached =
+
+     strategy.position_size == 0 and
+
+     (
+
+         longPending or
+
+         shortPending
+
+     ) and
+
+     not na(pendingSetupBar) and
+
+     not na(pendingExpiryBars) and
+
+     bar_index >=
+
+     pendingSetupBar +
+
+     pendingExpiryBars
+
+if pendingExpiryReached
+
+    if longPending
+
+        strategy.cancel("Long")
+
+    if shortPending
+
+        strategy.cancel("Short")
+
+    longPending := false
+
+    shortPending := false
+
+    pendingModel := ""
+
+    pendingSetupBar := na
+
+    pendingExpiryBars := na
+
+    pendingEntry := na
+
+    pendingStop := na
+
+    pendingQty := na
+
+
+
+// ============================================================================
+
+// 30 — POSITION SIZING
+
+// ============================================================================
+
+calculateQty(float stopDistance) =>
+
+    float qty =
+
+         fixedQuantity
+
+    if sizingMode == "Risk %"
+
+        float cashRisk =
+
+             strategy.equity *
+
+             riskPercent /
+
+             100
+
+        float riskPerUnit =
+
+             stopDistance *
+
+             syminfo.pointvalue
+
+        qty :=
+
+             riskPerUnit > 0 ?
+
+             cashRisk /
+
+             riskPerUnit :
+
+             0
+
+    math.max(
+
+         qty,
+
+         minimumQuantity
+
+     )
+
+
+
+// ============================================================================
+
+// 31 — SETUP A EMA TOUCH
+
+// ============================================================================
+
+bool touchesFast =
+
+     high >= emaFast and
+
+     low <= emaFast
+
+bool touchesSlow =
+
+     high >= emaSlow and
+
+     low <= emaSlow
+
+bool touchesEither =
+
+     touchesFast or
+
+     touchesSlow
+
+int barsSincePriorTouch =
+
+     ta.barssince(
+
+         touchesEither
+
+     )[1]
+
+bool recentTouch =
+
+     not na(barsSincePriorTouch) and
+
+     barsSincePriorTouch <
+
+     aTouchLookback
+
+
+
+// ============================================================================
+
+// 32 — SETUP A LONG
+
+// ============================================================================
+
+bool aLongRsiAllowed =
+
+     rsiValue >= aLongRsiMin and
+
+     rsiValue <= aLongRsiMax
+
+bool aBullishRejection =
+
+     validRange and
+
+     close > open and
+
+     closeLocation >= aLongCloseLocation and
+
+     low >=
+
+     (
+
+         emaSlow -
+
+         aEma50ToleranceATR *
+
+         atrValue
+
+     )
+
+bool aRangeAllowed =
+
+     not aUseLargeCandleFilter or
+
+     candleRange <=
+
+     aMaximumRangeATR *
+
+     atrValue
+
+float aLongEntry =
+
+     high +
+
+     aEntryBufferATR *
+
+     atrValue
+
+float aLongStop =
+
+     low -
+
+     aStopBufferATR *
+
+     atrValue
+
+float aLongRisk =
+
+     aLongEntry -
+
+     aLongStop
+
+float aLongRiskATR =
+
+     atrValue > 0 ?
+
+     aLongRisk /
+
+     atrValue :
+
+     na
+
+bool aLongStopAllowed =
+
+     aLongRisk > 0 and
+
+     aLongRiskATR >= minimumStopATR and
+
+     aLongRiskATR <= maximumStopATR
+
+bool validALong =
+
+     canSearch and
+
+     enableSetupA and
+
+     enableLongs and
+
+     htfLong and
+
+     m15Long and
+
+     adxAllowed and
+
+     aLongRsiAllowed and
+
+     recentTouch and
+
+     aBullishRejection and
+
+     aRangeAllowed and
+
+     aLongStopAllowed
+
+
+
+// ============================================================================
+
+// 33 — SETUP A SHORT
+
+// ============================================================================
+
+bool aShortRsiAllowed =
+
+     rsiValue >= aShortRsiMin and
+
+     rsiValue <= aShortRsiMax
+
+bool aBearishRejection =
+
+     validRange and
+
+     close < open and
+
+     closeLocation <= aShortCloseLocation and
+
+     high <=
+
+     (
+
+         emaSlow +
+
+         aEma50ToleranceATR *
+
+         atrValue
+
+     )
+
+float aShortEntry =
+
+     low -
+
+     aEntryBufferATR *
+
+     atrValue
+
+float aShortStop =
+
+     high +
+
+     aStopBufferATR *
+
+     atrValue
+
+float aShortRisk =
+
+     aShortStop -
+
+     aShortEntry
+
+float aShortRiskATR =
+
+     atrValue > 0 ?
+
+     aShortRisk /
+
+     atrValue :
+
+     na
+
+bool aShortStopAllowed =
+
+     aShortRisk > 0 and
+
+     aShortRiskATR >= minimumStopATR and
+
+     aShortRiskATR <= maximumStopATR
+
+bool validAShort =
+
+     canSearch and
+
+     enableSetupA and
+
+     enableShorts and
+
+     htfShort and
+
+     m15Short and
+
+     adxAllowed and
+
+     aShortRsiAllowed and
+
+     recentTouch and
+
+     aBearishRejection and
+
+     aRangeAllowed and
+
+     aShortStopAllowed
+
+
+
+// ============================================================================
+
+// 34 — SETUP B LOCAL STRUCTURE
+
+// ============================================================================
+
+float previousStructureHigh =
+
+     ta.highest(
+
+         high[1],
+
+         bBreakoutLookback
+
+     )
+
+float previousStructureLow =
+
+     ta.lowest(
+
+         low[1],
+
+         bBreakoutLookback
+
+     )
+
+
+
+// ============================================================================
+
+// 35 — SETUP B BREAKOUT CANDLE QUALITY
+
+// ============================================================================
+
+float rangeATR =
+
+     atrValue > 0 ?
+
+     candleRange /
+
+     atrValue :
+
+     na
+
+bool bRangeAllowed =
+
+     not na(rangeATR) and
+
+     rangeATR >= bMinimumRangeATR and
+
+     rangeATR <= bMaximumRangeATR
+
+bool bStrongBullCandle =
+
+     close > open and
+
+     bodyPct >= bMinimumBodyPct
+
+bool bStrongBearCandle =
+
+     close < open and
+
+     bodyPct >= bMinimumBodyPct
+
+
+
+// ============================================================================
+
+// 36 — SETUP B STRUCTURE BREAK
+
+// ============================================================================
+
+bool bLongStructureBreak =
+
+     close >
+
+     previousStructureHigh
+
+bool bShortStructureBreak =
+
+     close <
+
+     previousStructureLow
+
+
+
+// ============================================================================
+
+// 37 — SETUP B RSI
+
+// ============================================================================
+
+bool bLongRsiAllowed =
+
+     rsiValue >= bLongRsiMin and
+
+     rsiValue <= bLongRsiMax
+
+bool bShortRsiAllowed =
+
+     rsiValue >= bShortRsiMin and
+
+     rsiValue <= bShortRsiMax
+
+
+
+// ============================================================================
+
+// 38 — SETUP B ANTI-CHASE
+
+// ============================================================================
+
+float distanceFromFastATR =
+
+     atrValue > 0 ?
+
+     math.abs(
+
+         close -
+
+         emaFast
+
+     ) /
+
+     atrValue :
+
+     na
+
+bool bExtensionAllowed =
+
+     not na(distanceFromFastATR) and
+
+     distanceFromFastATR <=
+
+     bMaximumExtensionATR
+
+
+
+// ============================================================================
+
+// 39 — SETUP B LONG RISK
+
+// ============================================================================
+
+float bLongEntry =
+
+     high +
+
+     bEntryBufferATR *
+
+     atrValue
+
+float bLongStructureLow =
+
+     ta.lowest(
+
+         low,
+
+         bStructureStopBars
+
+     )
+
+float bLongStop =
+
+     bLongStructureLow -
+
+     bStopBufferATR *
+
+     atrValue
+
+float bLongRisk =
+
+     bLongEntry -
+
+     bLongStop
+
+float bLongRiskATR =
+
+     atrValue > 0 ?
+
+     bLongRisk /
+
+     atrValue :
+
+     na
+
+bool bLongStopAllowed =
+
+     bLongRisk > 0 and
+
+     bLongRiskATR >= minimumStopATR and
+
+     bLongRiskATR <= maximumStopATR
+
+
+
+// ============================================================================
+
+// 40 — SETUP B SHORT RISK
+
+// ============================================================================
+
+float bShortEntry =
+
+     low -
+
+     bEntryBufferATR *
+
+     atrValue
+
+float bShortStructureHigh =
+
+     ta.highest(
+
+         high,
+
+         bStructureStopBars
+
+     )
+
+float bShortStop =
+
+     bShortStructureHigh +
+
+     bStopBufferATR *
+
+     atrValue
+
+float bShortRisk =
+
+     bShortStop -
+
+     bShortEntry
+
+float bShortRiskATR =
+
+     atrValue > 0 ?
+
+     bShortRisk /
+
+     atrValue :
+
+     na
+
+bool bShortStopAllowed =
+
+     bShortRisk > 0 and
+
+     bShortRiskATR >= minimumStopATR and
+
+     bShortRiskATR <= maximumStopATR
+
+
+
+// ============================================================================
+
+// 41 — SETUP B VALID LONG
+
+// ============================================================================
+
+bool validBLong =
+
+     canSearch and
+
+     enableSetupB and
+
+     enableLongs and
+
+     htfLong and
+
+     m15Long and
+
+     adxAllowed and
+
+     bLongRsiAllowed and
+
+     bStrongBullCandle and
+
+     bRangeAllowed and
+
+     bLongStructureBreak and
+
+     bExtensionAllowed and
+
+     bLongStopAllowed
+
+
+
+// ============================================================================
+
+// 42 — SETUP B VALID SHORT
+
+// ============================================================================
+
+bool validBShort =
+
+     canSearch and
+
+     enableSetupB and
+
+     enableShorts and
+
+     htfShort and
+
+     m15Short and
+
+     adxAllowed and
+
+     bShortRsiAllowed and
+
+     bStrongBearCandle and
+
+     bRangeAllowed and
+
+     bShortStructureBreak and
+
+     bExtensionAllowed and
+
+     bShortStopAllowed
+
+
+
+// ============================================================================
+
+// 43 — CREATE ORDERS
+
+// ============================================================================
+
+//
+
+// Setup A retains priority if A and B appear on exactly the same candle.
+
+//
+
+if validALong
+
+    float qty =
+
+         calculateQty(
+
+             aLongRisk
+
+         )
+
+    if qty > 0
+
+        longPending := true
+
+        shortPending := false
+
+        pendingModel := "A"
+
+        pendingSetupBar := bar_index
+
+        pendingExpiryBars := aPendingBars
+
+        pendingEntry := aLongEntry
+
+        pendingStop := aLongStop
+
+        pendingQty := qty
+
+        strategy.entry(
+
+             "Long",
+
+             strategy.long,
+
+             qty = qty,
+
+             stop = pendingEntry,
+
+             comment = "A-LONG"
+
+         )
+
+
+
+else if validAShort
+
+    float qty =
+
+         calculateQty(
+
+             aShortRisk
+
+         )
+
+    if qty > 0
+
+        shortPending := true
+
+        longPending := false
+
+        pendingModel := "A"
+
+        pendingSetupBar := bar_index
+
+        pendingExpiryBars := aPendingBars
+
+        pendingEntry := aShortEntry
+
+        pendingStop := aShortStop
+
+        pendingQty := qty
+
+        strategy.entry(
+
+             "Short",
+
+             strategy.short,
+
+             qty = qty,
+
+             stop = pendingEntry,
+
+             comment = "A-SHORT"
+
+         )
+
+
+
+else if validBLong
+
+    float qty =
+
+         calculateQty(
+
+             bLongRisk
+
+         )
+
+    if qty > 0
+
+        longPending := true
+
+        shortPending := false
+
+        pendingModel := "B"
+
+        pendingSetupBar := bar_index
+
+        pendingExpiryBars := bPendingBars
+
+        pendingEntry := bLongEntry
+
+        pendingStop := bLongStop
+
+        pendingQty := qty
+
+        strategy.entry(
+
+             "Long",
+
+             strategy.long,
+
+             qty = qty,
+
+             stop = pendingEntry,
+
+             comment = "B-LONG"
+
+         )
+
+
+
+else if validBShort
+
+    float qty =
+
+         calculateQty(
+
+             bShortRisk
+
+         )
+
+    if qty > 0
+
+        shortPending := true
+
+        longPending := false
+
+        pendingModel := "B"
+
+        pendingSetupBar := bar_index
+
+        pendingExpiryBars := bPendingBars
+
+        pendingEntry := bShortEntry
+
+        pendingStop := bShortStop
+
+        pendingQty := qty
+
+        strategy.entry(
+
+             "Short",
+
+             strategy.short,
+
+             qty = qty,
+
+             stop = pendingEntry,
+
+             comment = "B-SHORT"
+
+         )
+
+
+
+// ============================================================================
+
+// 44 — EVENT FLAGS
+
+// ============================================================================
+
+bool setupALongEntryEvent = false
+
+bool setupAShortEntryEvent = false
+
+bool setupBLongEntryEvent = false
+
+bool setupBShortEntryEvent = false
+
+bool longTpEvent = false
+
+bool longSlEvent = false
+
+bool longOtherEvent = false
+
+bool shortTpEvent = false
+
+bool shortSlEvent = false
+
+bool shortOtherEvent = false
+
+
+
+// ============================================================================
+
+// 45 — LONG FILL
+
+// ============================================================================
+
+bool longFill =
+
+     strategy.position_size > 0 and
+
+     not tradeInitialized
+
+if longFill
+
+    activeEntry :=
+
+         strategy.position_avg_price
+
+    activeStop :=
+
+         pendingStop
+
+    activeInitialRisk :=
+
+         activeEntry -
+
+         activeStop
+
+    if activeInitialRisk > 0
+
+        activeTarget :=
+
+             activeEntry +
+
+             rewardMultiple *
+
+             activeInitialRisk
+
+        activeRiskCash :=
+
+             activeInitialRisk *
+
+             math.abs(
+
+                 strategy.position_size
+
+             ) *
+
+             syminfo.pointvalue
+
+        activeModel :=
+
+             pendingModel
+
+        activeSide :=
+
+             "LONG"
+
+        tradeInitialized := true
+
+        tradesToday += 1
+
+        setupALongEntryEvent :=
+
+             activeModel == "A"
+
+        setupBLongEntryEvent :=
+
+             activeModel == "B"
+
+        longPending := false
+
+        shortPending := false
+
+        pendingModel := ""
+
+        pendingSetupBar := na
+
+        pendingExpiryBars := na
+
+    else
+
+        strategy.close(
+
+             "Long",
+
+             comment = "INVALID-RISK"
+
+         )
+
+
+
+// ============================================================================
+
+// 46 — SHORT FILL
+
+// ============================================================================
+
+bool shortFill =
+
+     strategy.position_size < 0 and
+
+     not tradeInitialized
+
+if shortFill
+
+    activeEntry :=
+
+         strategy.position_avg_price
+
+    activeStop :=
+
+         pendingStop
+
+    activeInitialRisk :=
+
+         activeStop -
+
+         activeEntry
+
+    if activeInitialRisk > 0
+
+        activeTarget :=
+
+             activeEntry -
+
+             rewardMultiple *
+
+             activeInitialRisk
+
+        activeRiskCash :=
+
+             activeInitialRisk *
+
+             math.abs(
+
+                 strategy.position_size
+
+             ) *
+
+             syminfo.pointvalue
+
+        activeModel :=
+
+             pendingModel
+
+        activeSide :=
+
+             "SHORT"
+
+        tradeInitialized := true
+
+        tradesToday += 1
+
+        setupAShortEntryEvent :=
+
+             activeModel == "A"
+
+        setupBShortEntryEvent :=
+
+             activeModel == "B"
+
+        longPending := false
+
+        shortPending := false
+
+        pendingModel := ""
+
+        pendingSetupBar := na
+
+        pendingExpiryBars := na
+
+    else
+
+        strategy.close(
+
+             "Short",
+
+             comment = "INVALID-RISK"
+
+         )
+
+
+
+// ============================================================================
+
+// 47 — EXIT BRACKETS
+
+// ============================================================================
+
+if strategy.position_size > 0 and
+
+   tradeInitialized and
+
+   not na(activeStop) and
+
+   not na(activeTarget)
+
+    strategy.exit(
+
+         "L-EXIT",
+
+         from_entry = "Long",
+
+         stop = activeStop,
+
+         limit = activeTarget,
+
+         comment = "LONG-3R"
+
+     )
+
+
+
+if strategy.position_size < 0 and
+
+   tradeInitialized and
+
+   not na(activeStop) and
+
+   not na(activeTarget)
+
+    strategy.exit(
+
+         "S-EXIT",
+
+         from_entry = "Short",
+
+         stop = activeStop,
+
+         limit = activeTarget,
+
+         comment = "SHORT-3R"
+
+     )
+
+
+
+// ============================================================================
+
+// 48 — PROCESS CLOSED TRADE
+
+// ============================================================================
+
+if strategy.closedtrades > processedClosedTrades
+
+    int tradeIndex =
+
+         strategy.closedtrades -
+
+         1
+
+    float closedProfit =
+
+         strategy.closedtrades.profit(
+
+             tradeIndex
+
+         )
+
+    float exitPrice =
+
+         strategy.closedtrades.exit_price(
+
+             tradeIndex
+
+         )
+
+    string entryId =
+
+         strategy.closedtrades.entry_id(
+
+             tradeIndex
+
+         )
+
+    float tradeR =
+
+         activeRiskCash > 0 ?
+
+         closedProfit /
+
+         activeRiskCash :
+
+         na
+
+
+
+    // ------------------------------------------------------------------------
+
+    // LOSS STREAK
+
+    // ------------------------------------------------------------------------
+
+    if closedProfit < 0
+
+        consecutiveLossesToday += 1
+
+    else if closedProfit > 0
+
+        consecutiveLossesToday := 0
+
+
+
+    if consecutiveLossesToday >=
+
+       maximumDailyLossStreak
+
+        dailyStreakLocked := true
+
+
+
+    // ------------------------------------------------------------------------
+
+    // SETUP A
+
+    // ------------------------------------------------------------------------
+
+    if activeModel == "A"
+
+        setupATrades += 1
+
+        setupAPnl +=
+
+             closedProfit
+
+        if closedProfit > 0
+
+            setupAWins += 1
+
+            setupAGrossProfit +=
+
+                 closedProfit
+
+        else if closedProfit < 0
+
+            setupAGrossLoss +=
+
+                 math.abs(
+
+                     closedProfit
+
+                 )
+
+
+
+    // ------------------------------------------------------------------------
+
+    // SETUP B
+
+    // ------------------------------------------------------------------------
+
+    else if activeModel == "B"
+
+        setupBTrades += 1
+
+        setupBPnl +=
+
+             closedProfit
+
+        if closedProfit > 0
+
+            setupBWins += 1
+
+            setupBGrossProfit +=
+
+                 closedProfit
+
+        else if closedProfit < 0
+
+            setupBGrossLoss +=
+
+                 math.abs(
+
+                     closedProfit
+
+                 )
+
+
+
+    // ------------------------------------------------------------------------
+
+    // UNKNOWN MODEL
+
+    // ------------------------------------------------------------------------
+
+    else
+
+        unknownTrades += 1
+
+        unknownPnl +=
+
+             closedProfit
+
+
+
+    // ------------------------------------------------------------------------
+
+    // R
+
+    // ------------------------------------------------------------------------
+
+    if not na(tradeR)
+
+        totalR +=
+
+             tradeR
+
+
+
+    // ------------------------------------------------------------------------
+
+    // EXIT TYPE
+
+    // ------------------------------------------------------------------------
+
+    float exitTolerance =
+
+         math.max(
+
+             syminfo.mintick * 3,
+
+             nz(
+
+                 activeInitialRisk,
+
+                 0
+
+             ) *
+
+             0.05
+
+         )
+
+    bool classifiedTp = false
+
+    bool classifiedSl = false
+
+    bool classifiedOther = false
+
+
+
+    if entryId == "Long"
+
+        classifiedTp :=
+
+             not na(activeTarget) and
+
+             exitPrice >=
+
+             activeTarget -
+
+             exitTolerance
+
+        classifiedSl :=
+
+             not classifiedTp and
+
+             not na(activeStop) and
+
+             exitPrice <=
+
+             activeStop +
+
+             exitTolerance
+
+        classifiedOther :=
+
+             not classifiedTp and
+
+             not classifiedSl
+
+        longTpEvent :=
+
+             classifiedTp
+
+        longSlEvent :=
+
+             classifiedSl
+
+        longOtherEvent :=
+
+             classifiedOther
+
+
+
+    if entryId == "Short"
+
+        classifiedTp :=
+
+             not na(activeTarget) and
+
+             exitPrice <=
+
+             activeTarget +
+
+             exitTolerance
+
+        classifiedSl :=
+
+             not classifiedTp and
+
+             not na(activeStop) and
+
+             exitPrice >=
+
+             activeStop -
+
+             exitTolerance
+
+        classifiedOther :=
+
+             not classifiedTp and
+
+             not classifiedSl
+
+        shortTpEvent :=
+
+             classifiedTp
+
+        shortSlEvent :=
+
+             classifiedSl
+
+        shortOtherEvent :=
+
+             classifiedOther
+
+
+
+    if classifiedTp
+
+        tpCount += 1
+
+    else if classifiedSl
+
+        slCount += 1
+
+    else
+
+        otherExitCount += 1
+
+
+
+    processedClosedTrades :=
+
+         strategy.closedtrades
+
+
+
+    // ------------------------------------------------------------------------
+
+    // RESET ACTIVE STATE
+
+    // ------------------------------------------------------------------------
+
+    tradeInitialized := false
+
+    activeEntry := na
+
+    activeStop := na
+
+    activeTarget := na
+
+    activeInitialRisk := na
+
+    activeRiskCash := na
+
+    activeModel := ""
+
+    activeSide := ""
+
+    pendingEntry := na
+
+    pendingStop := na
+
+    pendingQty := na
+
+
+
+// ============================================================================
+
+// 49 — STATISTICS
+
+// ============================================================================
+
+int accountedTrades =
+
+     setupATrades +
+
+     setupBTrades +
+
+     unknownTrades
+
+float overallWinRate =
+
+     strategy.closedtrades > 0 ?
+
+     strategy.wintrades /
+
+     strategy.closedtrades *
+
+     100 :
+
+     na
+
+float overallProfitFactor =
+
+     strategy.grossloss != 0 ?
+
+     strategy.grossprofit /
+
+     math.abs(
+
+         strategy.grossloss
+
+     ) :
+
+     na
+
+float expectancyR =
+
+     accountedTrades > 0 ?
+
+     totalR /
+
+     accountedTrades :
+
+     na
+
+
+
+float setupAWinRate =
+
+     setupATrades > 0 ?
+
+     setupAWins /
+
+     setupATrades *
+
+     100 :
+
+     na
+
+float setupBWinRate =
+
+     setupBTrades > 0 ?
+
+     setupBWins /
+
+     setupBTrades *
+
+     100 :
+
+     na
+
+
+
+float setupAPF =
+
+     setupAGrossLoss > 0 ?
+
+     setupAGrossProfit /
+
+     setupAGrossLoss :
+
+     na
+
+float setupBPF =
+
+     setupBGrossLoss > 0 ?
+
+     setupBGrossProfit /
+
+     setupBGrossLoss :
+
+     na
+
+
+
+// ============================================================================
+
+// 50 — PLOTS
+
+// ============================================================================
+
+plot(
+
+     showEma ?
+
+     emaFast :
+
+     na,
+
+     title = "EMA20",
+
+     linewidth = 2
+
+ )
+
+plot(
+
+     showEma ?
+
+     emaSlow :
+
+     na,
+
+     title = "EMA50",
+
+     linewidth = 2
+
+ )
+
+
+
+// ============================================================================
+
+// 51 — SETUP MARKERS
+
+// ============================================================================
+
+plotshape(
+
+     showSetupMarkers and
+
+     validALong,
+
+     title = "A Long",
+
+     style = shape.triangleup,
+
+     location = location.belowbar,
+
+     size = size.tiny,
+
+     text = "A-L"
+
+ )
+
+plotshape(
+
+     showSetupMarkers and
+
+     validAShort,
+
+     title = "A Short",
+
+     style = shape.triangledown,
+
+     location = location.abovebar,
+
+     size = size.tiny,
+
+     text = "A-S"
+
+ )
+
+plotshape(
+
+     showSetupMarkers and
+
+     validBLong,
+
+     title = "B Long",
+
+     style = shape.circle,
+
+     location = location.belowbar,
+
+     size = size.tiny,
+
+     text = "B-L"
+
+ )
+
+plotshape(
+
+     showSetupMarkers and
+
+     validBShort,
+
+     title = "B Short",
+
+     style = shape.circle,
+
+     location = location.abovebar,
+
+     size = size.tiny,
+
+     text = "B-S"
+
+ )
+
+
+
+// ============================================================================
+
+// 52 — ACTIVE LEVELS
+
+// ============================================================================
+
+plot(
+
+     showLevels and
+
+     tradeInitialized ?
+
+     activeEntry :
+
+     na,
+
+     title = "Entry",
+
+     style = plot.style_linebr,
+
+     linewidth = 2
+
+ )
+
+plot(
+
+     showLevels and
+
+     tradeInitialized ?
+
+     activeStop :
+
+     na,
+
+     title = "Stop",
+
+     style = plot.style_linebr,
+
+     linewidth = 2
+
+ )
+
+plot(
+
+     showLevels and
+
+     tradeInitialized ?
+
+     activeTarget :
+
+     na,
+
+     title = "Target",
+
+     style = plot.style_linebr,
+
+     linewidth = 2
+
+ )
+
+
+
+// ============================================================================
+
+// 53 — STATUS TABLE
+
+// ============================================================================
+
+var table status =
+
+     table.new(
+
+         position.top_right,
+
+         2,
+
+         27,
+
+         border_width = 1
+
+     )
+
+if barstate.islast and
+
+   showTable
+
+    string trendState =
+
+         htfLong ?
+
+         "BULL" :
+
+         htfShort ?
+
+         "BEAR" :
+
+         "NEUTRAL"
+
+
+
+    string positionState =
+
+         strategy.position_size > 0 ?
+
+         "LONG " +
+
+         activeModel :
+
+         strategy.position_size < 0 ?
+
+         "SHORT " +
+
+         activeModel :
+
+         longPending ?
+
+         "LONG PENDING " +
+
+         pendingModel :
+
+         shortPending ?
+
+         "SHORT PENDING " +
+
+         pendingModel :
+
+         "FLAT"
+
+
+
+    table.cell(status, 0, 0, "BTC V2.2")
+
+    table.cell(status, 1, 0, "A + BREAKOUT B")
+
+    table.cell(status, 0, 1, "H1 Trend")
+
+    table.cell(status, 1, 1, trendState)
+
+    table.cell(status, 0, 2, "Position")
+
+    table.cell(status, 1, 2, positionState)
+
+    table.cell(status, 0, 3, "Strategy Closed")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         3,
+
+         str.tostring(
+
+             strategy.closedtrades
+
+         )
+
+     )
+
+    table.cell(status, 0, 4, "A+B+Unknown")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         4,
+
+         str.tostring(
+
+             accountedTrades
+
+         )
+
+     )
+
+    table.cell(status, 0, 5, "Unknown Trades")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         5,
+
+         str.tostring(
+
+             unknownTrades
+
+         )
+
+     )
+
+    table.cell(status, 0, 6, "Overall Win %")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         6,
+
+         na(overallWinRate) ?
+
+         "NA" :
+
+         str.tostring(
+
+             overallWinRate,
+
+             "#.##"
+
+         ) +
+
+         "%"
+
+     )
+
+    table.cell(status, 0, 7, "Overall PF")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         7,
+
+         na(overallProfitFactor) ?
+
+         "NA" :
+
+         str.tostring(
+
+             overallProfitFactor,
+
+             "#.###"
+
+         )
+
+     )
+
+    table.cell(status, 0, 8, "Net PnL")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         8,
+
+         str.tostring(
+
+             strategy.netprofit,
+
+             "#.##"
+
+         )
+
+     )
+
+    table.cell(status, 0, 9, "Expectancy R")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         9,
+
+         na(expectancyR) ?
+
+         "NA" :
+
+         str.tostring(
+
+             expectancyR,
+
+             "#.###"
+
+         )
+
+     )
+
+    table.cell(status, 0, 10, "A Trades")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         10,
+
+         str.tostring(
+
+             setupATrades
+
+         )
+
+     )
+
+    table.cell(status, 0, 11, "A Win %")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         11,
+
+         na(setupAWinRate) ?
+
+         "NA" :
+
+         str.tostring(
+
+             setupAWinRate,
+
+             "#.##"
+
+         ) +
+
+         "%"
+
+     )
+
+    table.cell(status, 0, 12, "A PF")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         12,
+
+         na(setupAPF) ?
+
+         "NA" :
+
+         str.tostring(
+
+             setupAPF,
+
+             "#.###"
+
+         )
+
+     )
+
+    table.cell(status, 0, 13, "A PnL")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         13,
+
+         str.tostring(
+
+             setupAPnl,
+
+             "#.##"
+
+         )
+
+     )
+
+    table.cell(status, 0, 14, "B Trades")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         14,
+
+         str.tostring(
+
+             setupBTrades
+
+         )
+
+     )
+
+    table.cell(status, 0, 15, "B Win %")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         15,
+
+         na(setupBWinRate) ?
+
+         "NA" :
+
+         str.tostring(
+
+             setupBWinRate,
+
+             "#.##"
+
+         ) +
+
+         "%"
+
+     )
+
+    table.cell(status, 0, 16, "B PF")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         16,
+
+         na(setupBPF) ?
+
+         "NA" :
+
+         str.tostring(
+
+             setupBPF,
+
+             "#.###"
+
+         )
+
+     )
+
+    table.cell(status, 0, 17, "B PnL")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         17,
+
+         str.tostring(
+
+             setupBPnl,
+
+             "#.##"
+
+         )
+
+     )
+
+    table.cell(status, 0, 18, "Unknown PnL")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         18,
+
+         str.tostring(
+
+             unknownPnl,
+
+             "#.##"
+
+         )
+
+     )
+
+    table.cell(status, 0, 19, "TP / SL / OTHER")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         19,
+
+         str.tostring(tpCount) +
+
+         " / " +
+
+         str.tostring(slCount) +
+
+         " / " +
+
+         str.tostring(otherExitCount)
+
+     )
+
+    table.cell(status, 0, 20, "Trades Today")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         20,
+
+         str.tostring(tradesToday) +
+
+         "/" +
+
+         str.tostring(maximumTradesPerDay)
+
+     )
+
+    table.cell(status, 0, 21, "Daily Equity DD")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         21,
+
+         str.tostring(
+
+             dailyEquityDdPct,
+
+             "#.##"
+
+         ) +
+
+         "%"
+
+     )
+
+    table.cell(status, 0, 22, "Monthly Equity DD")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         22,
+
+         str.tostring(
+
+             monthlyEquityDdPct,
+
+             "#.##"
+
+         ) +
+
+         "%"
+
+     )
+
+    table.cell(status, 0, 23, "ADX")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         23,
+
+         str.tostring(
+
+             adxValue,
+
+             "#.0"
+
+         )
+
+     )
+
+    table.cell(status, 0, 24, "RSI")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         24,
+
+         str.tostring(
+
+             rsiValue,
+
+             "#.0"
+
+         )
+
+     )
+
+    table.cell(status, 0, 25, "Weekend Trading")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         25,
+
+         saturday and sunday ?
+
+         "ON" :
+
+         "OFF/PARTIAL"
+
+     )
+
+    table.cell(status, 0, 26, "B Lookback")
+
+    table.cell(
+
+         status,
+
+         1,
+
+         26,
+
+         str.tostring(
+
+             bBreakoutLookback
+
+         )
+
+     )
+
+
+
+// ============================================================================
+
+// 54 — ENTRY ALERTS
+
+// ============================================================================
+
+alertcondition(
+
+     setupALongEntryEvent,
+
+     title = "BTC Setup A Long",
+
+     message = '{"system":"BTC_V2_2","setup":"A","event":"entry","side":"long","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     setupAShortEntryEvent,
+
+     title = "BTC Setup A Short",
+
+     message = '{"system":"BTC_V2_2","setup":"A","event":"entry","side":"short","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     setupBLongEntryEvent,
+
+     title = "BTC Setup B Long",
+
+     message = '{"system":"BTC_V2_2","setup":"B","event":"entry","side":"long","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     setupBShortEntryEvent,
+
+     title = "BTC Setup B Short",
+
+     message = '{"system":"BTC_V2_2","setup":"B","event":"entry","side":"short","version":"2.2.0"}'
+
+ )
+
+
+
+// ============================================================================
+
+// 55 — EXIT ALERTS
+
+// ============================================================================
+
+alertcondition(
+
+     longTpEvent,
+
+     title = "BTC Long TP",
+
+     message = '{"system":"BTC_V2_2","event":"exit","side":"long","reason":"target","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     longSlEvent,
+
+     title = "BTC Long SL",
+
+     message = '{"system":"BTC_V2_2","event":"exit","side":"long","reason":"stop","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     longOtherEvent,
+
+     title = "BTC Long OTHER",
+
+     message = '{"system":"BTC_V2_2","event":"exit","side":"long","reason":"other","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     shortTpEvent,
+
+     title = "BTC Short TP",
+
+     message = '{"system":"BTC_V2_2","event":"exit","side":"short","reason":"target","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     shortSlEvent,
+
+     title = "BTC Short SL",
+
+     message = '{"system":"BTC_V2_2","event":"exit","side":"short","reason":"stop","version":"2.2.0"}'
+
+ )
+
+alertcondition(
+
+     shortOtherEvent,
+
+     title = "BTC Short OTHER",
+
+     message = '{"system":"BTC_V2_2","event":"exit","side":"short","reason":"other","version":"2.2.0"}'
+
+ )
