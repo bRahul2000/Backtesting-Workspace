@@ -249,8 +249,7 @@ def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
 
 
 def render_backtest_panel(data: pd.DataFrame) -> None:
-    st.divider()
-    st.header("BACKTEST SETTINGS")
+    st.header("Backtest")
     if data.empty:
         st.info("Download BTC/USD data before running a demo backtest.")
         return
@@ -267,6 +266,7 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
                                        min_value=earliest, max_value=latest)
         end = date_cols[1].date_input("Backtest End Date", value=latest,
                                      min_value=earliest, max_value=latest)
+        st.subheader("Account / Risk Settings")
         a, b, c = st.columns(3)
         starting_balance = a.number_input("Starting Balance ($)", min_value=0.01, value=10000.0)
         risk_mode = b.selectbox("Risk Mode", [mode.value for mode in RiskMode])
@@ -294,18 +294,18 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
         min_quantity = sizing_cols[2].number_input(
             "Minimum Quantity", min_value=0.0, value=0.0, format="%.8f",
         )
-        st.info(
+        st.caption(
             "Price Distance Only excludes trading costs from configured risk. "
             "Estimated Total Stop Loss attempts to keep projected stop-out loss, "
             "including configured costs, near the selected risk amount. "
             "An adverse gap can still cause a larger loss."
         )
+        st.subheader("Strategy Parameters")
         if btc_selected:
             st.caption("Pine commission defaults to 0.05%. Its two-tick slippage cannot be expressed exactly by the audited percentage-slippage model; set a percentage above if desired.")
             btc_params = render_setup_b_controls()
         else:
-            st.subheader("DEMO STRATEGY PARAMETERS")
-            st.warning("DEMO / ENGINE TEST STRATEGY. EMA crossover is used to validate the engine, not as a profitable trading strategy.")
+            st.caption("Demo EMA crossover validates the engine.")
             p1, p2, p3, p4 = st.columns(4)
             fast = p1.number_input("Fast EMA", min_value=1, value=20, step=1)
             slow = p2.number_input("Slow EMA", min_value=2, value=50, step=1)

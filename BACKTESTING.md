@@ -114,3 +114,27 @@ Runs do not bridge gaps or combine segment balances. The Streamlit Market Data
 view shows the saved range, gaps, segments, and last update; the backtest UI
 requires a single continuous selected range for Setup B. Chart candles may be
 downsampled for display, while execution always uses original M15 rows.
+
+## Segment-aware long-history research
+
+`python -m research.segment_aware_baseline` reads the canonical dataset and
+runs every continuous 15-minute segment independently. It derives the search
+start from the frozen Setup B indicator lengths: 50 M15 bars and 205 fully
+confirmed H1 bars for EMA200 plus its five-bar slope. A segment beginning on
+an hour requires 821 candles to leave one searchable candle; a partial first
+hour requires up to three additional M15 candles. Shorter segments are listed
+with an exclusion reason.
+
+Each usable run starts with fresh indicators, confirmed H1 state, orders,
+positions, daily/monthly state, and the audited $10,000 account. The engine's
+end-of-test rule leaves a still-open position unrealized and cancels an
+unfilled pending Setup B order. The pooled trade statistics sum completed
+outcomes from independent runs. No continuous equity curve or drawdown is
+constructed across gaps. Drawdowns are reported by segment. Calendar-year
+trades are grouped by UTC exit year, and monthly rows flag incomplete source
+coverage. The trade export includes signal-time H1 EMA200 slope, ATR%, and
+ADX for descriptive research only.
+
+Reports and downloads are written to `reports/long_history/segment_aware/`.
+The Streamlit Long-History Research section reads these reports and keeps the
+interactive backtest interface unchanged.

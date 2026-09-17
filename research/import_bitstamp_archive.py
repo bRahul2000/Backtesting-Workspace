@@ -38,8 +38,8 @@ def _complete_bins(rows: pd.DataFrame) -> pd.DataFrame:
         minutes=("timestamp", "size"), first=("timestamp", "first"),
         last=("timestamp", "last"),
     )
-    valid = ((result.minutes == 15) & (result.first == result.index) &
-             (result.last == result.index + pd.Timedelta(minutes=14)) &
+    valid = ((result["minutes"] == 15) & (result["first"] == result.index) &
+             (result["last"] == result.index + pd.Timedelta(minutes=14)) &
              (result.volume > 0))
     result = result.loc[valid, ["open", "high", "low", "close", "volume"]]
     result.index.name = "timestamp"
