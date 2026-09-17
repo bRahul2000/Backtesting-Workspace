@@ -29,6 +29,7 @@ from ui.long_history_research import render_long_history_research
 from ui.setup_b_diagnostics import render_setup_b_diagnostics
 from ui.setup_b_exit_research import render_exit_research
 from ui.setup_b_entry_research import render_entry_research
+from ui.exness_broker_data import render_exness_broker_data
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -313,6 +314,7 @@ def render_market_data() -> pd.DataFrame:
         display_dataset_details(active_data)
     else:
         st.info("No local BTC/USD dataset is available yet. Select a date range and download it above.")
+    render_exness_broker_data()
     return active_data
 
 

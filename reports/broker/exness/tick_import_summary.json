@@ -1,0 +1,15 @@
+{
+  "status": "not_imported",
+  "reason": "No Exness BTCUSDm raw CSV or ZIP tick file was present in data/exness/raw/.",
+  "source_file": null,
+  "first_tick_utc": null,
+  "last_tick_utc": null,
+  "tick_count": null,
+  "median_spread_price": null,
+  "mean_spread_price": null,
+  "p95_spread_price": null,
+  "maximum_spread_price": null,
+  "median_spread_bps": null,
+  "bid_15m_candles": null,
+  "missing_15m_intervals": null
+}

@@ -18,3 +18,7 @@ htmlcov/
 secrets.*
 *.pem
 *.key
+
+# User-supplied Exness tick archives stay local; keep the directory scaffold.
+/data/exness/raw/*
+!/data/exness/raw/.gitkeep
