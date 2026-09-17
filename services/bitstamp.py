@@ -39,11 +39,14 @@ class BitstampClient:
         timeout_seconds: float = 15.0,
         max_retries: int = 3,
         backoff_seconds: float = 0.6,
+        min_request_interval_seconds: float = 0.15,
         session: Optional[requests.Session] = None,
     ) -> None:
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
         self.backoff_seconds = backoff_seconds
+        self.min_request_interval_seconds = min_request_interval_seconds
+        self._last_request_started: float | None = None
         self.session = session or requests.Session()
         self.session.headers.update(
             {"User-Agent": "BTC-Strategy-Backtester/1.0 (+local Streamlit app)"}
@@ -66,6 +69,11 @@ class BitstampClient:
         last_error: Optional[Exception] = None
         for attempt in range(self.max_retries + 1):
             try:
+                if self._last_request_started is not None:
+                    elapsed = time.monotonic() - self._last_request_started
+                    if elapsed < self.min_request_interval_seconds:
+                        time.sleep(self.min_request_interval_seconds - elapsed)
+                self._last_request_started = time.monotonic()
                 response = self.session.get(
                     BITSTAMP_OHLC_URL,
                     params=params,

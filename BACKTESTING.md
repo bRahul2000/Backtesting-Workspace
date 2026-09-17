@@ -85,6 +85,32 @@ engine configures slippage as a **percentage**. The BTC preset therefore uses
 0% percentage slippage and exposes it as an editable input; a percentage is
 not silently passed off as two ticks. This baseline is an engine-model
 backtest of Pine's signal and permission logic, not a byte-for-byte
-TradingView strategy report. The saved data starts a contiguous run on
-2026-08-17, so early EMA200 values are seeded from that first available H1
-close rather than from unavailable earlier candles.
+TradingView strategy report. Each separate continuous segment seeds its own
+indicators from its first available candle; no missing history is invented.
+
+## Long BTC history
+
+`python -m research.update_btc_history` resumes the canonical
+`data/btcusd_15m.csv` from the public Bitstamp OHLC API, requesting only
+missing 15-minute timestamps from 2023 onward and probing 2021 history.
+Each successful API chunk is atomically saved, so an interrupted run resumes
+at the next missing range. Requests use timeouts, retries, backoff, pacing,
+and the API's incomplete-candle exclusion.
+
+When the official endpoint was unreachable for the Phase 4A build, a
+documented Bitstamp one-minute archive was aggregated conservatively: a
+15-minute candle is retained only with all 15 unique, valid source minutes
+and positive total volume. Existing saved Bitstamp candles take precedence.
+The source URLs, licenses, SHA-256 hashes, and overlap checks are recorded in
+`data/btcusd_15m_provenance.json`. The historical bulk archive is
+Kaggle-derived; its recorded differences from the isolated 2025-01-01 saved
+day mean it should be distinguished from directly fetched Bitstamp OHLC.
+
+`python -m research.setup_b_history_baseline` writes the data-quality audit,
+primary frozen Setup B baseline, yearly and monthly tables, six-month windows,
+and separate runs for other continuous segments of at least 90 days to
+`reports/long_history/`. The primary run uses the largest continuous segment.
+Runs do not bridge gaps or combine segment balances. The Streamlit Market Data
+view shows the saved range, gaps, segments, and last update; the backtest UI
+requires a single continuous selected range for Setup B. Chart candles may be
+downsampled for display, while execution always uses original M15 rows.

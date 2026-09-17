@@ -14,6 +14,7 @@ from engine.models import BacktestResult, BacktestSettings, RiskCalculation, Ris
 from strategies.demo_strategy import DemoEmaCrossover, DemoParameters
 from strategies.btc_v2_setup_b import BtcV2SetupB, STAGES
 from ui.btc_setup_b_controls import render_setup_b_controls
+from utils.data_validation import continuous_segments
 
 
 MAX_CHART_CANDLES = 2_000
@@ -39,6 +40,16 @@ def setup_b_diagnostic_counts(result: BacktestResult,
         "Completed Trades": len(result.trades),
     })
     return counts
+
+
+def setup_b_run_data(data: pd.DataFrame, selected: pd.DataFrame) -> pd.DataFrame:
+    """Keep same-segment warm-up and execution candles at original M15 size."""
+    if selected.empty or len(continuous_segments(selected)) != 1:
+        raise ValueError("Select one continuous BTC 15-minute period.")
+    first, last = selected.timestamp.iloc[0], selected.timestamp.iloc[-1]
+    segment = next(item for item in continuous_segments(data)
+                   if item.start <= first <= item.end)
+    return data.loc[data.timestamp.between(segment.start, last)].reset_index(drop=True)
 
 
 def trades_table(result: BacktestResult) -> pd.DataFrame:
@@ -311,11 +322,22 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
             if selected.empty:
                 raise ValueError("The selected dates have no saved candles.")
             if btc_selected:
+                segments = continuous_segments(selected)
+                if len(segments) > 1:
+                    largest = max(segments, key=lambda segment: segment.candles)
+                    raise ValueError(
+                        f"The selected BTC range contains {len(segments)} separate 15-minute "
+                        f"segments. Select one continuous period; the largest is "
+                        f"{largest.start} to {largest.end} ({largest.candles:,} candles)."
+                    )
+            if btc_selected:
                 params = replace(btc_params, reward_multiple=float(rr))
                 strategy = selected_strategy(strategy_name, params, None)
+                run_data = setup_b_run_data(data, selected)
             else:
                 params = DemoParameters(int(fast), int(slow), int(atr_length), float(stop_multiple))
                 strategy = selected_strategy(strategy_name, None, params)
+                run_data = data
             settings = BacktestSettings(
                 starting_balance=float(starting_balance), risk_mode=RiskMode(risk_mode),
                 risk_percent=float(risk_percent), fixed_risk_dollars=float(fixed_risk),
@@ -326,7 +348,7 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
             )
             start_time = pd.Timestamp(start, tz="UTC")
             end_time = pd.Timestamp(end, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(minutes=15)
-            result = run_backtest(data, strategy, settings,
+            result = run_backtest(run_data, strategy, settings,
                                   trade_start=start_time, trade_end=end_time)
             diagnostics = dict(strategy.diagnostics) if btc_selected else None
             st.session_state["demo_backtest"] = (result, selected, start, end,

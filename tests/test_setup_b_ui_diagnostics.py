@@ -92,3 +92,16 @@ def test_diagnostics_have_directional_cumulative_gates_and_order_totals():
     assert counts["Pending Cancelled"] == 1
     assert counts["Completed Trades"] == 1
     assert all(stage in counts for stage in STAGES)
+
+
+def test_setup_b_run_uses_same_segment_warmup_without_downsampling():
+    old = pd.date_range("2023-01-01T00:00:00Z", periods=3, freq="15min")
+    recent = pd.date_range("2024-01-01T00:00:00Z", periods=5, freq="15min")
+    data = pd.DataFrame({"timestamp": [*old, *recent],
+                         "open": range(8), "high": range(8),
+                         "low": range(8), "close": range(8),
+                         "volume": [1] * 8})
+    selected = data.iloc[-2:].reset_index(drop=True)
+    run_data = backtest_dashboard.setup_b_run_data(data, selected)
+    assert run_data.timestamp.tolist() == list(recent)
+    assert run_data.timestamp.diff().dropna().eq(pd.Timedelta(minutes=15)).all()

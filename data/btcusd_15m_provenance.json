@@ -1,0 +1,31 @@
+{
+  "source": "ff137/bitstamp-btcusd-minute-data public archive",
+  "source_urls": [
+    "https://raw.githubusercontent.com/ff137/bitstamp-btcusd-minute-data/main/data/historical/btcusd_bitstamp_1min_2012-2025.csv.gz",
+    "https://raw.githubusercontent.com/ff137/bitstamp-btcusd-minute-data/main/data/updates/btcusd_bitstamp_1min_latest.csv"
+  ],
+  "source_license_note": "Historical bulk is Kaggle-derived CC BY-SA 4.0; recent updates are Bitstamp API-derived CC BY 4.0.",
+  "historical_sha256": "1be152060b39327b669cbed236eeb283191fadaf3862f76c1e974be54ceb1a20",
+  "updates_sha256": "c110ed34f3fc39093adaae1bc1ffb6c26d610d4c5c77071c34d39dbaf45f5729",
+  "aggregation": "Only 15 unique valid one-minute rows with positive total volume; no empty or incomplete bins synthesized.",
+  "overlap_checked": 3049,
+  "api_derived_overlap_checked": 2953,
+  "api_derived_overlap_ohlcv_match": true,
+  "older_bulk_overlap_mismatch_counts": {
+    "open": 14,
+    "high": 2,
+    "low": 6,
+    "close": 0,
+    "volume": 0
+  },
+  "overlap_resolution": "Saved canonical candles take precedence over archive rows.",
+  "source_minutes_in_range": 3002510,
+  "invalid_source_minutes": 0,
+  "duplicate_source_minutes_removed": 0,
+  "complete_positive_volume_15m_candles": 200084,
+  "saved_15m_candles": 200084,
+  "saved_first": "2021-01-01 00:00:00+00:00",
+  "saved_last": "2026-09-17 01:30:00+00:00",
+  "saved_missing_candles": 83,
+  "dry_run": false
+}

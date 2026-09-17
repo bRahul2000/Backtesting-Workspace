@@ -1,0 +1,2 @@
+period,trades,long_trades,short_trades,wins,losses,breakeven,win_rate,gross_profit,gross_loss,net_pnl,profit_factor,average_r,median_r,expectancy_r,average_winner_r,average_loser_r,max_drawdown_percent,maximum_losing_streak
+2025-10-17 to 2026-04-17,105,39,66,25,80,0,23.809523809523807,1482.1201270890763,-1942.6556099041366,-460.5354828150603,0.7629350871728694,-0.17686136879927644,-1.0,-0.17686136879927644,2.448423125620272,-0.9972627733053854,5.5385300127875725,12

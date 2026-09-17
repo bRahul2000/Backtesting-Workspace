@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
+import json
 
 import pandas as pd
 import streamlit as st
@@ -9,15 +10,16 @@ import streamlit as st
 from services.bitstamp import (
     BITSTAMP_STEP_SECONDS,
     BitstampAPIError,
-    BitstampClient,
     latest_complete_candle_open,
 )
+from services.history import sync_btc_history
 from utils.data_validation import (
     DataValidationError,
-    find_missing_ranges,
+    continuous_segments,
     format_timeframe,
     load_ohlcv_csv,
     merge_ohlcv,
+    missing_gaps,
     prepare_ohlcv,
     save_ohlcv_csv,
     validate_ohlcv,
@@ -27,6 +29,7 @@ from ui.backtest_dashboard import render_backtest_panel
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_FILE = APP_DIR / "data" / "btcusd_15m.csv"
+PROVENANCE_FILE = APP_DIR / "data" / "btcusd_15m_provenance.json"
 EARLIEST_SELECTABLE_DATE = date(2011, 8, 18)
 
 
@@ -129,6 +132,35 @@ def display_dataset(data: pd.DataFrame) -> None:
     row_two[1].metric("Missing 15m Candles", f"{report.missing_candles:,}")
     row_two[2].metric("Invalid OHLCV Rows", f"{report.invalid_ohlcv_rows:,}")
 
+    segments = continuous_segments(data, BITSTAMP_STEP_SECONDS)
+    st.caption(
+        f"Expected candles: {report.expected_candles:,} · "
+        f"Duplicate timestamps: {report.duplicate_timestamps:,} · "
+        f"Continuous segments: {len(segments):,} · "
+        f"Last update: {pd.Timestamp(DATA_FILE.stat().st_mtime, unit='s', tz='UTC'):%Y-%m-%d %H:%M UTC}"
+    )
+    if PROVENANCE_FILE.exists():
+        provenance = json.loads(PROVENANCE_FILE.read_text())
+        st.caption(
+            f"Archive provenance: {provenance['source']}; "
+            f"{provenance['api_derived_overlap_checked']:,} API-derived "
+            "overlap candles matched the saved data. See "
+            "data/btcusd_15m_provenance.json for source details."
+        )
+    st.subheader("Continuous Segments")
+    full_width_dataframe(pd.DataFrame([
+        {"Start UTC": segment.start, "End UTC": segment.end, "Candles": segment.candles}
+        for segment in segments
+    ]))
+    gaps = missing_gaps(data, BITSTAMP_STEP_SECONDS)
+    if gaps:
+        with st.expander(f"Missing-data gaps ({len(gaps):,})"):
+            full_width_dataframe(pd.DataFrame([
+                {"Gap Start UTC": gap.start, "Gap End UTC": gap.end,
+                 "Missing Candles": gap.missing_candles}
+                for gap in gaps
+            ]))
+
     if report.detected_timeframe_minutes is not None and not report.is_expected_timeframe:
         st.warning("The dominant interval in this dataset is not 15 minutes.")
     if report.missing_candles:
@@ -164,7 +196,7 @@ if saved_data_error:
 
 today_utc = pd.Timestamp.now(tz="UTC").date()
 default_end = today_utc
-default_start = max(EARLIEST_SELECTABLE_DATE, default_end - timedelta(days=30))
+default_start = date(2023, 1, 1)
 
 date_col, end_col = st.columns(2)
 selected_start = date_col.date_input(
@@ -181,13 +213,14 @@ selected_end = end_col.date_input(
 )
 
 st.markdown(
-    '<div class="data-source-note">Source: Bitstamp public OHLC API. '
+    '<div class="data-source-note">Update BTC History uses the Bitstamp public OHLC API. '
+    "The saved file may include documented archive-derived candles; its provenance is shown below. "
     "The currently open 15-minute candle is excluded.</div>",
     unsafe_allow_html=True,
 )
 
 button_width = {"width": "stretch"} if streamlit_supports_width() else {"use_container_width": True}
-download_clicked = st.button("Download / Update BTC Data", type="primary", **button_width)
+download_clicked = st.button("Update BTC History", type="primary", **button_width)
 
 active_data = saved_data
 
@@ -199,102 +232,41 @@ if download_clicked:
         if range_start > range_end:
             st.error("The selected range does not contain a completed 15-minute candle yet.")
         else:
-            missing_ranges = find_missing_ranges(
-                saved_data,
-                range_start,
-                range_end,
-                step_seconds=BITSTAMP_STEP_SECONDS,
-            )
+            progress_bar = st.progress(0.0, text="Preparing resumable Bitstamp history update…")
+            try:
+                def show_progress(completed: int, total: int, saved: int) -> None:
+                    progress_bar.progress(
+                        completed / max(total, 1),
+                        text=f"API chunk {completed:,}/{total:,} · {saved:,} candles checkpointed",
+                    )
 
-            if not missing_ranges:
-                st.success("The selected period is already complete in the local dataset. No API request was needed.")
-            else:
-                requested_candles = sum(
-                    int((range_finish - range_begin).total_seconds() // BITSTAMP_STEP_SECONDS) + 1
-                    for range_begin, range_finish in missing_ranges
+                sync = sync_btc_history(
+                    range_start, range_end, path=DATA_FILE, progress=show_progress,
                 )
-                request_counts = [
-                    int((finish - begin).total_seconds() // BITSTAMP_STEP_SECONDS) + 1
-                    for begin, finish in missing_ranges
-                ]
-                total_requests = sum((count + 999) // 1000 for count in request_counts)
-                progress = st.progress(0.0, text="Preparing Bitstamp download…")
-                completed_requests = 0
-                downloaded_parts: list[pd.DataFrame] = []
-
-                try:
-                    client = BitstampClient()
-                    for gap_number, (gap_start, gap_end) in enumerate(missing_ranges, start=1):
-                        def update_progress(chunk_number: int, chunk_total: int, rows_received: int) -> None:
-                            del chunk_total
-                            current = completed_requests + chunk_number
-                            fraction = min(current / max(total_requests, 1), 1.0)
-                            progress.progress(
-                                fraction,
-                                text=(
-                                    f"Downloading gap {gap_number}/{len(missing_ranges)} · "
-                                    f"API request {current}/{total_requests} · "
-                                    f"{rows_received:,} rows received"
-                                ),
-                            )
-
-                        part = client.download_ohlc(
-                            gap_start,
-                            gap_end,
-                            progress_callback=update_progress,
-                        )
-                        downloaded_parts.append(part)
-                        gap_candles = int(
-                            (gap_end - gap_start).total_seconds() // BITSTAMP_STEP_SECONDS
-                        ) + 1
-                        completed_requests += (gap_candles + 999) // 1000
-
-                    downloaded = merge_ohlcv(*downloaded_parts)
-                    combined = merge_ohlcv(saved_data, downloaded)
-                    if downloaded.empty and saved_data.empty:
-                        raise DataValidationError(
-                            "Bitstamp returned no candles for the selected period; the local file was not changed."
-                        )
-                    combined_report = validate_ohlcv(
-                        combined,
-                        expected_step_seconds=BITSTAMP_STEP_SECONDS,
+                cached_load_saved_data.clear()
+                st.session_state.pop("demo_backtest", None)
+                active_data = load_ohlcv_csv(DATA_FILE) if DATA_FILE.exists() else saved_data
+                progress_bar.progress(1.0, text="History update finished.")
+                message = (
+                    f"Processed {sync.completed_chunks:,} API chunks; "
+                    f"saved {sync.saved_candles:,} unique candles to "
+                    f"{DATA_FILE.relative_to(APP_DIR)}."
+                )
+                if sync.remaining_candles:
+                    st.warning(
+                        message + f" {sync.remaining_candles:,} requested candles remain "
+                        "missing; no candles were fabricated. Run the update again to retry."
                     )
-                    if combined_report.invalid_ohlcv_rows:
-                        raise DataValidationError(
-                            "Bitstamp returned invalid OHLCV data; the local file was not changed."
-                        )
-
-                    save_ohlcv_csv(combined, DATA_FILE)
-                    cached_load_saved_data.clear()
-                    st.session_state.pop("demo_backtest", None)
-                    active_data = combined
-                    progress.progress(1.0, text="Download and validation complete.")
-                    remaining_ranges = find_missing_ranges(
-                        combined,
-                        range_start,
-                        range_end,
-                        step_seconds=BITSTAMP_STEP_SECONDS,
-                    )
-                    remaining_candles = sum(
-                        int((finish - begin).total_seconds() // BITSTAMP_STEP_SECONDS) + 1
-                        for begin, finish in remaining_ranges
-                    )
-                    result_message = (
-                        f"Downloaded {len(downloaded):,} unique candle(s) for "
-                        f"{requested_candles:,} requested timestamp(s). "
-                        f"Saved {len(combined):,} total candle(s) to {DATA_FILE.relative_to(APP_DIR)}."
-                    )
-                    if remaining_candles:
-                        st.warning(
-                            result_message
-                            + f" Bitstamp did not return {remaining_candles:,} requested candle(s); "
-                            "those gaps remain missing and were not fabricated."
-                        )
-                    else:
-                        st.success(result_message)
-                except (BitstampAPIError, DataValidationError, OSError, ValueError) as exc:
-                    progress.empty()
-                    st.error(f"BTC data could not be updated: {exc}")
+                else:
+                    st.success(message)
+            except (BitstampAPIError, DataValidationError, OSError, ValueError) as exc:
+                progress_bar.empty()
+                cached_load_saved_data.clear()
+                active_data = load_ohlcv_csv(DATA_FILE) if DATA_FILE.exists() else saved_data
+                st.error(
+                    f"BTC history update stopped: {exc}. Completed chunks are already "
+                    "saved; use Update BTC History to resume."
+                )
 
 st.divider()
 

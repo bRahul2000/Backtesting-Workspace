@@ -15,6 +15,12 @@ class NextOpenRegressionTests(unittest.TestCase):
     def test_prior_38_trade_demo_baseline(self):
         root = Path(__file__).resolve().parents[1]
         data = load_ohlcv_csv(root / "data" / "btcusd_15m.csv")
+        # Pin the original 2,953-candle fixture, including its indicator
+        # warm-up boundary, after the canonical CSV gains older history.
+        data = data.loc[data["timestamp"].between(
+            pd.Timestamp("2026-08-17T00:00:00Z"),
+            pd.Timestamp("2026-09-16T18:00:00Z"),
+        )].reset_index(drop=True)
         result = run_backtest(
             data, DemoEmaCrossover(),
             BacktestSettings(risk_calculation=RiskCalculation.PRICE_DISTANCE,

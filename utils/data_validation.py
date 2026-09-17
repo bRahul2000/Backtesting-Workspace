@@ -33,6 +33,22 @@ class DataQualityReport:
     is_expected_timeframe: bool
     missing_candles: int
     invalid_ohlcv_rows: int
+    expected_candles: int = 0
+    duplicate_timestamps: int = 0
+
+
+@dataclass(frozen=True)
+class ContinuousSegment:
+    start: pd.Timestamp
+    end: pd.Timestamp
+    candles: int
+
+
+@dataclass(frozen=True)
+class MissingGap:
+    start: pd.Timestamp
+    end: pd.Timestamp
+    missing_candles: int
 
 
 def normalize_columns(data: pd.DataFrame) -> pd.DataFrame:
@@ -153,7 +169,44 @@ def validate_ohlcv(
         is_expected_timeframe=is_expected,
         missing_candles=missing_count,
         invalid_ohlcv_rows=int(invalid_ohlcv_mask(data).sum()),
+        expected_candles=len(expected_index),
+        duplicate_timestamps=int(data["timestamp"].duplicated().sum()),
     )
+
+
+def continuous_segments(
+    data: pd.DataFrame, step_seconds: int = 900,
+) -> list[ContinuousSegment]:
+    """Partition sorted unique UTC candles at every missing timestamp."""
+    if data.empty:
+        return []
+    times = pd.DatetimeIndex(pd.to_datetime(data["timestamp"], utc=True)).unique().sort_values()
+    step = pd.Timedelta(seconds=step_seconds)
+    cuts = [0] + [i for i in range(1, len(times)) if times[i] - times[i - 1] != step]
+    ends = cuts[1:] + [len(times)]
+    return [ContinuousSegment(times[first], times[last - 1], last - first)
+            for first, last in zip(cuts, ends)]
+
+
+def missing_gaps(
+    data: pd.DataFrame, step_seconds: int = 900,
+) -> list[MissingGap]:
+    segments = continuous_segments(data, step_seconds)
+    step = pd.Timedelta(seconds=step_seconds)
+    return [MissingGap(left.end + step, right.start - step,
+                       int((right.start - left.end) / step) - 1)
+            for left, right in zip(segments, segments[1:])]
+
+
+def largest_continuous_segment(
+    data: pd.DataFrame, step_seconds: int = 900,
+) -> tuple[pd.DataFrame, ContinuousSegment | None]:
+    segments = continuous_segments(data, step_seconds)
+    if not segments:
+        return data.iloc[0:0].copy(), None
+    largest = max(segments, key=lambda item: item.candles)
+    timestamps = pd.to_datetime(data["timestamp"], utc=True)
+    return data.loc[timestamps.between(largest.start, largest.end)].reset_index(drop=True), largest
 
 
 def format_timeframe(minutes: Optional[float]) -> str:
