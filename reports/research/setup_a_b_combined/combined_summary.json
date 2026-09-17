@@ -1,0 +1,136 @@
+{
+  "data_sha256": "3abad99b42813b675b19a2016aca9ee79154262fa8e00bc88410dcb15fa9a2e9",
+  "data_start_utc": "2023-11-09 00:00:00+00:00",
+  "data_end_utc": "2026-09-17 17:15:00+00:00",
+  "results": [
+    {
+      "scope": "A+B",
+      "cost_view": "zero_cost",
+      "trades": 787,
+      "long_trades": 424,
+      "short_trades": 363,
+      "wins": 214,
+      "losses": 573,
+      "win_rate_percent": 27.19186785260483,
+      "profit_factor": 1.118770272594642,
+      "average_r": 0.08049407132910369,
+      "net_pnl": 1702.01332657693,
+      "worst_segment_dd_percent": 9.74364479144715,
+      "sum_r": 63.348834136004605
+    },
+    {
+      "scope": "A+B",
+      "cost_view": "fixed_spread_$10",
+      "trades": 787,
+      "long_trades": 424,
+      "short_trades": 363,
+      "wins": 214,
+      "losses": 573,
+      "win_rate_percent": 27.19186785260483,
+      "profit_factor": 1.0775246051312832,
+      "average_r": 0.052663266913722764,
+      "net_pnl": 1141.993245966059,
+      "worst_segment_dd_percent": 10.498992920895379,
+      "sum_r": 41.44599106109982
+    },
+    {
+      "scope": "A+B",
+      "cost_view": "fixed_spread_$20",
+      "trades": 787,
+      "long_trades": 424,
+      "short_trades": 363,
+      "wins": 214,
+      "losses": 573,
+      "win_rate_percent": 27.19186785260483,
+      "profit_factor": 1.038461944705023,
+      "average_r": 0.024832462498341798,
+      "net_pnl": 581.9731653551873,
+      "worst_segment_dd_percent": 11.303160443411198,
+      "sum_r": 19.543147986194995
+    }
+  ],
+  "marginal_b_vs_a": {
+    "combined_minus_a_pnl": -301.24178248602766,
+    "combined_minus_a_sum_r": -13.7095644574324,
+    "combined_minus_a_average_r": -0.034176164673034706,
+    "combined_b_attributed_pnl": -320.29979298585033,
+    "combined_b_attributed_sum_r": -14.421498236534468
+  },
+  "a_priority_suppressed_b_signals": 177,
+  "a_priority_suppressed_b_standalone_completed_trades": 131,
+  "b_candidates_blocked_by_a_pending": 1,
+  "b_candidates_blocked_by_a_position": 472,
+  "b_standalone_completed_trades_blocked_by_a": 183,
+  "b_standalone_completed_trades_blocked_by_a_pending": 0,
+  "b_standalone_completed_trades_blocked_by_a_position": 183,
+  "segments": [
+    {
+      "segment_id": "exness_native-S01",
+      "candles": 4041,
+      "usable": true,
+      "first_search": "2023-11-17 13:00:00+00:00",
+      "open_at_end": false,
+      "pending_at_end": false,
+      "reason": null
+    },
+    {
+      "segment_id": "exness_native-S02",
+      "candles": 4006,
+      "usable": true,
+      "first_search": "2023-12-29 16:00:00+00:00",
+      "open_at_end": false,
+      "pending_at_end": false,
+      "reason": null
+    },
+    {
+      "segment_id": "exness_native-S03",
+      "candles": 31144,
+      "usable": true,
+      "first_search": "2024-02-09 10:00:00+00:00",
+      "open_at_end": false,
+      "pending_at_end": false,
+      "reason": null
+    },
+    {
+      "segment_id": "exness_native-S04",
+      "candles": 10,
+      "usable": false,
+      "first_search": null,
+      "open_at_end": null,
+      "pending_at_end": null,
+      "reason": "needs 824 causal warm-up candles"
+    },
+    {
+      "segment_id": "exness_native-S05",
+      "candles": 10961,
+      "usable": true,
+      "first_search": "2024-12-29 23:00:00+00:00",
+      "open_at_end": false,
+      "pending_at_end": false,
+      "reason": null
+    },
+    {
+      "segment_id": "exness_native-S06",
+      "candles": 17763,
+      "usable": true,
+      "first_search": "2025-04-23 04:00:00+00:00",
+      "open_at_end": true,
+      "pending_at_end": false,
+      "reason": null
+    },
+    {
+      "segment_id": "exness_native-S07",
+      "candles": 32255,
+      "usable": true,
+      "first_search": "2025-10-25 07:00:00+00:00",
+      "open_at_end": false,
+      "pending_at_end": false,
+      "reason": null
+    }
+  ],
+  "orders": {
+    "expired": 347,
+    "triggered": 788,
+    "cancelled": 7
+  }
+}
