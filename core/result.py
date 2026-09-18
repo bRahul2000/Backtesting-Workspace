@@ -41,6 +41,7 @@ class UniversalBacktestResult:
     mfe_mae: dict[str, Any] = field(default_factory=dict)
     execution_diagnostics: dict[str, Any] = field(default_factory=dict)
     legacy_segment_results: list[Any] = field(default_factory=list, repr=False)
+    instrument_fingerprint: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         output = asdict(self)

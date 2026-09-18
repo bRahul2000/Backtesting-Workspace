@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS experiments (
     parameter_fingerprint TEXT NOT NULL,
     dataset_fingerprint TEXT NOT NULL,
     broker_fingerprint TEXT NOT NULL,
+    instrument_fingerprint TEXT NOT NULL DEFAULT '',
     broker_profile TEXT NOT NULL,
     instrument TEXT NOT NULL,
     date_start TEXT NOT NULL,
@@ -38,6 +39,11 @@ class ExperimentLedger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(experiments)")}
+            if "instrument_fingerprint" not in columns:
+                conn.execute(
+                    "ALTER TABLE experiments ADD COLUMN instrument_fingerprint TEXT NOT NULL DEFAULT ''"
+                )
 
     def _connect(self):
         return sqlite3.connect(self.path)
@@ -47,19 +53,19 @@ class ExperimentLedger:
                   dataset_fingerprint: str, broker_fingerprint: str,
                   broker_profile: str, instrument: str, date_start: str,
                   date_end: str, dataset_role: str, config: dict[str, Any],
-                  notes: str = "") -> str:
+                                    notes: str = "", instrument_fingerprint: str = "") -> str:
         with self._connect() as conn:
             cursor = conn.execute(
                 """INSERT INTO experiments (
-                run_id,timestamp_utc,strategy_id,strategy_name,strategy_status,
+                                timestamp_utc,strategy_id,strategy_name,strategy_status,
                 strategy_fingerprint,parameter_fingerprint,dataset_fingerprint,
-                broker_fingerprint,broker_profile,instrument,date_start,date_end,
-                dataset_role,config_json,results_json,notes
-                ) VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?)""",
+                broker_fingerprint,instrument_fingerprint,broker_profile,instrument,date_start,date_end,
+                                dataset_role,config_json,notes
+                                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     datetime.now(timezone.utc).isoformat(), strategy_id, strategy_name,
                     strategy_status, strategy_fingerprint, parameter_fingerprint,
-                    dataset_fingerprint, broker_fingerprint, broker_profile, instrument,
+                    dataset_fingerprint, broker_fingerprint, instrument_fingerprint, broker_profile, instrument,
                     date_start, date_end, dataset_role,
                     json.dumps(config, sort_keys=True, default=str), notes,
                 ),

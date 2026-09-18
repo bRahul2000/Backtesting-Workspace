@@ -15,6 +15,8 @@ from core.result import DirectionStatistics, UniversalBacktestResult
 from engine.metrics import calculate_metrics
 from engine.models import BacktestSettings, Direction, RiskCalculation, RiskMode, SameBarResolution
 from experiments.ledger import ExperimentLedger
+from instruments.btcusd import BTCUSD
+from instruments.xauusd import XAUUSD
 from research.exness_cost_calibrated import run_synthetic_segment
 from research.v3_regime_adaptive_baseline import add_closed_trade_equity
 from strategies.base_strategy import AuditedStrategyAdapter, parameter_fingerprint
@@ -128,6 +130,7 @@ def run_universal_backtest(
     parameter_hash = parameter_fingerprint(config.strategy_parameters)
     dataset_hash = sha256_file(path)
     broker_hash = EXNESS.fingerprint()
+    instrument_hash = stable_fingerprint(asdict(BTCUSD if config.instrument == "BTCUSD" else XAUUSD))
     adapter = AuditedStrategyAdapter(descriptor)
     ledger = ExperimentLedger(ledger_path or Path("experiments") / "experiments.sqlite3")
     config_dict = asdict(config)
@@ -141,6 +144,7 @@ def run_universal_backtest(
         parameter_fingerprint=parameter_hash,
         dataset_fingerprint=dataset_hash,
         broker_fingerprint=broker_hash,
+        instrument_fingerprint=instrument_hash,
         broker_profile=config.broker_profile,
         instrument=config.instrument,
         date_start=start.isoformat(), date_end=end.isoformat(),
@@ -198,6 +202,7 @@ def run_universal_backtest(
         parameter_fingerprint=parameter_hash,
         dataset_fingerprint=dataset_hash,
         broker_fingerprint=broker_hash,
+        instrument_fingerprint=instrument_hash,
         instrument=config.instrument,
         period={"start": start.isoformat(), "end": end.isoformat()},
         dataset_role=config.dataset_role.value,

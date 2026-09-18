@@ -26,6 +26,22 @@ class BrokerInstrumentProfile:
     swap_rule: str | None = None
     known: bool = True
     notes: tuple[str, ...] = ()
+    price_precision: int | None = None
+    point: float | None = None
+    tick_value_profit: float | None = None
+    tick_value_loss: float | None = None
+    stops_level: int | None = None
+    freeze_level: int | None = None
+    margin_calculation_mode: str | None = None
+    margin_initial: float | None = None
+    margin_maintenance: float | None = None
+    swap_long: float | None = None
+    swap_short: float | None = None
+    swap_mode: str | None = None
+    trading_sessions: tuple[str, ...] = ()
+    description: str | None = None
+    capture_timestamp_utc: str | None = None
+    source: str | None = None
 
 
 @dataclass(frozen=True)

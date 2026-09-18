@@ -25,6 +25,21 @@ class InstrumentProfile:
     commission_model: str | None
     swap_model: str | None
     notes: tuple[str, ...] = ()
+    point: float | None = None
+    tick_value_profit: float | None = None
+    tick_value_loss: float | None = None
+    stops_level: int | None = None
+    freeze_level: int | None = None
+    margin_calculation_mode: str | None = None
+    margin_initial: float | None = None
+    margin_maintenance: float | None = None
+    swap_long: float | None = None
+    swap_short: float | None = None
+    swap_mode: str | None = None
+    trading_sessions: tuple[str, ...] = ()
+    broker_profile_id: str | None = None
+    captured_at_utc: str | None = None
+    source: str | None = None
 
     @property
     def unknown_fields(self) -> tuple[str, ...]:
@@ -34,6 +49,9 @@ class InstrumentProfile:
                 "minimum_volume", "volume_step", "maximum_volume", "trading_hours",
                 "weekend_behavior", "leverage_rule", "margin_rule", "spread_model",
                 "commission_model", "swap_model",
+                "point", "tick_value_profit", "tick_value_loss", "stops_level",
+                "freeze_level", "margin_calculation_mode", "margin_initial",
+                "margin_maintenance", "swap_long", "swap_short", "swap_mode",
             )
             if getattr(self, field) is None
         )
