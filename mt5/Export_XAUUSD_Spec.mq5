@@ -41,10 +41,11 @@ void OnStart()
       Print("Unable to select symbol ", InpSymbol, ": ", GetLastError());
       return;
      }
-   int handle = FileOpen(InpOutputFile, FILE_WRITE|FILE_TXT|FILE_ANSI);
+  int handle = FileOpen(InpOutputFile, FILE_WRITE|FILE_TXT|FILE_ANSI|FILE_COMMON);
    if(handle == INVALID_HANDLE)
      {
-      Print("Unable to open output file: ", GetLastError());
+      Print("Unable to open output file ", TerminalInfoString(TERMINAL_COMMONDATA_PATH),
+        "\\Files\\", InpOutputFile, ": ", GetLastError());
       return;
      }
    string server = AccountInfoString(ACCOUNT_SERVER);
@@ -81,5 +82,6 @@ void OnStart()
    json += "}\n";
    FileWriteString(handle, json);
    FileClose(handle);
-   Print("Wrote ", InpOutputFile, " for ", InpSymbol);
+     Print("Wrote ", TerminalInfoString(TERMINAL_COMMONDATA_PATH), "\\Files\\",
+       InpOutputFile, " for ", InpSymbol);
   }
