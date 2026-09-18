@@ -9,21 +9,51 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from engine.backtester import run_backtest
+from core.config import DatasetRole
 from engine.metrics import calculate_metrics
 from engine.models import BacktestResult, BacktestSettings, RiskCalculation, RiskMode, SameBarResolution
 from strategies.demo_strategy import DemoEmaCrossover, DemoParameters
 from strategies.btc_v2_setup_b import BtcV2SetupB, STAGES
+from strategies.btc_v3_regime_adaptive import (BtcV3RegimeAdaptive, RANGE_SETUP_ID,
+                                               TREND_SETUP_ID)
+from strategies.btc_v3_a4_pullback_long import BtcV3A4PullbackLongFrozen
+from strategies.btc_v3_t3_breakout_short import BtcV3T3BreakoutShortFrozen
+from strategies.btc_v3_core_v1 import BtcV3CoreV1Frozen
+from strategies.registry import discover_builtin_strategies
+from strategies.base_strategy import StrategyStatus
+from ui.universal_controls import render_dynamic_parameters, render_status_badge, dataset_role_selectbox
 from ui.btc_setup_b_controls import render_setup_b_controls
+from ui.btc_v3_controls import render_v3_controls
 from utils.data_validation import continuous_segments
 
 
 MAX_CHART_CANDLES = 2_000
 STRATEGY_OPTIONS = ("Demo EMA Strategy", "BTC V2.2 — Setup B Trend Breakout")
+V3_STRATEGY_NAME = "BTC V3.0 — Regime Adaptive"
+_UNIVERSAL_REGISTRY = discover_builtin_strategies()
+UNIVERSAL_STRATEGY_NAMES = tuple(
+    item.metadata.name for item in _UNIVERSAL_REGISTRY.all()
+    if item.metadata.status is not StrategyStatus.REJECTED
+)
+FROZEN_V3_STRATEGY_NAMES = tuple(
+    item.metadata.name for item in _UNIVERSAL_REGISTRY.all()
+    if item.metadata.status is StrategyStatus.FROZEN
+)
+BACKTEST_STRATEGY_OPTIONS = (*STRATEGY_OPTIONS, V3_STRATEGY_NAME, *UNIVERSAL_STRATEGY_NAMES)
 
 
-def selected_strategy(name: str, btc_params: object, demo_params: object):
+def selected_strategy(name: str, btc_params: object = None, demo_params: object = None,
+                      v3_params: object = None):
     if name == STRATEGY_OPTIONS[1]:
         return BtcV2SetupB(btc_params)
+    if name == V3_STRATEGY_NAME:
+        return BtcV3RegimeAdaptive(v3_params)
+    try:
+        descriptor = _UNIVERSAL_REGISTRY.by_name(name)
+    except KeyError:
+        descriptor = None
+    if descriptor is not None:
+        return descriptor.create()
     if name == STRATEGY_OPTIONS[0]:
         return DemoEmaCrossover(demo_params)
     raise ValueError(f"Unknown strategy: {name}")
@@ -158,6 +188,46 @@ def _money(value: float) -> str:
     return f"${value:,.2f}"
 
 
+def _subset_performance(trades) -> dict:
+    winners = [trade for trade in trades if trade.pnl > 1e-9]
+    losers = [trade for trade in trades if trade.pnl < -1e-9]
+    profit = sum(trade.pnl for trade in winners)
+    loss = sum(trade.pnl for trade in losers)
+    count = len(trades)
+    return {
+        "trades": count,
+        "win_rate": len(winners) / count * 100 if count else 0.0,
+        "profit_factor": (profit / abs(loss) if losers else float("inf") if winners else None),
+        "average_r": sum(trade.realized_r for trade in trades) / count if count else 0.0,
+        "net_pnl": sum(trade.pnl for trade in trades),
+    }
+
+
+def _render_v3_split(result: BacktestResult, data: pd.DataFrame) -> None:
+    trend = _subset_performance([t for t in result.trades if t.setup_id == TREND_SETUP_ID])
+    range_ = _subset_performance([t for t in result.trades if t.setup_id == RANGE_SETUP_ID])
+    long_ = _subset_performance([t for t in result.trades if t.direction.value == "LONG"])
+    short_ = _subset_performance([t for t in result.trades if t.direction.value == "SHORT"])
+    months = len(data) * 15 / (60 * 24 * 30.436875) if len(data) else 0.0
+    metrics = calculate_metrics(result)
+    st.subheader("BTC V3 Regime Split")
+    overall = st.columns(4)
+    overall[0].metric("Average R", f"{metrics.average_r_multiple:.4f}")
+    overall[1].metric("Max Losing Streak", f"{metrics.max_consecutive_losses}")
+    overall[2].metric("Trades / Month", f"{metrics.total_trades / months:.2f}" if months else "—")
+    overall[3].metric("Execution", "$10 Synthetic Bid/Ask")
+    table = pd.DataFrame([
+        {"Split": "TREND", **trend},
+        {"Split": "RANGE", **range_},
+        {"Split": "LONG", **long_},
+        {"Split": "SHORT", **short_},
+    ])
+    table = table.rename(columns={"trades": "Trades", "win_rate": "WR %",
+                                  "profit_factor": "PF", "average_r": "Avg R",
+                                  "net_pnl": "PnL $"})
+    st.dataframe(table, width="stretch", hide_index=True)
+
+
 def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
                    strategy_name: str = "Demo EMA Strategy",
                    diagnostics: dict[str, int] | None = None) -> None:
@@ -215,6 +285,9 @@ def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
                             columns=["Statistic", "Value"]),
                  width="stretch", hide_index=True)
 
+    if strategy_name == V3_STRATEGY_NAME:
+        _render_v3_split(result, data)
+
     first_time = data["timestamp"].iloc[0]
     st.plotly_chart(equity_figure(result, first_time), width="stretch")
     st.plotly_chart(drawdown_figure(result, first_time), width="stretch")
@@ -235,9 +308,28 @@ def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
         st.dataframe(order_events_table(result), width="stretch", hide_index=True)
     if diagnostics is not None:
         st.subheader("Signal Diagnostics / Filter Funnel")
-        counts = setup_b_diagnostic_counts(result, diagnostics)
-        labels = [*STAGES, "Pending Orders Created", "Pending Filled",
-                  "Pending Expired", "Pending Cancelled", "Completed Trades"]
+        if strategy_name == V3_STRATEGY_NAME:
+            counts = dict(diagnostics)
+            counts.update({
+                "Pending Orders Created": len(result.order_events),
+                "Pending Filled": sum(e.status == "triggered" for e in result.order_events),
+                "Pending Expired": sum(e.status == "expired" for e in result.order_events),
+                "Pending Cancelled": sum(e.status == "cancelled" for e in result.order_events),
+                "Completed Trades": len(result.trades),
+            })
+            labels = [
+                "Eligible candles", "Regime TREND", "Regime RANGE", "Regime CHOP",
+                "Trend LONG Signals", "Trend SHORT Signals",
+                "Range LONG Signals", "Range SHORT Signals",
+                "Pending Orders Created", "Pending Filled", "Pending Expired",
+                "Pending Cancelled", "Completed Trades",
+            ]
+            file_name = "btc_v3_diagnostics.csv"
+        else:
+            counts = setup_b_diagnostic_counts(result, diagnostics)
+            labels = [*STAGES, "Pending Orders Created", "Pending Filled",
+                      "Pending Expired", "Pending Cancelled", "Completed Trades"]
+            file_name = "btc_setup_b_diagnostics.csv"
         diagnostic_table = pd.DataFrame(
             [(label, counts.get(label, 0)) for label in labels],
             columns=["Stage", "Candles / Orders / Trades"],
@@ -245,7 +337,7 @@ def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
         st.dataframe(diagnostic_table, width="stretch", hide_index=True)
         st.download_button("Download Signal Diagnostics CSV",
                            diagnostic_table.to_csv(index=False).encode("utf-8"),
-                           file_name="btc_setup_b_diagnostics.csv", mime="text/csv")
+                           file_name=file_name, mime="text/csv")
 
 
 def render_backtest_panel(data: pd.DataFrame) -> None:
@@ -257,10 +349,25 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
     latest = data["timestamp"].iloc[-1].date()
     recent_start = max(earliest, latest - pd.Timedelta(days=30))
     with st.form("backtest_form"):
+        top_controls = st.columns(3)
+        instrument_name = top_controls[0].selectbox("Instrument", ("BTC/USD", "XAU/USD"))
+        broker_profile = top_controls[1].selectbox("Broker Profile", ("EXNESS_STANDARD",))
+        dataset_role = DatasetRole(top_controls[2].selectbox("Dataset Role", [role.value for role in DatasetRole]))
+        if instrument_name == "BTC/USD":
+            strategy_options = BACKTEST_STRATEGY_OPTIONS
+        else:
+            strategy_options = tuple()
+            st.info("Gold profile exists as a Phase-1 placeholder. Exact Exness XAUUSD specifications and Gold strategies are not enabled yet.")
         strategy_name = st.selectbox(
-            "Strategy", STRATEGY_OPTIONS,
+            "Strategy", strategy_options if strategy_options else ("No XAUUSD strategy available yet",),
+            disabled=not bool(strategy_options),
         )
-        btc_selected = strategy_name.startswith("BTC")
+        v2_selected = strategy_name == STRATEGY_OPTIONS[1]
+        v3_selected = strategy_name == V3_STRATEGY_NAME
+        universal_selected = strategy_name in UNIVERSAL_STRATEGY_NAMES
+        frozen_v3_selected = strategy_name in FROZEN_V3_STRATEGY_NAMES
+        v3_synthetic_selected = v3_selected or universal_selected
+        btc_selected = v2_selected or v3_synthetic_selected
         date_cols = st.columns(2)
         start = date_cols[0].date_input("Backtest Start Date", value=recent_start,
                                        min_value=earliest, max_value=latest)
@@ -278,9 +385,12 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
         rr = e.number_input("Risk Reward Ratio", min_value=0.01,
                             value=3.0 if btc_selected else 2.0,
                             key="btc_reward" if btc_selected else "demo_reward")
-        commission = f.number_input("Commission (%)", min_value=0.0, max_value=99.0,
-                                     value=0.05 if btc_selected else 0.0,
-                                     key="btc_commission" if btc_selected else "demo_commission")
+        commission = f.number_input(
+            "Commission (%)", min_value=0.0, max_value=99.0,
+            value=0.0 if v3_synthetic_selected else 0.05 if v2_selected else 0.0,
+            key="v3_commission" if v3_synthetic_selected else "btc_commission" if v2_selected else "demo_commission",
+            disabled=v3_synthetic_selected,
+        )
         g, h = st.columns(2)
         slippage = g.number_input("Slippage (%)", min_value=0.0, max_value=99.0, value=0.0)
         same_bar = h.selectbox("Same-Bar Resolution", [mode.value for mode in SameBarResolution])
@@ -301,9 +411,20 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
             "An adverse gap can still cause a larger loss."
         )
         st.subheader("Strategy Parameters")
-        if btc_selected:
+        if v2_selected:
             st.caption("Pine commission defaults to 0.05%. Its two-tick slippage cannot be expressed exactly by the audited percentage-slippage model; set a percentage above if desired.")
             btc_params = render_setup_b_controls()
+        elif v3_selected:
+            st.caption("V3 research execution uses the audited synthetic Exness-like Bid/Ask replay: $10/BTC spread and $0 separate commission. Forward data is not used automatically.")
+            v3_params = render_v3_controls()
+        elif strategy_name in UNIVERSAL_STRATEGY_NAMES:
+            descriptor = _UNIVERSAL_REGISTRY.by_name(strategy_name)
+            render_status_badge(descriptor)
+            render_dynamic_parameters(descriptor)
+            if descriptor.metadata.status is StrategyStatus.FROZEN:
+                st.caption("Frozen validated strategy: parameters are read-only. Execution remains the audited synthetic Exness Bid/Ask path.")
+            else:
+                st.caption("Historical research/rejected strategy. Universal metadata is available; production use is not implied.")
         else:
             st.caption("Demo EMA crossover validates the engine.")
             p1, p2, p3, p4 = st.columns(4)
@@ -330,9 +451,16 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
                         f"segments. Select one continuous period; the largest is "
                         f"{largest.start} to {largest.end} ({largest.candles:,} candles)."
                     )
-            if btc_selected:
+            if v2_selected:
                 params = replace(btc_params, reward_multiple=float(rr))
                 strategy = selected_strategy(strategy_name, params, None)
+                run_data = setup_b_run_data(data, selected)
+            elif v3_selected:
+                params = replace(v3_params, reward_multiple=float(rr))
+                strategy = selected_strategy(strategy_name, None, None, params)
+                run_data = setup_b_run_data(data, selected)
+            elif universal_selected:
+                strategy = selected_strategy(strategy_name)
                 run_data = setup_b_run_data(data, selected)
             else:
                 params = DemoParameters(int(fast), int(slow), int(atr_length), float(stop_multiple))
@@ -348,9 +476,24 @@ def render_backtest_panel(data: pd.DataFrame) -> None:
             )
             start_time = pd.Timestamp(start, tz="UTC")
             end_time = pd.Timestamp(end, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(minutes=15)
-            result = run_backtest(run_data, strategy, settings,
-                                  trade_start=start_time, trade_end=end_time)
-            diagnostics = dict(strategy.diagnostics) if btc_selected else None
+            if v3_synthetic_selected:
+                from research.v3_regime_adaptive_baseline import run_v3_synthetic_segment
+                if frozen_v3_selected:
+                    v3_settings = replace(
+                        settings, risk_mode=RiskMode.PERCENT_EQUITY, risk_percent=0.25,
+                        risk_reward_ratio=3.0, commission_percent=0.0, slippage_percent=0.0,
+                        same_bar_resolution=SameBarResolution.SL_FIRST,
+                        risk_calculation=RiskCalculation.ESTIMATED_TOTAL_STOP_LOSS,
+                        max_leverage=1.0, min_quantity=0.0,
+                    )
+                else:
+                    v3_settings = replace(settings, commission_percent=0.0, slippage_percent=0.0)
+                result = run_v3_synthetic_segment(
+                    run_data, strategy, 10.0, start_time, v3_settings)
+            else:
+                result = run_backtest(run_data, strategy, settings,
+                                      trade_start=start_time, trade_end=end_time)
+            diagnostics = dict(strategy.diagnostics) if (v2_selected or v3_selected) else None
             st.session_state["demo_backtest"] = (result, selected, start, end,
                                                   strategy_name, diagnostics)
         except ValueError as exc:
