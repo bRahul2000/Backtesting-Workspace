@@ -10,6 +10,7 @@ import streamlit as st
 from brokers.exness_standard_btcusdm import PROFILE
 from research.exness_cost_recalibration import OUTPUT
 from research.exness_cost_calibrated import OUTPUT as CALIBRATED_OUTPUT
+from research.exness_synthetic_audit import OUTPUT as SYNTHETIC_AUDIT_OUTPUT
 
 
 def render_exness_cost_calibration(report_dir: Path = OUTPUT) -> None:
@@ -125,3 +126,60 @@ def render_exness_cost_calibration(report_dir: Path = OUTPUT) -> None:
         st.dataframe(candidates[["candidate", "scope", "trades", "profit_factor",
                                  "average_r", "net_pnl", "worst_segment_dd_percent"]].round(4),
                      hide_index=True, width="stretch")
+    _render_synthetic_audit(SYNTHETIC_AUDIT_OUTPUT)
+
+
+def _render_synthetic_audit(report_dir: Path) -> None:
+    needed = ["fill_reconciliation.csv", "direction_comparison.csv",
+              "candidate_synthetic_results.csv", "candidate_direction_results.csv",
+              "synthetic_spread_sensitivity.csv", "robustness_flags.csv"]
+    if any(not (report_dir / name).exists() for name in needed):
+        return
+    st.divider()
+    st.subheader("Synthetic Execution Audit")
+    st.info("RESEARCH ONLY · BITSTAMP HISTORICAL PRICES · SYNTHETIC EXNESS-LIKE BID/ASK. These are not broker-native Exness historical results.")
+    reconciliation = pd.read_csv(report_dir / needed[0])
+    directions = pd.read_csv(report_dir / needed[1])
+    results = pd.read_csv(report_dir / needed[2])
+    side_results = pd.read_csv(report_dir / needed[3])
+    spreads = pd.read_csv(report_dir / needed[4])
+    flags = pd.read_csv(report_dir / needed[5])
+    counts = reconciliation.classification.value_counts()
+    cards = st.columns(4)
+    cards[0].metric("Original pending fills", f"{int(directions.loc[directions.model == 'original_single_price', 'pending_fills'].sum()):,}")
+    cards[1].metric("Synthetic $10 fills", f"{int(directions.loc[directions.model == 'synthetic_$10', 'pending_fills'].sum()):,}")
+    cards[2].metric("Synthetic-only fills", f"{int(counts.get('SYNTHETIC_ONLY_FILL', 0)):,}")
+    cards[3].metric("Original-only fills", f"{int(counts.get('ORIGINAL_ONLY_FILL', 0)):,}")
+    st.markdown("**Long vs short fill and trade difference**")
+    st.dataframe(directions[["direction", "model", "pending_fills", "same_fill",
+                             "synthetic_only", "original_only", "timing_changed",
+                             "price_changed", "trades", "win_rate_percent",
+                             "profit_factor", "average_r", "net_pnl"]].round(4),
+                 hide_index=True, width="stretch")
+    with st.expander("Exclusive fills and reconciliation details", expanded=False):
+        st.caption("Each order is matched by segment, signal time, direction, and setup ID. Exclusive fills include their signal-time state and causal explanation.")
+        for label, category in (("Synthetic-only", "SYNTHETIC_ONLY_FILL"),
+                                ("Original-only", "ORIGINAL_ONLY_FILL")):
+            st.markdown(f"**{label} fills**")
+            part = reconciliation.loc[reconciliation.classification == category]
+            st.dataframe(part[["segment_id", "signal_time", "direction", "trigger_price",
+                               "original_status", "synthetic_status", "reason", "explanation"]],
+                         hide_index=True, width="stretch")
+    st.markdown("**Frozen candidates · $10 synthetic execution**")
+    st.dataframe(results[["candidate", "scope", "signals", "pending_fills", "trades",
+                          "long_trades", "short_trades", "win_rate_percent",
+                          "profit_factor", "average_r", "median_r", "net_pnl",
+                          "worst_segment_dd_percent", "maximum_consecutive_losses"]].round(4),
+                 hide_index=True, width="stretch")
+    with st.expander("Long vs short robustness and descriptive flags", expanded=False):
+        st.dataframe(side_results[["candidate", "scope", "direction", "trades",
+                                   "profit_factor", "average_r", "net_pnl"]].round(4),
+                     hide_index=True, width="stretch")
+        st.dataframe(flags, hide_index=True, width="stretch")
+    st.markdown("**Synthetic spread sensitivity · $5 / $10 / $15 / $20**")
+    for metric, title in (("profit_factor", "Profit factor"),
+                          ("average_r", "Average R"), ("net_pnl", "Net PnL")):
+        fig = px.line(spreads, x="spread_usd_per_btc", y=metric, color="candidate",
+                      facet_col="scope", markers=True, title=title, template="plotly_dark")
+        st.plotly_chart(fig, width="stretch")
+    st.caption("The $10 synthetic spread is embedded in Bid/Ask execution prices. Commission is $0; no second spread is deducted. No candidate is selected for deployment.")

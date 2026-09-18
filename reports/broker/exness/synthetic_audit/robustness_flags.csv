@@ -1,0 +1,5 @@
+candidate,development_pf_gt_1,development_avg_r_gt_0,forward_pf_gt_1,forward_avg_r_gt_0,long_development_pf_gt_1,short_development_pf_gt_1,long_forward_pf_gt_1,short_forward_pf_gt_1,adequate_sample
+ORIGINAL,True,True,False,False,True,False,False,False,True
+C2,True,True,True,True,True,True,False,True,True
+C3,True,True,False,False,True,False,False,True,True
+ADX25,True,True,False,False,False,True,False,True,True
