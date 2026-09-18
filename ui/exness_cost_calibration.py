@@ -9,6 +9,7 @@ import streamlit as st
 
 from brokers.exness_standard_btcusdm import PROFILE
 from research.exness_cost_recalibration import OUTPUT
+from research.exness_cost_calibrated import OUTPUT as CALIBRATED_OUTPUT
 
 
 def render_exness_cost_calibration(report_dir: Path = OUTPUT) -> None:
@@ -79,3 +80,48 @@ def render_exness_cost_calibration(report_dir: Path = OUTPUT) -> None:
     st.dataframe(direction[["view", "direction", "executable_trades", "profit_factor",
                             "average_r", "net_pnl"]].round(4), hide_index=True, width="stretch")
     st.caption("Signals and historical movement remain from Bitstamp BTC/USD. This reprices frozen completed trades only. A broker-native backtest requires longer Exness Bid/Ask history and tick-level execution replay. The arithmetic final balance is not a compounded equity curve across data gaps.")
+
+    calibrated = CALIBRATED_OUTPUT
+    needed = ["cost_model_comparison.csv", "spread_sensitivity.csv",
+              "synthetic_execution_comparison.csv", "yearly_spread_bps.csv",
+              "frozen_candidate_comparison.csv"]
+    if any(not (calibrated / name).exists() for name in needed):
+        return
+    st.divider()
+    st.subheader("Exness Standard cost-calibrated approximation")
+    st.warning("These are cost-calibrated research results using Bitstamp historical prices. They are not broker-native historical Exness results.")
+    st.caption("Observed broker sample: 5 real tick files · 541,647 ticks · $10/BTC spread. Commission $0. Synthetic Ask = Bitstamp Bid + assumed fixed spread. No active strategy setting changes.")
+    new_comparison = pd.read_csv(calibrated / needed[0])
+    new_sensitivity = pd.read_csv(calibrated / needed[1])
+    mechanics = pd.read_csv(calibrated / needed[2])
+    bps = pd.read_csv(calibrated / needed[3])
+    candidates = pd.read_csv(calibrated / needed[4])
+    st.markdown("**A. Historical Bitstamp + old generic costs**")
+    old_row = new_comparison.loc[(new_comparison.scope == "all") &
+                                 (new_comparison.scenario == "old_0.05pct_per_side")]
+    st.dataframe(old_row[["trades", "profit_factor", "average_r", "net_pnl",
+                          "worst_segment_dd_percent"]].round(4), hide_index=True, width="stretch")
+    st.markdown("**B. Historical Bitstamp + Exness-calibrated fixed spread approximation**")
+    ten = new_comparison.loc[new_comparison.scenario == "spread_$10"]
+    st.dataframe(ten[["scope", "trades", "win_rate_percent", "profit_factor",
+                      "average_r", "net_pnl", "total_spread_cost",
+                      "worst_segment_dd_percent"]].round(4), hide_index=True, width="stretch")
+    st.markdown("**C. Synthetic Exness-like Bid/Ask execution**")
+    st.caption("Research-only quote-side trigger and exit replay; Bitstamp remains the historical price source.")
+    st.dataframe(mechanics[["view", "scope", "pending_fills", "pending_expiries",
+                            "trades", "win_rate_percent", "profit_factor", "average_r",
+                            "net_pnl", "worst_segment_dd_percent"]].round(4),
+                 hide_index=True, width="stretch")
+    st.markdown("**Fixed-spread sensitivity · cost-only**")
+    whole = new_sensitivity.loc[new_sensitivity.scope == "all"]
+    for metric, title in (("profit_factor", "Profit factor"),
+                          ("average_r", "Average R"), ("net_pnl", "Net PnL")):
+        fig = px.line(whole, x="spread_usd_per_btc", y=metric, markers=True,
+                      title=title, template="plotly_dark")
+        st.plotly_chart(fig, width="stretch")
+    with st.expander("Spread bps by year and secondary frozen candidates", expanded=False):
+        st.dataframe(bps.round(4), hide_index=True, width="stretch")
+        st.caption("C2, C3, and ADX25 were frozen in Phase 4E. These are secondary cost-only views, not newly selected strategies.")
+        st.dataframe(candidates[["candidate", "scope", "trades", "profit_factor",
+                                 "average_r", "net_pnl", "worst_segment_dd_percent"]].round(4),
+                     hide_index=True, width="stretch")
