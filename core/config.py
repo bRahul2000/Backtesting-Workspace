@@ -9,7 +9,9 @@ import pandas as pd
 
 class DatasetRole(str, Enum):
     DEVELOPMENT = "DEVELOPMENT"
+    VALIDATION = "VALIDATION"
     FORWARD_VALIDATION = "FORWARD_VALIDATION"
+    HOLDOUT = "HOLDOUT"
     PAPER = "PAPER"
     LIVE = "LIVE"
 

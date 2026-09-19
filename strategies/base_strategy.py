@@ -45,6 +45,8 @@ class StrategyParameter:
     optimization_allowed: bool = True
     frozen: bool = False
     choices: tuple[Any, ...] = ()
+    display_name: str | None = None
+    group: str = "Strategy Inputs"
 
     def validate(self, value: Any) -> Any:
         if self.frozen and value != self.default:

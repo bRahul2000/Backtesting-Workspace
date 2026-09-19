@@ -37,6 +37,7 @@ from ui.setup_a_v1_candidate import render_setup_a_v1_candidate
 from ui.setup_a_diagnostics import render_setup_a_diagnostics
 from ui.exness_broker_data import render_exness_broker_data
 from ui.live_chart import render_live_chart
+from ui.research_lab import render_research_lab
 from ui.universal_workspace import render_experiment_comparison, render_experiment_history, render_universal_workspace
 
 
@@ -327,8 +328,8 @@ def render_market_data() -> pd.DataFrame:
     return active_data
 
 
-workspace_tab, history_tab, comparison_tab, market_tab, backtest_tab, research_tab, diagnostics_tab, live_chart_tab = st.tabs(
-    ["Universal Workspace", "Experiment History", "Experiment Comparison", "Market Data", "Backtest", "Long-History Research", "Diagnostics", "Live Chart"]
+workspace_tab, history_tab, comparison_tab, lab_tab, market_tab, backtest_tab, research_tab, diagnostics_tab, live_chart_tab = st.tabs(
+    ["Universal Workspace", "Experiment History", "Experiment Comparison", "Research Lab", "Market Data", "Backtest", "Long-History Research", "Diagnostics", "Live Chart"]
 )
 with workspace_tab:
     render_universal_workspace()
@@ -336,6 +337,8 @@ with history_tab:
     render_experiment_history()
 with comparison_tab:
     render_experiment_comparison()
+with lab_tab:
+    render_research_lab()
 with market_tab:
     active_data = render_market_data()
 with backtest_tab:
