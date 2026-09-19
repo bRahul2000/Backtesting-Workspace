@@ -1,0 +1,593 @@
+{
+  "optimization_id": "PB1-PHASE-B1-CORE-STRUCTURE-V1",
+  "baseline": {
+    "trades": 810,
+    "pf": 0.9267538477539468,
+    "average_r": -0.05081890315227994,
+    "total_r": -41.163311553346745
+  },
+  "run": {
+    "optimization_id": "PB1-PHASE-B1-CORE-STRUCTURE-V1",
+    "created_at": "2026-09-19T21:04:28.313269+00:00",
+    "strategy_id": "BTC_PB1_SHALLOW_PULLBACK_V1",
+    "strategy_version": "1.0",
+    "search_method": "GRID",
+    "search_seed": null,
+    "parameter_space": {
+      "confirmation_minimum_body_percent": [
+        0.4,
+        0.5,
+        0.6,
+        0.7
+      ],
+      "impulse_minimum_range_atr": [
+        1.2,
+        1.5,
+        1.8,
+        2.1
+      ],
+      "pullback_maximum_retracement_percent": [
+        0.35,
+        0.45,
+        0.55
+      ],
+      "pullback_minimum_retracement_percent": [
+        0.15,
+        0.2,
+        0.25
+      ]
+    },
+    "candidate_count": 144,
+    "dataset_role": "DEVELOPMENT",
+    "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+    "instrument_fingerprint": "036f2af4aead59fbaa04a893d51550dd4e542c0c87ff6ce31bc7d424484525cc",
+    "broker_fingerprint": "cb34c18494012add1e02899ee13b8af320f43db5401953907923a4e2389d9fa3",
+    "engine_version": "phase3b",
+    "status": "COMPLETED",
+    "runtime_seconds": null,
+    "optimization_dataset_role": "DEVELOPMENT",
+    "optimization_dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+    "development_dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+    "validation_dataset_role": null,
+    "validation_dataset_fingerprint": null
+  },
+  "generated_candidates": 144,
+  "successful_candidates": 144,
+  "unique_fingerprints": 144,
+  "candidates_pf_gt_1": 26,
+  "candidates_avg_r_gt_0": 26,
+  "candidates_meeting_full_viability": 18,
+  "stability_distribution": {
+    "Broad Plateau": 2,
+    "Moderate Stability": 15,
+    "Fragile Region": 127,
+    "Insufficient Neighbors": 0
+  },
+  "highest_pf_candidate": {
+    "parameters": {
+      "confirmation_minimum_body_percent": 0.6,
+      "impulse_minimum_range_atr": 1.8,
+      "pullback_maximum_retracement_percent": 0.35,
+      "pullback_minimum_retracement_percent": 0.25
+    },
+    "parameter_fingerprint": "b896f3f908c764d6089c886928a66273c733b5cb18de7056f7ed35e4f251ea15",
+    "closed_trades": 227,
+    "trades_per_month": 7.121326819841099,
+    "profit_factor": 1.2287505033758737,
+    "average_r": 0.15357473932001747,
+    "total_r": 34.86146582564396,
+    "pnl": 877.6204913428296,
+    "max_dd": 2.966597142713441,
+    "stability": {
+      "neighbor_count": 10,
+      "profitable_neighbor_percent": 80.0,
+      "positive_average_r_neighbor_percent": 80.0,
+      "median_neighbor_pf": 1.0526057845608694,
+      "median_neighbor_average_r": 0.03724899630121494,
+      "median_neighbor_dd": 4.927957697707534,
+      "pf_dispersion": 0.0947976100944722,
+      "average_r_dispersion": 0.06596798249247533,
+      "dd_dispersion": 2.041972673321149,
+      "stability_score": 83.0144084604585,
+      "classification": "Broad Plateau",
+      "warnings": [
+        "BOUNDARY SENSITIVITY"
+      ],
+      "formula": "0.4*profitable_neighbor_pct + 0.4*positive_avg_r_neighbor_pct + 0.2*(100-min(median_dd,100))"
+    }
+  },
+  "highest_average_r_candidate": {
+    "parameters": {
+      "confirmation_minimum_body_percent": 0.6,
+      "impulse_minimum_range_atr": 1.8,
+      "pullback_maximum_retracement_percent": 0.35,
+      "pullback_minimum_retracement_percent": 0.25
+    },
+    "parameter_fingerprint": "b896f3f908c764d6089c886928a66273c733b5cb18de7056f7ed35e4f251ea15",
+    "closed_trades": 227,
+    "trades_per_month": 7.121326819841099,
+    "profit_factor": 1.2287505033758737,
+    "average_r": 0.15357473932001747,
+    "total_r": 34.86146582564396,
+    "pnl": 877.6204913428296,
+    "max_dd": 2.966597142713441,
+    "stability": {
+      "neighbor_count": 10,
+      "profitable_neighbor_percent": 80.0,
+      "positive_average_r_neighbor_percent": 80.0,
+      "median_neighbor_pf": 1.0526057845608694,
+      "median_neighbor_average_r": 0.03724899630121494,
+      "median_neighbor_dd": 4.927957697707534,
+      "pf_dispersion": 0.0947976100944722,
+      "average_r_dispersion": 0.06596798249247533,
+      "dd_dispersion": 2.041972673321149,
+      "stability_score": 83.0144084604585,
+      "classification": "Broad Plateau",
+      "warnings": [
+        "BOUNDARY SENSITIVITY"
+      ],
+      "formula": "0.4*profitable_neighbor_pct + 0.4*positive_avg_r_neighbor_pct + 0.2*(100-min(median_dd,100))"
+    }
+  },
+  "lowest_dd_viable_candidate": {
+    "parameters": {
+      "confirmation_minimum_body_percent": 0.6,
+      "impulse_minimum_range_atr": 1.8,
+      "pullback_maximum_retracement_percent": 0.35,
+      "pullback_minimum_retracement_percent": 0.2
+    },
+    "parameter_fingerprint": "a4d0c34c8ff1bce02cea5efe0daefb7a88b30948c2341c24e30fe9a039894792",
+    "closed_trades": 337,
+    "trades_per_month": 10.572190036504187,
+    "profit_factor": 1.082367039282775,
+    "average_r": 0.05625095452127069,
+    "total_r": 18.956571673668222,
+    "pnl": 480.39780030445655,
+    "max_dd": 4.0802011406513135,
+    "stability": {
+      "neighbor_count": 10,
+      "profitable_neighbor_percent": 60.0,
+      "positive_average_r_neighbor_percent": 60.0,
+      "median_neighbor_pf": 1.0115322426715472,
+      "median_neighbor_average_r": 0.008886380570904948,
+      "median_neighbor_dd": 5.88557651615135,
+      "pf_dispersion": 0.10051745729536672,
+      "average_r_dispersion": 0.06982211522200138,
+      "dd_dispersion": 2.33043319672545,
+      "stability_score": 66.82288469676973,
+      "classification": "Moderate Stability",
+      "warnings": [
+        "BOUNDARY SENSITIVITY"
+      ],
+      "formula": "0.4*profitable_neighbor_pct + 0.4*positive_avg_r_neighbor_pct + 0.2*(100-min(median_dd,100))"
+    }
+  },
+  "highest_stability_candidate": {
+    "parameters": {
+      "confirmation_minimum_body_percent": 0.5,
+      "impulse_minimum_range_atr": 1.8,
+      "pullback_maximum_retracement_percent": 0.35,
+      "pullback_minimum_retracement_percent": 0.25
+    },
+    "parameter_fingerprint": "9ae3718541f86f88467849ea6d53413b70310d66ec3b3f2ed6bcbd14a97fa94c",
+    "closed_trades": 279,
+    "trades_per_month": 8.752643976809104,
+    "profit_factor": 1.2124884994910055,
+    "average_r": 0.14245144654947262,
+    "total_r": 39.74395358730286,
+    "pnl": 999.737116135421,
+    "max_dd": 3.554625563804812,
+    "stability": {
+      "neighbor_count": 10,
+      "profitable_neighbor_percent": 80.0,
+      "positive_average_r_neighbor_percent": 80.0,
+      "median_neighbor_pf": 1.0477193155476776,
+      "median_neighbor_average_r": 0.03182985168169815,
+      "median_neighbor_dd": 4.668194473920207,
+      "pf_dispersion": 0.076020396088898,
+      "average_r_dispersion": 0.05119184830158696,
+      "dd_dispersion": 1.9066236010937139,
+      "stability_score": 83.06636110521596,
+      "classification": "Broad Plateau",
+      "warnings": [
+        "BOUNDARY SENSITIVITY"
+      ],
+      "formula": "0.4*profitable_neighbor_pct + 0.4*positive_avg_r_neighbor_pct + 0.2*(100-min(median_dd,100))"
+    }
+  },
+  "stable_region_representatives": [
+    {
+      "parameters": {
+        "confirmation_minimum_body_percent": 0.5,
+        "impulse_minimum_range_atr": 1.8,
+        "pullback_maximum_retracement_percent": 0.35,
+        "pullback_minimum_retracement_percent": 0.2
+      },
+      "parameter_fingerprint": "18ee17e0a41b7abff3915f8d0c5e357e36c3cd8ef11361ef6b0b2241c89014ab",
+      "closed_trades": 414,
+      "trades_per_month": 12.987794288168347,
+      "profit_factor": 1.0506776723752407,
+      "average_r": 0.03436149203927439,
+      "total_r": 14.225657704259598,
+      "pnl": 364.9169456193263,
+      "max_dd": 4.426109615014397,
+      "stability": {
+        "neighbor_count": 10,
+        "profitable_neighbor_percent": 70.0,
+        "positive_average_r_neighbor_percent": 70.0,
+        "median_neighbor_pf": 1.0067021749981127,
+        "median_neighbor_average_r": 0.005178383418680849,
+        "median_neighbor_dd": 5.088238788949458,
+        "pf_dispersion": 0.09347115792480591,
+        "average_r_dispersion": 0.0643906841762992,
+        "dd_dispersion": 1.961769188020053,
+        "stability_score": 74.98235224221011,
+        "classification": "Moderate Stability",
+        "warnings": [
+          "BOUNDARY SENSITIVITY"
+        ],
+        "formula": "0.4*profitable_neighbor_pct + 0.4*positive_avg_r_neighbor_pct + 0.2*(100-min(median_dd,100))"
+      },
+      "viability": {
+        "checks": {
+          "trades>=300": true,
+          "trades_per_month>=8": true,
+          "pf>1.00": true,
+          "avg_r>0": true,
+          "max_dd<=10": true
+        },
+        "meets_all_viability": true,
+        "positive_avg_r_years": [
+          "2023"
+        ],
+        "positive_avg_r_year_count": 1,
+        "one_year_dependency_year": "2023"
+      },
+      "yearly_statistics": {
+        "2021": {
+          "average_r": -0.06624241247431702,
+          "pnl": -242.25107062092007,
+          "profit_factor": 0.9131583835171049,
+          "trades": 146,
+          "win_rate": 23.28767123287671
+        },
+        "2022": {
+          "average_r": -0.07408532151495935,
+          "pnl": -209.71708617002363,
+          "profit_factor": 0.8957192364858676,
+          "trades": 111,
+          "win_rate": 22.52252252252252
+        },
+        "2023": {
+          "average_r": 0.2045893032717858,
+          "pnl": 816.8851024102701,
+          "profit_factor": 1.3403561296282431,
+          "trades": 157,
+          "win_rate": 29.936305732484076
+        }
+      },
+      "long_statistics": {
+        "average_r": 0.0778498795007881,
+        "pnl": 420.17895210541656,
+        "profit_factor": 1.1124817194770131,
+        "trades": 214,
+        "win_rate": 27.102803738317757
+      },
+      "short_statistics": {
+        "average_r": -0.012171082544545284,
+        "pnl": -55.26200648609019,
+        "profit_factor": 0.9840523492566465,
+        "trades": 200,
+        "win_rate": 24.0
+      }
+    },
+    {
+      "parameters": {
+        "confirmation_minimum_body_percent": 0.4,
+        "impulse_minimum_range_atr": 1.8,
+        "pullback_maximum_retracement_percent": 0.35,
+        "pullback_minimum_retracement_percent": 0.25
+      },
+      "parameter_fingerprint": "4630be0497ac3d12d763822e77f906dd605fba683dff8460d45ed368bc33e728",
+      "closed_trades": 321,
+      "trades_per_month": 10.070246295898647,
+      "profit_factor": 1.1380227235324556,
+      "average_r": 0.09320523603782002,
+      "total_r": 29.91888076814023,
+      "pnl": 760.8809870901757,
+      "max_dd": 4.676406557792553,
+      "stability": {
+        "neighbor_count": 10,
+        "profitable_neighbor_percent": 70.0,
+        "positive_average_r_neighbor_percent": 70.0,
+        "median_neighbor_pf": 1.0170216986656997,
+        "median_neighbor_average_r": 0.011418455761641053,
+        "median_neighbor_dd": 6.336057694008634,
+        "pf_dispersion": 0.1005273716447207,
+        "average_r_dispersion": 0.06852080820468044,
+        "dd_dispersion": 2.5119824062003118,
+        "stability_score": 74.73278846119828,
+        "classification": "Moderate Stability",
+        "warnings": [
+          "BOUNDARY SENSITIVITY"
+        ],
+        "formula": "0.4*profitable_neighbor_pct + 0.4*positive_avg_r_neighbor_pct + 0.2*(100-min(median_dd,100))"
+      },
+      "viability": {
+        "checks": {
+          "trades>=300": true,
+          "trades_per_month>=8": true,
+          "pf>1.00": true,
+          "avg_r>0": true,
+          "max_dd<=10": true
+        },
+        "meets_all_viability": true,
+        "positive_avg_r_years": [
+          "2021",
+          "2023"
+        ],
+        "positive_avg_r_year_count": 2,
+        "one_year_dependency_year": "2023"
+      },
+      "yearly_statistics": {
+        "2021": {
+          "average_r": 0.052404831848988455,
+          "pnl": 160.32398010680606,
+          "profit_factor": 1.0735672531996465,
+          "trades": 118,
+          "win_rate": 26.271186440677965
+        },
+        "2022": {
+          "average_r": -0.10745069653927077,
+          "pnl": -225.34536037541594,
+          "profit_factor": 0.856947090817971,
+          "trades": 84,
+          "win_rate": 21.428571428571427
+        },
+        "2023": {
+          "average_r": 0.27530226150637255,
+          "pnl": 825.9023673587857,
+          "profit_factor": 1.4697486906262276,
+          "trades": 119,
+          "win_rate": 31.932773109243698
+        }
+      },
+      "long_statistics": {
+        "average_r": 0.08795260662739061,
+        "pnl": 375.83840602888444,
+        "profit_factor": 1.1279956789281258,
+        "trades": 168,
+        "win_rate": 27.38095238095238
+      },
+      "short_statistics": {
+        "average_r": 0.09897282911593859,
+        "pnl": 385.0425810612913,
+        "profit_factor": 1.1494506616010505,
+        "trades": 153,
+        "win_rate": 26.797385620915033
+      }
+    },
+    {
+      "parameters": {
+        "confirmation_minimum_body_percent": 0.6,
+        "impulse_minimum_range_atr": 1.8,
+        "pullback_maximum_retracement_percent": 0.35,
+        "pullback_minimum_retracement_percent": 0.2
+      },
+      "parameter_fingerprint": "a4d0c34c8ff1bce02cea5efe0daefb7a88b30948c2341c24e30fe9a039894792",
+      "closed_trades": 337,
+      "trades_per_month": 10.572190036504187,
+      "profit_factor": 1.082367039282775,
+      "average_r": 0.05625095452127069,
+      "total_r": 18.956571673668222,
+      "pnl": 480.39780030445655,
+      "max_dd": 4.0802011406513135,
+      "stability": {
+        "neighbor_count": 10,
+        "profitable_neighbor_percent": 60.0,
+        "positive_average_r_neighbor_percent": 60.0,
+        "median_neighbor_pf": 1.0115322426715472,
+        "median_neighbor_average_r": 0.008886380570904948,
+        "median_neighbor_dd": 5.88557651615135,
+        "pf_dispersion": 0.10051745729536672,
+        "average_r_dispersion": 0.06982211522200138,
+        "dd_dispersion": 2.33043319672545,
+        "stability_score": 66.82288469676973,
+        "classification": "Moderate Stability",
+        "warnings": [
+          "BOUNDARY SENSITIVITY"
+        ],
+        "formula": "0.4*profitable_neighbor_pct + 0.4*positive_avg_r_neighbor_pct + 0.2*(100-min(median_dd,100))"
+      },
+      "viability": {
+        "checks": {
+          "trades>=300": true,
+          "trades_per_month>=8": true,
+          "pf>1.00": true,
+          "avg_r>0": true,
+          "max_dd<=10": true
+        },
+        "meets_all_viability": true,
+        "positive_avg_r_years": [
+          "2021",
+          "2023"
+        ],
+        "positive_avg_r_year_count": 2,
+        "one_year_dependency_year": null
+      },
+      "yearly_statistics": {
+        "2021": {
+          "average_r": 0.0676184547684931,
+          "pnl": 198.01424860658867,
+          "profit_factor": 1.0926848382144168,
+          "trades": 116,
+          "win_rate": 26.724137931034484
+        },
+        "2022": {
+          "average_r": -0.15187201701056158,
+          "pnl": -321.1436915267086,
+          "profit_factor": 0.7954194649517893,
+          "trades": 84,
+          "win_rate": 20.238095238095237
+        },
+        "2023": {
+          "average_r": 0.174234163134381,
+          "pnl": 603.5272432245764,
+          "profit_factor": 1.2838510137794645,
+          "trades": 137,
+          "win_rate": 29.197080291970803
+        }
+      },
+      "long_statistics": {
+        "average_r": 0.1147600533892945,
+        "pnl": 533.2267729570997,
+        "profit_factor": 1.1694355988430611,
+        "trades": 183,
+        "win_rate": 27.868852459016395
+      },
+      "short_statistics": {
+        "average_r": -0.013276091536186183,
+        "pnl": -52.82897265264309,
+        "profit_factor": 0.9803268010195738,
+        "trades": 154,
+        "win_rate": 24.025974025974026
+      }
+    }
+  ],
+  "parameter_surfaces": {
+    "impulse_minimum_range_atr": [
+      {
+        "value": 1.2,
+        "n": 36,
+        "median_pf": 0.8988645719872502,
+        "median_average_r": -0.07351126196221361,
+        "median_trades_per_month": 27.230447927850545,
+        "median_max_dd": 9.730138487486547,
+        "profitable_count": 0
+      },
+      {
+        "value": 1.5,
+        "n": 36,
+        "median_pf": 0.93965044016228,
+        "median_average_r": -0.042992217838730855,
+        "median_trades_per_month": 20.893408202705604,
+        "median_max_dd": 7.534817583263516,
+        "profitable_count": 1
+      },
+      {
+        "value": 1.8,
+        "n": 36,
+        "median_pf": 1.0067021749981127,
+        "median_average_r": 0.005178383418680849,
+        "median_trades_per_month": 16.501400472407127,
+        "median_max_dd": 6.8174343272169295,
+        "profitable_count": 22
+      },
+      {
+        "value": 2.1,
+        "n": 36,
+        "median_pf": 0.900728969044593,
+        "median_average_r": -0.07404227385730858,
+        "median_trades_per_month": 11.623134743397035,
+        "median_max_dd": 5.7529237843438175,
+        "profitable_count": 3
+      }
+    ],
+    "pullback_minimum_retracement_percent": [
+      {
+        "value": 0.15,
+        "n": 48,
+        "median_pf": 0.9400470128931064,
+        "median_average_r": -0.0416316480191535,
+        "median_trades_per_month": 22.27375348937084,
+        "median_max_dd": 8.736071374931074,
+        "profitable_count": 4
+      },
+      {
+        "value": 0.2,
+        "n": 48,
+        "median_pf": 0.9059175422952149,
+        "median_average_r": -0.06606336716226588,
+        "median_trades_per_month": 18.71309007945029,
+        "median_max_dd": 7.487984665243361,
+        "profitable_count": 8
+      },
+      {
+        "value": 0.25,
+        "n": 48,
+        "median_pf": 0.9398388486919544,
+        "median_average_r": -0.04173635079973052,
+        "median_trades_per_month": 14.838711831651278,
+        "median_max_dd": 6.334056098958972,
+        "profitable_count": 14
+      }
+    ],
+    "pullback_maximum_retracement_percent": [
+      {
+        "value": 0.35,
+        "n": 48,
+        "median_pf": 0.957032398800715,
+        "median_average_r": -0.030095867350740164,
+        "median_trades_per_month": 12.862308353016962,
+        "median_max_dd": 5.637058552602452,
+        "profitable_count": 16
+      },
+      {
+        "value": 0.45,
+        "n": 48,
+        "median_pf": 0.9064347139306801,
+        "median_average_r": -0.06753644131126527,
+        "median_trades_per_month": 19.450319948464674,
+        "median_max_dd": 7.430777971960031,
+        "profitable_count": 6
+      },
+      {
+        "value": 0.55,
+        "n": 48,
+        "median_pf": 0.9237156858418267,
+        "median_average_r": -0.05373808149904993,
+        "median_trades_per_month": 24.532500322095768,
+        "median_max_dd": 8.520760105957404,
+        "profitable_count": 4
+      }
+    ],
+    "confirmation_minimum_body_percent": [
+      {
+        "value": 0.4,
+        "n": 36,
+        "median_pf": 0.920218787457391,
+        "median_average_r": -0.056239285740042305,
+        "median_trades_per_month": 25.410901868155463,
+        "median_max_dd": 9.618758210792855,
+        "profitable_count": 6
+      },
+      {
+        "value": 0.5,
+        "n": 36,
+        "median_pf": 0.9459894056889677,
+        "median_average_r": -0.03773932276617482,
+        "median_trades_per_month": 21.458094910886835,
+        "median_max_dd": 8.325966928471736,
+        "profitable_count": 8
+      },
+      {
+        "value": 0.6,
+        "n": 36,
+        "median_pf": 0.9360629678872936,
+        "median_average_r": -0.04346394242143832,
+        "median_trades_per_month": 17.222944599527594,
+        "median_max_dd": 7.020252541546142,
+        "profitable_count": 7
+      },
+      {
+        "value": 0.7,
+        "n": 36,
+        "median_pf": 0.9156928372159469,
+        "median_average_r": -0.05812232691885674,
+        "median_trades_per_month": 12.062335516426884,
+        "median_max_dd": 5.887127214540824,
+        "profitable_count": 5
+      }
+    ]
+  }
+}
