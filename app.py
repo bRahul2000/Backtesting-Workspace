@@ -78,6 +78,16 @@ st.markdown(
             padding: 0.85rem 1rem;
             background: rgba(128, 128, 128, 0.06);
         }
+        section[data-testid="stSidebar"] {
+            width: 240px !important;
+        }
+        [data-testid="stSidebarNav"] {
+            padding-top: 0.5rem;
+        }
+        [data-testid="stSidebarNavLink"].st-emotion-cache-i4rl61 {
+            background-color: rgba(255, 75, 75, 0.12) !important;
+            border-left: 3px solid #ff4b4b !important;
+        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -328,24 +338,19 @@ def render_market_data() -> pd.DataFrame:
     return active_data
 
 
-workspace_tab, history_tab, comparison_tab, lab_tab, market_tab, backtest_tab, research_tab, diagnostics_tab, live_chart_tab = st.tabs(
-    ["Universal Workspace", "Experiment History", "Experiment Comparison", "Research Lab", "Market Data", "Backtest", "Long-History Research", "Diagnostics", "Live Chart"]
-)
-with workspace_tab:
-    render_universal_workspace()
-with history_tab:
-    render_experiment_history()
-with comparison_tab:
-    render_experiment_comparison()
-with lab_tab:
-    render_research_lab()
-with market_tab:
-    active_data = render_market_data()
-with backtest_tab:
+def _market_data_page() -> None:
+    st.session_state["active_data"] = render_market_data()
+
+
+def _backtest_page() -> None:
+    active_data = st.session_state.get("active_data")
+    if active_data is None:
+        active_data, _ = get_saved_data()
+        st.session_state["active_data"] = active_data
     render_backtest_panel(active_data)
-with research_tab:
-    render_long_history_research()
-with diagnostics_tab:
+
+
+def _diagnostics_page() -> None:
     render_setup_b_diagnostics()
     render_exit_research()
     render_entry_research()
@@ -354,5 +359,17 @@ with diagnostics_tab:
     render_setup_a_v1_candidate()
     render_setup_a_native_validation()
     render_setup_a_diagnostics()
-with live_chart_tab:
-    render_live_chart()
+
+
+navigation = st.navigation([
+    st.Page(render_universal_workspace, title="Universal Workspace", default=True),
+    st.Page(render_experiment_history, title="Experiment History"),
+    st.Page(render_experiment_comparison, title="Experiment Comparison"),
+    st.Page(render_research_lab, title="Research Lab"),
+    st.Page(_market_data_page, title="Market Data"),
+    st.Page(_backtest_page, title="Backtest"),
+    st.Page(render_long_history_research, title="Long-History Research"),
+    st.Page(_diagnostics_page, title="Diagnostics"),
+    st.Page(render_live_chart, title="Live Chart"),
+])
+navigation.run()
