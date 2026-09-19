@@ -42,6 +42,17 @@ from strategies.confirmed_h1_regime import ConfirmedH1Regime
 from strategies.pine_indicators import ATR, EMA
 
 
+#: Architecture modes for the acceptance gate. STRICT is the Phase A baseline and
+#: the default, so default behaviour is unchanged; the other two exist only so a
+#: predeclared ablation can measure what the gate is actually doing. The mode is
+#: part of PB2Parameters, so it participates in the effective-parameter
+#: fingerprint and a variant run can never be mistaken for the baseline.
+ACCEPTANCE_STRICT = "STRICT"
+ACCEPTANCE_LEVEL_HOLD = "LEVEL_HOLD"
+ACCEPTANCE_RECLAIM_ONLY = "RECLAIM_ONLY"
+ACCEPTANCE_MODES = (ACCEPTANCE_STRICT, ACCEPTANCE_LEVEL_HOLD, ACCEPTANCE_RECLAIM_ONLY)
+
+
 @dataclass(frozen=True)
 class PB2Parameters:
     """Typed Phase A baseline. ``tunable`` marks plausible future search space;
@@ -88,6 +99,9 @@ class PB2Parameters:
     # R multiple via BacktestSettings.risk_reward_ratio. PB2 never sets a target.
     reward_multiple: float = 3.0
 
+    # Acceptance architecture. STRICT reproduces the Phase A baseline exactly.
+    acceptance_mode: str = ACCEPTANCE_STRICT
+
     def __post_init__(self) -> None:
         lengths = (self.h1_fast_ema, self.h1_slow_ema, self.h1_atr_length, self.h1_slope_lookback,
                    self.m15_atr_length, self.m15_ema20_length, self.m15_ema50_length,
@@ -118,6 +132,8 @@ class PB2Parameters:
             raise ValueError("Stop ATR bounds must satisfy 0 < minimum < maximum.")
         if self.reward_multiple <= 0:
             raise ValueError("reward_multiple must be positive.")
+        if self.acceptance_mode not in ACCEPTANCE_MODES:
+            raise ValueError(f"acceptance_mode must be one of {ACCEPTANCE_MODES}.")
 
 
 #: Parameters a later phase could plausibly search. Declared here so the typed
@@ -318,7 +334,9 @@ class PB2ReclaimAcceptance(Strategy):
         if self.state is PB2State.SEARCHING_DISPLACEMENT:
             self._search_displacement(candle, regime, atr, ema20, ema50)
         elif self.state in (PB2State.WAITING_RETEST, PB2State.WAITING_RECLAIM):
-            self._advance_retest_and_reclaim(candle, atr, ema20, ema50)
+            # Under RECLAIM_ONLY the reclaim bar itself produces the entry, so
+            # this branch can return a signal.
+            signal = self._advance_retest_and_reclaim(candle, atr, ema20, ema50)
         elif self.state is PB2State.WAITING_ACCEPTANCE:
             signal = self._evaluate_acceptance(candle, atr)
 
@@ -468,7 +486,7 @@ class PB2ReclaimAcceptance(Strategy):
     # ------------------------------------------------------------------
 
     def _advance_retest_and_reclaim(self, candle: Candle, atr: float,
-                                    ema20: float, ema50: float) -> None:
+                                    ema20: float, ema50: float) -> Signal | None:
         p = self.params
         structure = self.structure
         assert structure is not None
@@ -483,9 +501,10 @@ class PB2ReclaimAcceptance(Strategy):
                       candle.timestamp, {"close": candle.close,
                                          "displacement_low": structure.displacement_low,
                                          "displacement_high": structure.displacement_high,
+                                         "displacement_time": str(structure.displacement_time),
                                          "bars_since_displacement": structure.bars_since_displacement})
             self._reset_structure()
-            return
+            return None
 
         adverse = (structure.displacement_low - candle.low if self._long
                    else candle.high - structure.displacement_high)
@@ -528,15 +547,21 @@ class PB2ReclaimAcceptance(Strategy):
             same_bar = structure.bars_to_retest == structure.bars_since_displacement
             if self._evaluate_reclaim(candle, structure, atr):
                 structure.same_bar_retest_reclaim = same_bar
-                return
+                if p.acceptance_mode == ACCEPTANCE_RECLAIM_ONLY:
+                    # Architecture ablation: no separate acceptance bar, so the
+                    # reclaim candle is the entry reference.
+                    return self._construct_entry(candle, structure, atr)
+                return None
 
         if structure.bars_since_displacement >= p.retest_maximum_bars:
             self._log("retest_expired", False,
                       "no reclaim within the retest window" if structure.retested
                       else "structure level never retested",
                       candle.timestamp, {"bars_since_displacement": structure.bars_since_displacement,
+                                         "displacement_time": str(structure.displacement_time),
                                          "retested": structure.retested})
             self._reset_structure()
+        return None
 
     def _evaluate_reclaim(self, candle: Candle, structure: _Structure, atr: float) -> bool:
         p = self.params
@@ -583,10 +608,12 @@ class PB2ReclaimAcceptance(Strategy):
         structure.reclaim_close_location = directional_location
         structure.reclaim_range_atr = range_atr
         self._extend_anchor(candle, structure)
-        self.state = PB2State.WAITING_ACCEPTANCE
+        if p.acceptance_mode != ACCEPTANCE_RECLAIM_ONLY:
+            self.state = PB2State.WAITING_ACCEPTANCE
         self._log("reclaim_confirmed", True, None, candle.timestamp, {
             "body_percent": body, "close_location": directional_location, "range_atr": range_atr,
             "reclaim_close": candle.close, "structure_level": structure.structure_level,
+            "displacement_time": str(structure.displacement_time),
         })
         return True
 
@@ -612,27 +639,36 @@ class PB2ReclaimAcceptance(Strategy):
         beyond_level = self._beyond(candle.close, structure.structure_level)
         held_reclaim = (candle.close >= structure.reclaim_close if self._long
                         else candle.close <= structure.reclaim_close)
+        # STRICT additionally demands the acceptance bar extend beyond the
+        # reclaim close; LEVEL_HOLD only asks that the reclaimed level holds.
+        requires_expansion = p.acceptance_mode == ACCEPTANCE_STRICT
         distance_atr = abs(candle.close - structure.structure_level) / atr
         range_atr = (candle.high - candle.low) / atr
         change = candle.close - structure.reclaim_close
 
         self._log("acceptance_evaluated", True, None, candle.timestamp, {
             "beyond_level": beyond_level, "held_reclaim": held_reclaim,
+            "acceptance_mode": p.acceptance_mode, "requires_expansion": requires_expansion,
             "acceptance_distance_atr": distance_atr, "acceptance_range_atr": range_atr,
             "reclaim_to_acceptance_change": change,
+            "displacement_time": str(structure.displacement_time),
         })
         self._xray(candle.timestamp, "acceptance_distance_atr", distance_atr, 0.0, beyond_level,
                    "Acceptance close beyond the structure level, in ATR")
         self._xray(candle.timestamp, "acceptance_range_atr", range_atr, None, True,
                    "Acceptance candle range in ATR (unfiltered in Phase A)")
 
-        if not (beyond_level and held_reclaim):
+        if not (beyond_level and (held_reclaim or not requires_expansion)):
             self._log("acceptance_failed", False,
                       "close fell back through the structure level" if not beyond_level
                       else "close did not hold the reclaim close",
                       candle.timestamp, {"acceptance_close": candle.close,
                                          "structure_level": structure.structure_level,
-                                         "reclaim_close": structure.reclaim_close})
+                                         "reclaim_close": structure.reclaim_close,
+                                         "acceptance_mode": p.acceptance_mode,
+                                         "beyond_level": beyond_level,
+                                         "held_reclaim": held_reclaim,
+                                         "displacement_time": str(structure.displacement_time)})
             self._reset_structure()
             return None
 
@@ -640,6 +676,8 @@ class PB2ReclaimAcceptance(Strategy):
         self._log("acceptance_confirmed", True, None, candle.timestamp, {
             "acceptance_distance_atr": distance_atr, "acceptance_range_atr": range_atr,
             "reclaim_to_acceptance_change": change, "acceptance_close": candle.close,
+            "acceptance_mode": p.acceptance_mode, "held_reclaim": held_reclaim,
+            "displacement_time": str(structure.displacement_time),
         })
         return self._construct_entry(candle, structure, atr)
 
@@ -684,6 +722,9 @@ class PB2ReclaimAcceptance(Strategy):
             "reclaim_body_percent": structure.reclaim_body_percent,
             "acceptance_distance_atr": abs(candle.close - structure.structure_level) / atr,
             "same_bar_retest_reclaim": structure.same_bar_retest_reclaim,
+            "acceptance_mode": p.acceptance_mode,
+            "displacement_time": str(structure.displacement_time),
+            "reclaim_time": str(structure.reclaim_time),
             "before_trade_start": bool(self._trade_start is not None
                                        and candle.timestamp < self._trade_start),
         })

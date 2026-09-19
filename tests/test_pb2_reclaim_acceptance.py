@@ -6,11 +6,12 @@ arithmetic the rules specify (trigger = acceptance extreme + entry buffer x ATR,
 stop = structural anchor -/+ stop buffer x ATR).
 """
 from dataclasses import asdict, replace
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from core.config import DatasetRole
+from core.config import BacktestConfig, DatasetRole
 from engine.models import (
     Candle, Direction, ExecutionState, PendingOrder, Position, Signal, Trade,
 )
@@ -18,6 +19,7 @@ from strategies.base_strategy import (
     StrategyStatus, effective_parameter_payload, parameter_fingerprint,
 )
 from strategies.btc_pb2_reclaim_acceptance import (
+    ACCEPTANCE_LEVEL_HOLD, ACCEPTANCE_MODES, ACCEPTANCE_RECLAIM_ONLY, ACCEPTANCE_STRICT,
     PB2Parameters, PB2State, TUNABLE_PARAMETERS, _Structure, body_percent,
     close_location_percent,
 )
@@ -493,6 +495,115 @@ def test_registered_parameters_are_tunable_except_the_reward_multiple():
     assert set(TUNABLE_PARAMETERS).issubset(tunable)
     assert all(tunable[name] for name in TUNABLE_PARAMETERS)
     assert tunable["reward_multiple"] is False
+
+
+# --- Acceptance architecture modes (Phase A.1 ablation) --------------------------------------
+
+
+def test_strict_acceptance_is_the_default_and_demands_expansion():
+    """STRICT is the Phase A baseline: holding the level is not enough."""
+    assert PB2Parameters().acceptance_mode == ACCEPTANCE_STRICT
+    strategy = BtcPB2ReclaimLong(_fast())
+    rows = list(LONG_ROWS[:14]) + [(112.9, 113.0, 111.0, 111.5)]
+    signals = _feed(strategy, rows)
+    assert signals[-1] is None
+    failed = _stages(strategy, "acceptance_failed")
+    assert len(failed) == 1
+    assert failed[0].reason == "close did not hold the reclaim close"
+    assert failed[0].metadata["beyond_level"] is True
+
+
+def test_level_hold_acceptance_admits_the_same_bar_strict_rejects():
+    """Variant B keeps the separate bar but drops only the expansion demand."""
+    strategy = BtcPB2ReclaimLong(_fast(acceptance_mode=ACCEPTANCE_LEVEL_HOLD))
+    rows = list(LONG_ROWS[:14]) + [(112.9, 113.0, 111.0, 111.5)]
+    signals = _feed(strategy, rows)
+    assert not _stages(strategy, "acceptance_failed")
+    confirmed = _stages(strategy, "acceptance_confirmed")
+    assert len(confirmed) == 1
+    assert confirmed[0].metadata["held_reclaim"] is False
+    assert confirmed[0].metadata["acceptance_mode"] == ACCEPTANCE_LEVEL_HOLD
+    signal = signals[-1]
+    assert isinstance(signal, Signal)
+    atr = strategy.atr._average.value
+    assert signal.pending_entry_price == pytest.approx(113.0 + 0.05 * atr)
+
+
+def test_level_hold_still_rejects_a_close_back_through_the_level():
+    strategy = BtcPB2ReclaimLong(_fast(acceptance_mode=ACCEPTANCE_LEVEL_HOLD))
+    rows = list(LONG_ROWS[:14]) + [(112.9, 113.0, 108.0, 109.0)]
+    signals = _feed(strategy, rows)
+    assert signals[-1] is None
+    assert _stages(strategy, "acceptance_failed")[0].reason == \
+        "close fell back through the structure level"
+
+
+def test_reclaim_only_enters_from_the_reclaim_bar_without_an_acceptance_stage():
+    """Variant C removes the separate bar entirely: the reclaim candle is the entry."""
+    strategy = BtcPB2ReclaimLong(_fast(acceptance_mode=ACCEPTANCE_RECLAIM_ONLY))
+    signals = _feed(strategy, LONG_ROWS)
+    signal = signals[RECLAIM_INDEX]
+    assert isinstance(signal, Signal)
+    assert signals[ACCEPTANCE_INDEX] is None
+    assert not _stages(strategy, "acceptance_evaluated")
+    assert not _stages(strategy, "acceptance_confirmed")
+    # Trigger comes off the reclaim candle's high (113.0), a bar earlier than STRICT.
+    assert signal.pending_entry_price > 113.0
+    assert _stages(strategy, "pending_created")[0].metadata["acceptance_mode"] == \
+        ACCEPTANCE_RECLAIM_ONLY
+
+
+def test_reclaim_only_short_enters_from_the_reclaim_bar():
+    strategy = BtcPB2ReclaimShort(_fast(acceptance_mode=ACCEPTANCE_RECLAIM_ONLY))
+    signals = _feed(strategy, SHORT_ROWS)
+    assert isinstance(signals[RECLAIM_INDEX], Signal)
+    assert signals[RECLAIM_INDEX].direction is Direction.SHORT
+    assert signals[ACCEPTANCE_INDEX] is None
+
+
+def test_acceptance_mode_is_part_of_the_parameter_fingerprint():
+    descriptor = discover_builtin_strategies().get(LONG_ID)
+    fingerprints = {
+        mode: parameter_fingerprint(effective_parameter_payload(descriptor, {"acceptance_mode": mode}))
+        for mode in ACCEPTANCE_MODES
+    }
+    assert len(set(fingerprints.values())) == 3
+    # The default payload must be identical to an explicit STRICT override.
+    assert fingerprints[ACCEPTANCE_STRICT] == parameter_fingerprint(
+        effective_parameter_payload(descriptor, {}))
+
+
+def test_acceptance_mode_is_overridable_but_never_optimizable():
+    descriptor = discover_builtin_strategies().get(LONG_ID)
+    parameter = next(p for p in descriptor.parameters if p.name == "acceptance_mode")
+    assert parameter.optimization_allowed is False
+    assert parameter.frozen is False
+    assert set(parameter.choices) == set(ACCEPTANCE_MODES)
+    assert descriptor.create({"acceptance_mode": ACCEPTANCE_RECLAIM_ONLY}).params.acceptance_mode \
+        == ACCEPTANCE_RECLAIM_ONLY
+    with pytest.raises(ValueError):
+        PB2Parameters(acceptance_mode="SOMETHING_ELSE")
+
+
+def test_phase_a_long_baseline_still_reproduces(tmp_path):
+    """The stored Phase A LONG baseline must survive the architecture-mode change."""
+    from math import isclose
+
+    from core.adapters.audited_engine import run_universal_backtest
+
+    config = BacktestConfig(
+        instrument="BTCUSD", broker_profile="EXNESS_STANDARD", strategy_id=LONG_ID,
+        timeframe="15m", higher_timeframes=("1h",),
+        start_date=pd.Timestamp("2021-01-01", tz="UTC"),
+        end_date=pd.Timestamp("2023-12-31 23:45", tz="UTC"),
+        dataset_role=DatasetRole.DEVELOPMENT,
+    )
+    result = run_universal_backtest(
+        Path(__file__).resolve().parents[1] / "data" / "btcusd_15m.csv",
+        config, ledger_path=tmp_path / "ledger.sqlite3")
+    assert result.total_trades == 29
+    assert isclose(result.profit_factor, 1.8656360038448085, abs_tol=1e-12)
+    assert isclose(result.average_r, 0.5410, abs_tol=1e-4)
 
 
 def test_parameter_validation_rejects_an_impossible_schema():

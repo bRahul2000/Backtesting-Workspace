@@ -1,0 +1,582 @@
+{
+  "phase": "PB2 Phase A.1 \u2014 acceptance gate selectivity and frequency audit",
+  "experiment": "predeclared architecture ablation; no parameter value was searched",
+  "dataset_role": "DEVELOPMENT",
+  "period": {
+    "start": "2021-01-01T00:00:00+00:00",
+    "end": "2023-12-31T23:45:00+00:00"
+  },
+  "variants": {
+    "A": "STRICT",
+    "B": "LEVEL_HOLD",
+    "C": "RECLAIM_ONLY"
+  },
+  "baseline_reproduction": {
+    "LONG": {
+      "closed_trades": 29,
+      "profit_factor": 1.8656360038448085,
+      "average_r": 0.541
+    },
+    "SHORT": {
+      "closed_trades": 14,
+      "profit_factor": 0.2309911155042199,
+      "average_r": -0.7143
+    }
+  },
+  "parameter_fingerprints": {
+    "A": "fd32325e36996c40ba56525122e1061d8f157f7a2d68e6069331ef13875bb40e",
+    "B": "28c976b6a43d2b23ae3518eeb9a894ef9d5e35ce3d690ab9e48a9658b7800c3f",
+    "C": "804b0b31bddbb8fa88a3a36bbbd998e39de28999c6a82c5f64b5725d6a7d2130"
+  },
+  "baseline_parameters": {
+    "h1_fast_ema": 50,
+    "h1_slow_ema": 200,
+    "h1_atr_length": 14,
+    "h1_slope_lookback": 4,
+    "m15_atr_length": 14,
+    "m15_ema20_length": 20,
+    "m15_ema50_length": 50,
+    "structure_lookback": 12,
+    "displacement_minimum_range_atr": 1.3,
+    "displacement_minimum_body_percent": 0.7,
+    "displacement_close_location_percent": 0.2,
+    "retest_tolerance_atr": 0.1,
+    "retest_maximum_bars": 5,
+    "reclaim_minimum_body_percent": 0.5,
+    "reclaim_close_location_percent": 0.35,
+    "reclaim_maximum_range_atr": 2.0,
+    "entry_buffer_atr": 0.05,
+    "pending_expiry_bars": 2,
+    "stop_buffer_atr": 0.2,
+    "minimum_stop_atr": 0.5,
+    "maximum_stop_atr": 2.5,
+    "reward_multiple": 3.0,
+    "acceptance_mode": "STRICT"
+  },
+  "components": {
+    "LONG": {
+      "runs": {
+        "A": {
+          "component": "LONG",
+          "variant": "A",
+          "acceptance_mode": "STRICT",
+          "strategy_id": "BTC_PB2_RECLAIM_LONG_V1",
+          "strategy_fingerprint": "668674ac4cc77cbab07d4922ce1c14e8e79ee921e27739e21535fa510e2236d5",
+          "parameter_fingerprint": "fd32325e36996c40ba56525122e1061d8f157f7a2d68e6069331ef13875bb40e",
+          "metrics": {
+            "trades": 29,
+            "trades_per_month": 0.9097730298475413,
+            "win_rate": 37.93103448275862,
+            "profit_factor": 1.8656360038448085,
+            "average_r": 0.5409916805184694,
+            "total_r": 15.688758735035613,
+            "pnl": 393.183016086768,
+            "max_drawdown_percent": 0.7724014547051793,
+            "max_losing_streak": 3,
+            "average_holding_minutes": 188.27586206896552,
+            "median_holding_minutes": 105.0
+          },
+          "sample_band": "INSUFFICIENT",
+          "yearly": {
+            "2021": {
+              "trades": 4,
+              "profit_factor": 2.9864531486179464,
+              "average_r": 0.9996069497899502,
+              "total_r": 3.998427799159801
+            },
+            "2022": {
+              "trades": 7,
+              "profit_factor": 0.49306439245601147,
+              "average_r": -0.43702182731925515,
+              "total_r": -3.0591527912347862
+            },
+            "2023": {
+              "trades": 18,
+              "profit_factor": 2.4650925353684783,
+              "average_r": 0.8194157626172553,
+              "total_r": 14.749483727110597
+            }
+          },
+          "funnel": {
+            "displacement_detected": 540,
+            "retest_detected": 308,
+            "reclaim_confirmed": 130,
+            "acceptance_evaluated": 130,
+            "acceptance_confirmed": 58,
+            "acceptance_failed": 72,
+            "risk_evaluated": 58,
+            "risk_rejected": 19,
+            "pending_created": 39,
+            "pending_expired": 6,
+            "trade_entered": 29,
+            "trade_exited": 29,
+            "open_at_end": 0,
+            "engine_order_events": {
+              "triggered": 29,
+              "expired": 6
+            }
+          }
+        },
+        "B": {
+          "component": "LONG",
+          "variant": "B",
+          "acceptance_mode": "LEVEL_HOLD",
+          "strategy_id": "BTC_PB2_RECLAIM_LONG_V1",
+          "strategy_fingerprint": "668674ac4cc77cbab07d4922ce1c14e8e79ee921e27739e21535fa510e2236d5",
+          "parameter_fingerprint": "28c976b6a43d2b23ae3518eeb9a894ef9d5e35ce3d690ab9e48a9658b7800c3f",
+          "metrics": {
+            "trades": 40,
+            "trades_per_month": 1.25485935151385,
+            "win_rate": 30.0,
+            "profit_factor": 1.317364091592877,
+            "average_r": 0.22250002692374324,
+            "total_r": 8.90000107694973,
+            "pnl": 222.0897587841471,
+            "max_drawdown_percent": 1.4882166458620576,
+            "max_losing_streak": 6,
+            "average_holding_minutes": 198.75,
+            "median_holding_minutes": 105.0
+          },
+          "sample_band": "VERY_SMALL",
+          "yearly": {
+            "2021": {
+              "trades": 5,
+              "profit_factor": 1.990082723333678,
+              "average_r": 0.6,
+              "total_r": 3.0
+            },
+            "2022": {
+              "trades": 8,
+              "profit_factor": 0.42383545902091974,
+              "average_r": -0.5069380234197676,
+              "total_r": -4.0555041873581406
+            },
+            "2023": {
+              "trades": 27,
+              "profit_factor": 1.5551694313980813,
+              "average_r": 0.36872241719658777,
+              "total_r": 9.95550526430787
+            }
+          },
+          "funnel": {
+            "displacement_detected": 462,
+            "retest_detected": 263,
+            "reclaim_confirmed": 112,
+            "acceptance_evaluated": 112,
+            "acceptance_confirmed": 91,
+            "acceptance_failed": 21,
+            "risk_evaluated": 91,
+            "risk_rejected": 21,
+            "pending_created": 70,
+            "pending_expired": 24,
+            "trade_entered": 40,
+            "trade_exited": 40,
+            "open_at_end": 0,
+            "engine_order_events": {
+              "expired": 24,
+              "triggered": 40
+            }
+          }
+        },
+        "C": {
+          "component": "LONG",
+          "variant": "C",
+          "acceptance_mode": "RECLAIM_ONLY",
+          "strategy_id": "BTC_PB2_RECLAIM_LONG_V1",
+          "strategy_fingerprint": "668674ac4cc77cbab07d4922ce1c14e8e79ee921e27739e21535fa510e2236d5",
+          "parameter_fingerprint": "804b0b31bddbb8fa88a3a36bbbd998e39de28999c6a82c5f64b5725d6a7d2130",
+          "metrics": {
+            "trades": 58,
+            "trades_per_month": 1.8195460596950825,
+            "win_rate": 24.137931034482758,
+            "profit_factor": 0.9034767181165428,
+            "average_r": -0.07137998366980827,
+            "total_r": -4.140039052848881,
+            "pnl": -105.18353564718338,
+            "max_drawdown_percent": 2.26243780345355,
+            "max_losing_streak": 9,
+            "average_holding_minutes": 137.58620689655172,
+            "median_holding_minutes": 90.0
+          },
+          "sample_band": "VERY_SMALL",
+          "yearly": {
+            "2021": {
+              "trades": 13,
+              "profit_factor": 0.5384572014366351,
+              "average_r": -0.3955428293934016,
+              "total_r": -5.142056782114221
+            },
+            "2022": {
+              "trades": 13,
+              "profit_factor": 0.5262573143563791,
+              "average_r": -0.4129655168692868,
+              "total_r": -5.368551719300728
+            },
+            "2023": {
+              "trades": 32,
+              "profit_factor": 1.2980245337704477,
+              "average_r": 0.19908029526768964,
+              "total_r": 6.370569448566068
+            }
+          },
+          "funnel": {
+            "displacement_detected": 312,
+            "retest_detected": 182,
+            "reclaim_confirmed": 79,
+            "acceptance_evaluated": "NOT_APPLICABLE_ARCHITECTURE_ABLATION",
+            "acceptance_confirmed": "NOT_APPLICABLE_ARCHITECTURE_ABLATION",
+            "acceptance_failed": "NOT_APPLICABLE_ARCHITECTURE_ABLATION",
+            "risk_evaluated": 79,
+            "risk_rejected": 3,
+            "pending_created": 76,
+            "pending_expired": 10,
+            "trade_entered": 58,
+            "trade_exited": 58,
+            "open_at_end": 0,
+            "engine_order_events": {
+              "expired": 10,
+              "triggered": 58
+            }
+          }
+        }
+      },
+      "incremental_analysis": {
+        "B": {
+          "shared_structures": 27,
+          "same_structure_different_entry_time": 0,
+          "shared_total_r_baseline": 17.69397953975246,
+          "shared_total_r_variant": 17.69397953975246,
+          "trades_added": 13,
+          "winners_added": 1,
+          "losers_added": 12,
+          "total_r_added": -8.79397846280273,
+          "average_r_of_incremental_trades": -0.6764598817540561,
+          "profit_factor_of_incremental_trades": 0.25573426503680646,
+          "structures_lost_to_downstream_availability": 2,
+          "total_r_lost_to_downstream_availability": -2.005220804716845
+        },
+        "C": {
+          "shared_structures": 18,
+          "same_structure_different_entry_time": 18,
+          "shared_total_r_baseline": 15.05115432923737,
+          "shared_total_r_variant": 16.664817535730762,
+          "trades_added": 40,
+          "winners_added": 5,
+          "losers_added": 35,
+          "total_r_added": -20.80485658857964,
+          "average_r_of_incremental_trades": -0.520121414714491,
+          "profit_factor_of_incremental_trades": 0.3972673779176757,
+          "structures_lost_to_downstream_availability": 11,
+          "total_r_lost_to_downstream_availability": 0.637604405798244
+        }
+      },
+      "strict_rejection_cohort": {
+        "cohort_size": 72,
+        "B": {
+          "entries": 13,
+          "winners": 1,
+          "losers": 12,
+          "average_r": -0.6764598817540561,
+          "total_r": -8.79397846280273
+        },
+        "C": {
+          "entries": 27,
+          "winners": 2,
+          "losers": 25,
+          "average_r": -0.6942864921415411,
+          "total_r": -18.74573528782161
+        }
+      },
+      "architecture_decision": {
+        "classification": "A",
+        "label": "STRICT ACCEPTANCE EARNS ITS PLACE",
+        "sample_bands": {
+          "A": "INSUFFICIENT",
+          "B": "VERY_SMALL",
+          "C": "VERY_SMALL"
+        },
+        "positive_years": {
+          "A": 2,
+          "B": 2,
+          "C": 1
+        },
+        "variants_with_interpretable_sample": [
+          "B",
+          "C"
+        ],
+        "variants_improving_on_evidence": [],
+        "strict_acceptance_earns_its_place": true,
+        "incremental_trades_examined": 53,
+        "incremental_average_r_margins": [
+          1.2174515622725255,
+          1.0611130952329604
+        ],
+        "rule": "A loosened variant counts as an improvement only if its sample is at least VERY_SMALL, its overall Avg R is positive, the trades it adds over the baseline are themselves positive on average, and at least two DEVELOPMENT years are positive. Strict acceptance earns its place only if the baseline is positive with at least two positive years and both loosenings add at least 10 trades each (>=30 combined) whose Avg R is at least 0.25R below the baseline's. Highest PF never decides, and neither verdict claims the surviving sample is large enough to trade."
+      }
+    },
+    "SHORT": {
+      "runs": {
+        "A": {
+          "component": "SHORT",
+          "variant": "A",
+          "acceptance_mode": "STRICT",
+          "strategy_id": "BTC_PB2_RECLAIM_SHORT_V1",
+          "strategy_fingerprint": "1caf727ad08e9d77bf0f0855c006e41daa7777ef269e4af2e21cf9b035260503",
+          "parameter_fingerprint": "fd32325e36996c40ba56525122e1061d8f157f7a2d68e6069331ef13875bb40e",
+          "metrics": {
+            "trades": 14,
+            "trades_per_month": 0.4392007730298475,
+            "win_rate": 7.142857142857143,
+            "profit_factor": 0.2309911155042199,
+            "average_r": -0.7142857142857143,
+            "total_r": -10.0,
+            "pnl": -249.6878125,
+            "max_drawdown_percent": 0.7481265625000014,
+            "max_losing_streak": 3,
+            "average_holding_minutes": 222.85714285714286,
+            "median_holding_minutes": 172.5
+          },
+          "sample_band": "INSUFFICIENT",
+          "yearly": {
+            "2021": {
+              "trades": 5,
+              "profit_factor": 0.0,
+              "average_r": -1.0,
+              "total_r": -5.0
+            },
+            "2022": {
+              "trades": 6,
+              "profit_factor": 0.5999992500009375,
+              "average_r": -0.3333333333333333,
+              "total_r": -2.0
+            },
+            "2023": {
+              "trades": 3,
+              "profit_factor": 0.0,
+              "average_r": -1.0,
+              "total_r": -3.0
+            }
+          },
+          "funnel": {
+            "displacement_detected": 538,
+            "retest_detected": 354,
+            "reclaim_confirmed": 138,
+            "acceptance_evaluated": 138,
+            "acceptance_confirmed": 62,
+            "acceptance_failed": 76,
+            "risk_evaluated": 62,
+            "risk_rejected": 34,
+            "pending_created": 28,
+            "pending_expired": 12,
+            "trade_entered": 14,
+            "trade_exited": 14,
+            "open_at_end": 0,
+            "engine_order_events": {
+              "expired": 12,
+              "triggered": 14
+            }
+          }
+        },
+        "B": {
+          "component": "SHORT",
+          "variant": "B",
+          "acceptance_mode": "LEVEL_HOLD",
+          "strategy_id": "BTC_PB2_RECLAIM_SHORT_V1",
+          "strategy_fingerprint": "1caf727ad08e9d77bf0f0855c006e41daa7777ef269e4af2e21cf9b035260503",
+          "parameter_fingerprint": "28c976b6a43d2b23ae3518eeb9a894ef9d5e35ce3d690ab9e48a9658b7800c3f",
+          "metrics": {
+            "trades": 26,
+            "trades_per_month": 0.8156585784840025,
+            "win_rate": 23.076923076923077,
+            "profit_factor": 0.9008967083826456,
+            "average_r": -0.07692307692307694,
+            "total_r": -2.0000000000000004,
+            "pnl": -49.502170738256844,
+            "max_drawdown_percent": 1.4906561914648226,
+            "max_losing_streak": 6,
+            "average_holding_minutes": 223.84615384615384,
+            "median_holding_minutes": 142.5
+          },
+          "sample_band": "INSUFFICIENT",
+          "yearly": {
+            "2021": {
+              "trades": 8,
+              "profit_factor": 3.00000957359145,
+              "average_r": 1.0,
+              "total_r": 8.0
+            },
+            "2022": {
+              "trades": 13,
+              "profit_factor": 0.25062486914476434,
+              "average_r": -0.6923076923076923,
+              "total_r": -9.0
+            },
+            "2023": {
+              "trades": 5,
+              "profit_factor": 0.7481331739394043,
+              "average_r": -0.20000000000000004,
+              "total_r": -1.0000000000000002
+            }
+          },
+          "funnel": {
+            "displacement_detected": 341,
+            "retest_detected": 223,
+            "reclaim_confirmed": 87,
+            "acceptance_evaluated": 87,
+            "acceptance_confirmed": 75,
+            "acceptance_failed": 12,
+            "risk_evaluated": 75,
+            "risk_rejected": 22,
+            "pending_created": 53,
+            "pending_expired": 23,
+            "trade_entered": 26,
+            "trade_exited": 26,
+            "open_at_end": 0,
+            "engine_order_events": {
+              "expired": 23,
+              "triggered": 26
+            }
+          }
+        },
+        "C": {
+          "component": "SHORT",
+          "variant": "C",
+          "acceptance_mode": "RECLAIM_ONLY",
+          "strategy_id": "BTC_PB2_RECLAIM_SHORT_V1",
+          "strategy_fingerprint": "1caf727ad08e9d77bf0f0855c006e41daa7777ef269e4af2e21cf9b035260503",
+          "parameter_fingerprint": "804b0b31bddbb8fa88a3a36bbbd998e39de28999c6a82c5f64b5725d6a7d2130",
+          "metrics": {
+            "trades": 32,
+            "trades_per_month": 1.00388748121108,
+            "win_rate": 25.0,
+            "profit_factor": 1.0132470845273334,
+            "average_r": 0.009045077515940298,
+            "total_r": 0.28944248051009014,
+            "pnl": 7.2476757890765215,
+            "max_drawdown_percent": 2.2276307590409306,
+            "max_losing_streak": 9,
+            "average_holding_minutes": 205.3125,
+            "median_holding_minutes": 90.0
+          },
+          "sample_band": "VERY_SMALL",
+          "yearly": {
+            "2021": {
+              "trades": 11,
+              "profit_factor": 0.29641225467487914,
+              "average_r": -0.6363636363636364,
+              "total_r": -7.0
+            },
+            "2022": {
+              "trades": 8,
+              "profit_factor": 0.6026970945150448,
+              "average_r": -0.24480845034477827,
+              "total_r": -1.9584676027582262
+            },
+            "2023": {
+              "trades": 13,
+              "profit_factor": 2.3133852991445427,
+              "average_r": 0.7113776987129474,
+              "total_r": 9.247910083268316
+            }
+          },
+          "funnel": {
+            "displacement_detected": 175,
+            "retest_detected": 121,
+            "reclaim_confirmed": 45,
+            "acceptance_evaluated": "NOT_APPLICABLE_ARCHITECTURE_ABLATION",
+            "acceptance_confirmed": "NOT_APPLICABLE_ARCHITECTURE_ABLATION",
+            "acceptance_failed": "NOT_APPLICABLE_ARCHITECTURE_ABLATION",
+            "risk_evaluated": 45,
+            "risk_rejected": 2,
+            "pending_created": 43,
+            "pending_expired": 4,
+            "trade_entered": 32,
+            "trade_exited": 32,
+            "open_at_end": 0,
+            "engine_order_events": {
+              "expired": 4,
+              "triggered": 32
+            }
+          }
+        }
+      },
+      "incremental_analysis": {
+        "B": {
+          "shared_structures": 11,
+          "same_structure_different_entry_time": 0,
+          "shared_total_r_baseline": -7.0,
+          "shared_total_r_variant": -7.0,
+          "trades_added": 15,
+          "winners_added": 5,
+          "losers_added": 10,
+          "total_r_added": 5.0,
+          "average_r_of_incremental_trades": 0.3333333333333333,
+          "profit_factor_of_incremental_trades": 1.5014959060235893,
+          "structures_lost_to_downstream_availability": 3,
+          "total_r_lost_to_downstream_availability": -3.0
+        },
+        "C": {
+          "shared_structures": 6,
+          "same_structure_different_entry_time": 6,
+          "shared_total_r_baseline": -6.0,
+          "shared_total_r_variant": 4.188345865848638,
+          "trades_added": 26,
+          "winners_added": 5,
+          "losers_added": 21,
+          "total_r_added": -3.898903385338548,
+          "average_r_of_incremental_trades": -0.1499578225130211,
+          "profit_factor_of_incremental_trades": 0.791721275470145,
+          "structures_lost_to_downstream_availability": 8,
+          "total_r_lost_to_downstream_availability": -4.0
+        }
+      },
+      "strict_rejection_cohort": {
+        "cohort_size": 76,
+        "B": {
+          "entries": 15,
+          "winners": 5,
+          "losers": 10,
+          "average_r": 0.3333333333333333,
+          "total_r": 5.0
+        },
+        "C": {
+          "entries": 13,
+          "winners": 4,
+          "losers": 9,
+          "average_r": 0.27882098820101847,
+          "total_r": 3.62467284661324
+        }
+      },
+      "architecture_decision": {
+        "classification": "D",
+        "label": "ARCHITECTURE STILL TOO SPARSE / UNRESOLVED",
+        "sample_bands": {
+          "A": "INSUFFICIENT",
+          "B": "INSUFFICIENT",
+          "C": "VERY_SMALL"
+        },
+        "positive_years": {
+          "A": 0,
+          "B": 1,
+          "C": 1
+        },
+        "variants_with_interpretable_sample": [
+          "C"
+        ],
+        "variants_improving_on_evidence": [],
+        "strict_acceptance_earns_its_place": false,
+        "incremental_trades_examined": 41,
+        "incremental_average_r_margins": [
+          -1.0476190476190477,
+          -0.5643278917726933
+        ],
+        "rule": "A loosened variant counts as an improvement only if its sample is at least VERY_SMALL, its overall Avg R is positive, the trades it adds over the baseline are themselves positive on average, and at least two DEVELOPMENT years are positive. Strict acceptance earns its place only if the baseline is positive with at least two positive years and both loosenings add at least 10 trades each (>=30 combined) whose Avg R is at least 0.25R below the baseline's. Highest PF never decides, and neither verdict claims the surviving sample is large enough to trade."
+      }
+    }
+  },
+  "years_present": [
+    2021,
+    2022,
+    2023
+  ]
+}

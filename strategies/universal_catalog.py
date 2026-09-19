@@ -33,7 +33,9 @@ from strategies.btc_v3_mr1_intraday_overshoot_mean_reversion import (
     BtcV3MR1IntradayOvershootMeanReversion, V3MR1Parameters,
 )
 from strategies.btc_pb1_shallow_pullback import BtcPB1ShallowPullback, PB1Parameters
-from strategies.btc_pb2_reclaim_acceptance import PB2Parameters
+from strategies.btc_pb2_reclaim_acceptance import (
+    ACCEPTANCE_MODES, ACCEPTANCE_STRICT, PB2Parameters,
+)
 from strategies.btc_pb2_reclaim_long import BtcPB2ReclaimLong
 from strategies.btc_pb2_reclaim_short import BtcPB2ReclaimShort
 
@@ -234,10 +236,17 @@ def _pb2_parameters() -> tuple[StrategyParameter, ...]:
                  "Maximum accepted stop distance, in ATR."),
         _frozen("reward_multiple", ParameterType.FLOAT, 3.0,
                 "Fixed R-multiple target applied by the audited engine."),
+        # Architecture mode, not a search dimension: overridable so a predeclared
+        # ablation can run, but never optimizable. STRICT is the Phase A baseline.
+        StrategyParameter(
+            "acceptance_mode", ParameterType.ENUM, ACCEPTANCE_STRICT,
+            choices=ACCEPTANCE_MODES, optimization_allowed=False, frozen=False,
+            description="Acceptance architecture: STRICT (baseline), LEVEL_HOLD, RECLAIM_ONLY.",
+        ),
     )
 
 
-_PB2_INDICATORS = ("H1 EMA50", "H1 EMA200", "H1 ATR14", "M15 EMA20", "M15 EMA50", "M15 ATR14")
+_PB2_INDICATORS =("H1 EMA50", "H1 EMA200", "H1 ATR14", "M15 EMA20", "M15 EMA50", "M15 ATR14")
 _PB2_CORE_FILE = "btc_pb2_reclaim_acceptance.py"
 
 register_strategy(StrategyDescriptor(
