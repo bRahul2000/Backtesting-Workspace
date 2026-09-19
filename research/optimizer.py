@@ -132,6 +132,11 @@ def search_parameters(descriptor: StrategyDescriptor) -> tuple[SearchParameter, 
 def guard_optimization(descriptor: StrategyDescriptor, role: DatasetRole) -> None:
     if descriptor.metadata.status is StrategyStatus.FROZEN:
         raise ValueError("OPTIMIZATION DISABLED - FROZEN STRATEGY")
+    # A closed research branch must not be reopened by a new parameter search.
+    # research.walk_forward.guard_walk_forward already refuses REJECTED; this is
+    # the same policy on the optimizer path, which previously only saw FROZEN.
+    if descriptor.metadata.status is StrategyStatus.REJECTED:
+        raise ValueError("OPTIMIZATION DISABLED - REJECTED STRATEGY")
     if role is not DatasetRole.DEVELOPMENT:
         raise ValueError("OPTIMIZATION BLOCKED: Parameter search is restricted to DEVELOPMENT data.")
 

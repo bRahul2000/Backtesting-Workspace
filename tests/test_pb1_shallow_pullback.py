@@ -4,7 +4,10 @@ from datetime import timedelta
 import pandas as pd
 import pytest
 
+from core.config import DatasetRole
 from engine.models import Candle, Direction, ExecutionState, PendingOrder, Position, Trade
+from research.optimizer import guard_optimization
+from research.walk_forward import WalkForwardBlocked, guard_walk_forward
 from strategies.base_strategy import StrategyStatus, effective_parameter_payload, parameter_fingerprint
 from strategies.btc_pb1_shallow_pullback import (
     BtcPB1ShallowPullback, PB1Parameters, STRATEGY_ID, SETUP_ID, _Structure,
@@ -272,11 +275,26 @@ def test_xray_values_expose_rule_level_checks():
 # --- Registry (section 10) --------------------------------------------------------------
 
 
-def test_registry_status_is_research():
+def test_registry_status_is_rejected_after_research_closure():
+    """PB1 v1 was closed as REJECTED for DEVELOPMENT cross-regime robustness failure.
+
+    Closure is a governance change only: the id, source, parameter schema and
+    defaults are preserved so every historical PB1 result stays reproducible.
+    """
     descriptor = discover_builtin_strategies().get(STRATEGY_ID)
-    assert descriptor.metadata.status is StrategyStatus.RESEARCH
+    assert descriptor.metadata.status is StrategyStatus.REJECTED
     assert descriptor.metadata.supported_instruments == ("BTCUSD",)
     assert "15m" in descriptor.required_timeframes and "1h" in descriptor.required_timeframes
+    assert descriptor.metadata.strategy_id == STRATEGY_ID
+    assert effective_parameter_payload(descriptor, {}) == asdict(PB1Parameters())
+
+
+def test_rejected_pb1_cannot_start_optimization_or_walk_forward():
+    descriptor = discover_builtin_strategies().get(STRATEGY_ID)
+    with pytest.raises(ValueError, match="REJECTED STRATEGY"):
+        guard_optimization(descriptor, DatasetRole.DEVELOPMENT)
+    with pytest.raises(WalkForwardBlocked, match="REJECTED STRATEGY"):
+        guard_walk_forward(descriptor, DatasetRole.DEVELOPMENT)
 
 
 def test_registry_parameters_are_tunable_except_reward_multiple():

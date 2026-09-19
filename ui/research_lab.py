@@ -119,16 +119,25 @@ def render_research_lab() -> None:
         _render_execution_replay_history()
 
 
+def _optimizer_eligibility_error(status: StrategyStatus) -> str | None:
+    """Mirrors research.optimizer.guard_optimization's status policy for the UI."""
+    if status is StrategyStatus.FROZEN:
+        return "OPTIMIZATION DISABLED - FROZEN STRATEGY"
+    if status is StrategyStatus.REJECTED:
+        return "OPTIMIZATION DISABLED - REJECTED STRATEGY"
+    return None
+
+
 def _render_optimizer() -> None:
     registry = discover_builtin_strategies()
     descriptors = registry.all()
     labels = [f"{item.metadata.name} · {item.metadata.status.value}" for item in descriptors]
     selected = st.selectbox("Research strategy", labels)
     descriptor = descriptors[labels.index(selected)]
-    frozen = descriptor.metadata.status is StrategyStatus.FROZEN
+    blocked = _optimizer_eligibility_error(descriptor.metadata.status)
     st.caption(f"Strategy version {descriptor.metadata.version} · fingerprint {descriptor.metadata.strategy_fingerprint}")
-    if frozen:
-        st.error("OPTIMIZATION DISABLED - FROZEN STRATEGY")
+    if blocked:
+        st.error(blocked)
     fixture_mode = st.checkbox("Use deterministic test fixture surface", value=True)
     st.markdown("### Optimization Dataset")
     st.caption("DEVELOPMENT ONLY")
@@ -148,7 +157,8 @@ def _render_optimizer() -> None:
     except ValueError as error:
         st.error(str(error))
     st.info(f"{combinations} parameter combinations · estimated backtests: {combinations}")
-    if st.button("Start Optimization", type="primary", disabled=frozen or combinations == 0):
+    if st.button("Start Optimization", type="primary",
+                 disabled=blocked is not None or combinations == 0):
         try:
             guard_optimization(descriptor, role)
             if validation_role != "NONE":

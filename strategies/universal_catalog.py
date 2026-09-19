@@ -138,10 +138,14 @@ def _pb1_warmup(start):
 
 
 register_strategy(StrategyDescriptor(
-    metadata=_meta("BTC_PB1_SHALLOW_PULLBACK_V1", "BTC PB1 — Shallow Trend Pullback Continuation [Research]", "1.0",
-                   StrategyStatus.RESEARCH, "trend_continuation",
+    metadata=_meta("BTC_PB1_SHALLOW_PULLBACK_V1", "BTC PB1 — Shallow Trend Pullback Continuation [Rejected]", "1.0",
+                   StrategyStatus.REJECTED, "trend_continuation",
                    "Impulse -> shallow controlled retracement -> continuation trigger. "
-                   "Phase A baseline, not yet optimized.", "btc_pb1_shallow_pullback.py"),
+                   "REJECTED — DEVELOPMENT cross-regime robustness failure: the hypothesis showed "
+                   "localized signal but no configuration was robust across 2021/2022/2023. "
+                   "Parameters, defaults and source are preserved unchanged so every historical "
+                   "PB1 result stays reproducible. See reports/pb1/RESEARCH_SUMMARY.md.",
+                   "btc_pb1_shallow_pullback.py"),
     factory=BtcPB1ShallowPullback,
     parameters=(
         _mutable("impulse_window_bars", ParameterType.INTEGER, 3, 2, 5, 1,
