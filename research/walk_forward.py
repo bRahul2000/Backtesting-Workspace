@@ -261,8 +261,16 @@ def check_temporal_integrity(fold: Fold, fold_bars: FoldBars, *, embargo_bars: i
 
 
 def guard_walk_forward(descriptor: StrategyDescriptor, role: DatasetRole) -> None:
-    if descriptor.metadata.status is StrategyStatus.FROZEN:
+    """Production/catalog strategy guard: walk-forward parameter search is only available to
+    RESEARCH-status strategies. Deterministic test-only fixtures may bypass this guard when a
+    test invokes the orchestrator directly with a synthetic descriptor rather than a catalog one."""
+    status = descriptor.metadata.status
+    if status is StrategyStatus.FROZEN:
         raise WalkForwardBlocked("WALK-FORWARD OPTIMIZATION DISABLED — FROZEN STRATEGY")
+    if status is StrategyStatus.REJECTED:
+        raise WalkForwardBlocked("WALK-FORWARD DISABLED — REJECTED STRATEGY")
+    if status is not StrategyStatus.RESEARCH:
+        raise WalkForwardBlocked("WALK-FORWARD DISABLED — STRATEGY STATUS NOT ELIGIBLE FOR RESEARCH")
     if role is not DatasetRole.DEVELOPMENT:
         raise WalkForwardBlocked("WALK-FORWARD BLOCKED: training data must use DEVELOPMENT role.")
 

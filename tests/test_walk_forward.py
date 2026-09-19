@@ -165,6 +165,37 @@ def test_frozen_strategy_walk_forward_disabled():
         guard_walk_forward(descriptor, DatasetRole.DEVELOPMENT)
 
 
+def test_research_status_is_allowed():
+    guard_walk_forward(_descriptor(StrategyStatus.RESEARCH), DatasetRole.DEVELOPMENT)  # does not raise
+
+
+def test_rejected_strategy_walk_forward_blocked():
+    with pytest.raises(WalkForwardBlocked, match="REJECTED STRATEGY"):
+        guard_walk_forward(_descriptor(StrategyStatus.REJECTED), DatasetRole.DEVELOPMENT)
+
+
+def test_unsupported_status_walk_forward_blocked():
+    for status in (StrategyStatus.CANDIDATE, StrategyStatus.FORWARD_VALIDATED, StrategyStatus.DEMO, StrategyStatus.LIVE):
+        with pytest.raises(WalkForwardBlocked, match="STATUS NOT ELIGIBLE FOR RESEARCH"):
+            guard_walk_forward(_descriptor(status), DatasetRole.DEVELOPMENT)
+
+
+def test_deterministic_fixture_remains_usable_bypassing_catalog_status():
+    """Deterministic test-only fixtures may invoke run_walk_forward directly with a RESEARCH
+    descriptor, bypassing the production strategy registry/status guard entirely."""
+    candidates = _fixture_grid_no_isolation(2, 2)
+    config = WalkForwardConfig(training_months=24, validation_months=3, step_months=3, minimum_training_bars=1, minimum_validation_bars=1)
+    run, fold_results = run_walk_forward(
+        descriptor=_descriptor(StrategyStatus.RESEARCH), config=config, bar_timestamps=BARS,
+        data_role=DatasetRole.DEVELOPMENT, dataset_fingerprint="d", broker_fingerprint="b",
+        instrument_fingerprint="i", engine_version="test-fixture",
+        train_candidates_fn=lambda fold, cfg: candidates,
+        validate_fn=lambda fold, params: _candidate(f"val-{fold.fold_id}", params["entry"], params["exit"], 1.3, 0.2, 100),
+    )
+    assert run.status == "COMPLETED"
+    assert len(fold_results) > 0
+
+
 # --- Deterministic candidate selection ---------------------------------------------
 
 

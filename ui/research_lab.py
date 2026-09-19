@@ -237,14 +237,31 @@ def _fold_bar_timestamps(training_months: int, extra_months: int = 3) -> list[da
     return bars
 
 
+def _walk_forward_eligibility_error(status: StrategyStatus) -> str | None:
+    """Mirrors research.walk_forward.guard_walk_forward's production status policy for the UI:
+    only RESEARCH-status catalog strategies may launch a real Walk-Forward run."""
+    if status is StrategyStatus.FROZEN:
+        return "WALK-FORWARD OPTIMIZATION DISABLED — FROZEN STRATEGY"
+    if status is StrategyStatus.REJECTED:
+        return "WALK-FORWARD DISABLED — REJECTED STRATEGY"
+    if status is not StrategyStatus.RESEARCH:
+        return "WALK-FORWARD DISABLED — STRATEGY STATUS NOT ELIGIBLE FOR RESEARCH"
+    return None
+
+
 def _render_walk_forward_setup() -> None:
     st.markdown("### Walk-Forward Setup")
     registry = discover_builtin_strategies()
     descriptors = registry.all()
-    labels = [f"{item.metadata.name} · {item.metadata.status.value}" for item in descriptors]
+    labels = []
+    for item in descriptors:
+        suffix = " (Historical — cannot launch Walk-Forward)" if item.metadata.status is not StrategyStatus.RESEARCH else ""
+        labels.append(f"{item.metadata.name} · {item.metadata.status.value}{suffix}")
     selected_label = st.selectbox("Strategy", labels, key="wf_strategy")
     descriptor = descriptors[labels.index(selected_label)]
-    frozen = descriptor.metadata.status is StrategyStatus.FROZEN
+    status = descriptor.metadata.status
+    eligibility_error = _walk_forward_eligibility_error(status)
+    ineligible = eligibility_error is not None
     st.caption(f"Strategy version {descriptor.metadata.version} · fingerprint {descriptor.metadata.strategy_fingerprint}")
 
     st.markdown("**Dataset**")
@@ -252,8 +269,10 @@ def _render_walk_forward_setup() -> None:
                "Reserved FORWARD_VALIDATION/HOLDOUT data is never consumed here.")
     role = DatasetRole(st.selectbox("Dataset role", [DatasetRole.DEVELOPMENT.value], index=0, key="wf_role"))
 
-    if frozen:
-        st.error("WALK-FORWARD OPTIMIZATION DISABLED — FROZEN STRATEGY")
+    if ineligible:
+        st.error(eligibility_error)
+        if status is not StrategyStatus.RESEARCH:
+            st.caption("This strategy is shown for research history only. Walk-Forward optimization requires RESEARCH status.")
 
     mode = WalkForwardMode(st.selectbox("Mode", [WalkForwardMode.ROLLING.value, WalkForwardMode.ANCHORED.value], key="wf_mode"))
     col1, col2, col3 = st.columns(3)
@@ -294,7 +313,7 @@ def _render_walk_forward_setup() -> None:
         folds = []
     st.info(f"Generated fold count: {len(folds)}")
 
-    if st.button("Start Walk-Forward", type="primary", disabled=frozen or not folds):
+    if st.button("Start Walk-Forward", type="primary", disabled=ineligible or not folds):
         try:
             guard_walk_forward(descriptor, role)
             guard_dataset_role(role)
