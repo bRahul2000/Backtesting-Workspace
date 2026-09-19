@@ -18,3 +18,6 @@ def test_ledger_allocates_reproducible_run_ids_and_counts_forward(tmp_path):
     assert ledger.forward_run_count("S1") == 1
     assert '"trades": 3' in ledger.get(second)["results_json"]
     assert ledger.get(second)["instrument_fingerprint"] == "if"
+    listed = ledger.list_runs(instrument="BTCUSD", dataset_role="FORWARD_VALIDATION")
+    assert [row["run_id"] for row in listed] == [second]
+    assert listed[0]["results_json"]["trades"] == 3

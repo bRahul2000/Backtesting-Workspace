@@ -38,17 +38,17 @@ def render_setup_a_native_validation() -> None:
     st.subheader("Exness cost sensitivity")
     st.info("BAR SPREAD COST = LOWER-BOUND RESEARCH, NOT TICK-EXACT EXECUTION")
     st.dataframe(full[["cost_view", "trades", "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Year stability")
     yearly = pd.read_csv(REPORT / "yearly_results.csv")
     st.dataframe(yearly[["year", "partial_year", "cost_view", "trades",
                          "win_rate_percent", "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Long vs Short")
     direction = pd.read_csv(REPORT / "direction_results.csv")
     st.dataframe(direction[["direction", "cost_view", "trades", "win_rate_percent",
                             "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Exness vs Bitstamp signal overlap")
     overlap = summary["signal_overlap"]
     st.caption(f"Exact {overlap['exact_matches']} · Near ±1 M15 {overlap['near_matches']} · "
@@ -60,14 +60,14 @@ def render_setup_a_native_validation() -> None:
     st.dataframe(native.loc[native.scope == "exact_common_timestamps",
                             ["feed", "signals", "trades", "win_rate_percent",
                              "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Setup A vs Setup B, separate strategies")
     comparison = pd.read_csv(REPORT / "setup_a_vs_b.csv")
-    st.dataframe(comparison.round(4), hide_index=True, width="stretch")
+    st.dataframe(comparison.round(4), hide_index=True, use_container_width=True)
     figure = px.bar(comparison, x="setup", y="profit_factor", color="cost_view",
                     barmode="group", template="plotly_dark",
                     title="Standalone PF on Exness Bid M15")
-    st.plotly_chart(figure, width="stretch")
+    st.plotly_chart(figure, use_container_width=True)
     lots = summary["lot_sizing"]
     st.caption(f"Filled positions: {lots['theoretical_filled_positions']} theoretical; "
                f"{lots['executable_filled_positions']} at or above 0.01 lot; "

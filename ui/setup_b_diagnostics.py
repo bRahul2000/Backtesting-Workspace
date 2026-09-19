@@ -36,7 +36,7 @@ def _bucket_table(buckets: pd.DataFrame, descriptor: str, heading: str) -> None:
                      "Average R", "Expectancy R", "Net PnL $", "Small sample"]
     st.dataframe(shown.round({"WR %": 2, "PF": 3, "Average R": 3,
                               "Expectancy R": 3, "Net PnL $": 2}),
-                 width="stretch", hide_index=True)
+                 use_container_width=True, hide_index=True)
 
 
 def render_setup_b_diagnostics(report_dir: Path = REPORT_DIR) -> None:
@@ -104,7 +104,7 @@ def render_setup_b_diagnostics(report_dir: Path = REPORT_DIR) -> None:
                         values="reached_percent").reindex(
                             ["All", "Long", "Short", "Losing", "Stopped"])
     pivot.columns = [f"+{value:g}R reached %" for value in pivot.columns]
-    st.dataframe(pivot.round(2), width="stretch")
+    st.dataframe(pivot.round(2), use_container_width=True)
     st.caption(
         f"Stopped trades: {stopped['never_reached_0.25r_percent']:.2f}% never "
         f"reached +0.25R; average MFE {stopped['average_mfe_r']:.3f}R; "
@@ -139,20 +139,20 @@ def render_setup_b_diagnostics(report_dir: Path = REPORT_DIR) -> None:
     fig.update_layout(template="plotly_dark", height=300,
                       xaxis_title="Signal hour UTC", yaxis_title="Average R",
                       xaxis=dict(dtick=2), margin=dict(l=20, r=20, t=20, b=30))
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
     st.dataframe(hours[["period", "trades", "win_rate_percent", "profit_factor",
                         "average_r", "expectancy_r", "small_sample"]].round(3),
-                 width="stretch", hide_index=True, height=250)
+                 use_container_width=True, hide_index=True, height=250)
     st.subheader("DAY-OF-WEEK PERFORMANCE")
     days = times.loc[(times.period_type == "UTC weekday") &
                      (times.direction == "All")]
     st.dataframe(days[["period", "trades", "win_rate_percent", "profit_factor",
                        "average_r", "expectancy_r", "small_sample"]].round(3),
-                 width="stretch", hide_index=True)
+                 use_container_width=True, hide_index=True)
     with st.expander("Calendar year, month, and direction detail"):
         st.dataframe(times.loc[times.period_type.isin(
             ["Calendar year", "Calendar month", "Analysis set"])],
-            width="stretch", hide_index=True, height=280)
+            use_container_width=True, hide_index=True, height=280)
 
     fills = pd.read_csv(report_dir / "fill_analysis.csv")
     st.subheader("FILL QUALITY")
@@ -162,14 +162,14 @@ def render_setup_b_diagnostics(report_dir: Path = REPORT_DIR) -> None:
     st.dataframe(rows[["fill_type", "trades", "win_rate_percent",
                        "profit_factor", "average_r", "expectancy_r",
                        "net_pnl", "small_sample"]].round(3),
-                 width="stretch", hide_index=True)
+                 use_container_width=True, hide_index=True)
     st.markdown("**Normal vs gap-through-trigger**")
     rows = fills.loc[(fills.comparison == "Trigger crossing") &
                      (fills.direction == "All")]
     st.dataframe(rows[["fill_type", "trades", "win_rate_percent",
                        "profit_factor", "average_r", "expectancy_r",
                        "net_pnl", "small_sample"]].round(3),
-                 width="stretch", hide_index=True)
+                 use_container_width=True, hide_index=True)
 
     st.subheader("LONG VS SHORT")
     sides = pd.read_csv(report_dir / "cost_analysis.csv")
@@ -177,7 +177,7 @@ def render_setup_b_diagnostics(report_dir: Path = REPORT_DIR) -> None:
         "population", "trades", "win_rate_percent", "profit_factor",
         "average_r", "expectancy_r", "net_pnl",
         "required_breakeven_win_rate_percent", "win_rate_gap_pp",
-    ]].round(3), width="stretch", hide_index=True)
+    ]].round(3), use_container_width=True, hide_index=True)
     st.caption(
         "Development: 2021–2024. Forward-validation for future changes: "
         "2025–2026. These later years have already been observed and are not a pristine holdout."

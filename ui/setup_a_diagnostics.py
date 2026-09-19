@@ -48,25 +48,25 @@ def render_setup_a_diagnostics() -> None:
                        "completed_trades", "fill_rate_percent", "win_rate_percent",
                        "profit_factor", "average_r", "median_mfe_r", "median_mae_r",
                        "never_reached_0.5r_percent", "losers_reached_1r_percent"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.caption("Median signal-time regime descriptors by year")
     st.dataframe(show[["year", "median_atr_percent", "median_adx",
                        "median_h1_slope_percent",
                        "median_recent_volatility_24h_percent",
                        "median_directional_efficiency_24h"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Winner vs loser profile")
     scope = st.selectbox("Profile population", list(profile.scope.unique()),
                          key="setup_a_diagnostics_profile_scope")
     st.dataframe(profile.loc[profile.scope.eq(scope),
                              ["outcome", "descriptor", "count", "mean", "median",
-                              "p25", "p75"]].round(3), hide_index=True, width="stretch")
+                              "p25", "p75"]].round(3), hide_index=True, use_container_width=True)
     st.caption("2025 losing trades versus 2024 and 2026 completed trades; median differences are descriptive.")
     st.dataframe(failure[["descriptor", "losing_2025_count", "losing_2025_median",
                           "losing_2025_p25", "losing_2025_p75", "other_years_count",
                           "other_years_median", "other_years_p25", "other_years_p75",
                           "median_shift_over_reference_iqr", "adequate_sample"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("MFE / MAE")
     st.caption("Conservative post-fill M15 OHLC excursion; uncertain intrabar extremes are excluded.")
     st.dataframe(excursions.loc[excursions.direction.eq("All"),
@@ -76,19 +76,19 @@ def render_setup_a_diagnostics() -> None:
                                  "losers_reached_1r_percent",
                                  "losers_reached_1.5r_percent",
                                  "losers_reached_2r_percent"]].round(2),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Long vs Short")
     st.dataframe(direction.loc[direction.year.isin([2024, 2025, 2026]),
                                 ["year", "direction", "trades", "win_rate_percent",
                                  "profit_factor", "average_r", "net_pnl"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Time analysis")
     dimension = st.selectbox("Time grouping", list(times.dimension.unique()),
                              key="setup_a_diagnostics_time_dimension")
     st.dataframe(times.loc[(times.scope.eq("All")) & times.dimension.eq(dimension),
                            ["value", "trades", "win_rate_percent", "profit_factor",
                             "average_r", "low_sample"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Regime buckets")
     st.caption("Descriptive quartiles and fixed ADX/stop bins. Small samples are flagged; no bucket changes strategy decisions.")
     descriptor = st.selectbox("Regime descriptor", list(buckets.descriptor.unique()),
@@ -96,15 +96,15 @@ def render_setup_a_diagnostics() -> None:
     chosen = buckets.loc[buckets.descriptor.eq(descriptor)]
     st.dataframe(chosen[["scope", "bucket", "trades", "profit_factor",
                          "average_r", "net_pnl", "low_sample"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Cost resilience by year")
     fig = px.line(costs.loc[costs.year.isin([2024, 2025, 2026])],
                   x="spread_usd_per_btc", y="profit_factor", color="year",
                   markers=True, template="plotly_dark")
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
     st.caption("Fixed spreads are sensitivity views, not historical tick-exact costs.")
     st.subheader("Feed sensitivity by year")
     st.dataframe(feeds.loc[feeds.year.isin([2024, 2025, 2026])].round(2),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     render_setup_a_regime_research()
     render_setup_a_long_history()

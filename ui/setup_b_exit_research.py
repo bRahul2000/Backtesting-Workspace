@@ -21,7 +21,7 @@ def _table(path: Path, columns: dict[str, str]) -> None:
         st.caption("No development-robust candidates; forward validation was not run.")
         return
     shown = frame[list(columns)].rename(columns=columns)
-    st.dataframe(shown.round(3), hide_index=True, width="stretch")
+    st.dataframe(shown.round(3), hide_index=True, use_container_width=True)
 
 
 def render_exit_research(report_dir: Path = REPORT_DIR) -> None:
@@ -60,7 +60,7 @@ def render_exit_research(report_dir: Path = REPORT_DIR) -> None:
     fig = px.bar(development, x="model", y="average_r", color="model",
                  title="Development average R", template="plotly_dark")
     fig.update_layout(showlegend=False, height=320)
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("Year-by-year stability", expanded=False):
         _table(report_dir / "development_yearly.csv", {

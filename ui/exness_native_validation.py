@@ -33,7 +33,7 @@ def render_exness_native_validation(report_dir: Path = REPORT) -> None:
                f"Bitstamp-only timestamps {price['bitstamp_only_timestamps']:,} · "
                f"Close correlation {price['close_correlation']:.6f}. No interpolation.")
     differences = pd.DataFrame(price["absolute_difference_summary"]).T.reset_index().rename(columns={"index": "price_field"})
-    st.dataframe(differences.round(4), hide_index=True, width="stretch")
+    st.dataframe(differences.round(4), hide_index=True, use_container_width=True)
 
     st.subheader("Signal overlap")
     cards = st.columns(4)
@@ -49,7 +49,7 @@ def render_exness_native_validation(report_dir: Path = REPORT) -> None:
                f"{trade['both_completed']} both completed")
     st.dataframe(pd.DataFrame([{"outcome": key, "pairs": value}
                                for key, value in trade["outcomes"].items()]),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
 
     st.header("Exness Native Setup B")
     st.info("BAR SPREAD COST = LOWER-BOUND RESEARCH, NOT TICK-EXACT EXECUTION")
@@ -59,30 +59,30 @@ def render_exness_native_validation(report_dir: Path = REPORT) -> None:
     st.dataframe(comparison[["feed", "signals", "pending_orders", "filled_orders", "trades",
                              "long_trades", "short_trades", "wins", "losses",
                              "win_rate_percent", "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     native = results.loc[(results.feed == "exness_native") & (results.scope == "full_native")]
     st.subheader("Full Exness native-price results")
     st.dataframe(native[["cost_view", "signals", "filled_orders", "trades", "win_rate_percent",
                          "profit_factor", "average_r", "spread_cost", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     fixed = native.loc[native.cost_view.str.startswith("fixed_spread")]
     if not fixed.empty:
         fig = px.bar(fixed, x="cost_view", y="net_pnl",
                      title="Fixed-spread sensitivity on frozen native trades",
                      template="plotly_dark")
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
     st.subheader("Earlier vs later Exness periods")
     periods = results.loc[(results.feed == "exness_native") &
                           (results.scope.isin(["earlier_2023_2024", "later_2025_2026"])) &
                           (results.cost_view.isin(["zero_cost", "bar_minimum_spread_lower_bound"]))]
     st.dataframe(periods[["scope", "cost_view", "trades", "win_rate_percent",
                           "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     yearly_path = report_dir / "yearly_results.csv"
     if yearly_path.exists():
         st.subheader("Yearly Exness results")
         year = pd.read_csv(yearly_path)
         st.dataframe(year[["year", "partial_year", "cost_view", "trades", "win_rate_percent",
                            "profit_factor", "average_r", "net_pnl"]].round(4),
-                     hide_index=True, width="stretch")
+                     hide_index=True, use_container_width=True)
     st.caption("Signals are calculated from Exness Bid M15 bars. The existing generic OHLC execution convention remains in use. A tick-replayed Exness execution backtest has not been performed.")

@@ -95,3 +95,26 @@ class ExperimentLedger:
             conn.row_factory = sqlite3.Row
             row = conn.execute("SELECT * FROM experiments WHERE run_id=?", (run_id,)).fetchone()
         return dict(row) if row else None
+
+    def list_runs(self, *, instrument: str | None = None,
+                  strategy_id: str | None = None,
+                  dataset_role: str | None = None) -> list[dict[str, Any]]:
+        clauses = []
+        values: list[str] = []
+        for column, value in (("instrument", instrument), ("strategy_id", strategy_id),
+                              ("dataset_role", dataset_role)):
+            if value is not None:
+                clauses.append(f"{column}=?")
+                values.append(value)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM experiments" + where + " ORDER BY sequence DESC", values
+            ).fetchall()
+        output = []
+        for row in rows:
+            item = dict(row)
+            item["results_json"] = json.loads(item["results_json"]) if item["results_json"] else {}
+            output.append(item)
+        return output

@@ -39,30 +39,30 @@ def render_setup_a_regime_research() -> None:
                            ("recent_volatility_24h_percent", "24h volatility sensitivity")):
         st.markdown(f"#### {title}")
         subset = one.loc[one.feature.eq(feature)]
-        st.dataframe(subset[show].round(4), hide_index=True, width="stretch")
+        st.dataframe(subset[show].round(4), hide_index=True, use_container_width=True)
         charts = st.columns(2)
         charts[0].plotly_chart(px.line(subset, x="percentile", y="retention_percent",
                                       markers=True, title="Trade retention", template="plotly_dark"),
-                               width="stretch")
+                               use_container_width=True)
         figures = subset.melt(id_vars="percentile", value_vars=["profit_factor", "average_r"],
                               var_name="metric", value_name="value")
         charts[1].plotly_chart(px.line(figures, x="percentile", y="value", color="metric",
                                       markers=True, title="PF and average R", template="plotly_dark"),
-                               width="stretch")
+                               use_container_width=True)
     with st.expander("Development direction and monthly participation"):
-        st.dataframe(direction.round(4), hide_index=True, width="stretch")
-        st.dataframe(monthly, hide_index=True, width="stretch")
+        st.dataframe(direction.round(4), hide_index=True, use_container_width=True)
+        st.dataframe(monthly, hide_index=True, use_container_width=True)
     st.markdown("#### Development candidate freeze")
     st.json({"freeze_hash_sha256": frozen["freeze_hash_sha256"],
              "candidates": frozen["candidates"]})
     st.caption("One ATR% candidate was frozen before validation. No 24h or combined candidate qualified.")
     st.markdown("#### 2025 and 2026 validation")
     st.dataframe(validation.loc[validation.period.isin(["2025", "2026", "2025–2026"])].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.caption("The frozen candidate did not materially improve 2025 per-trade quality and reduced 2026 average R.")
     st.markdown("#### Cost cross-check")
     st.dataframe(costs.loc[costs.spread_usd_per_btc.isin([0., 10., 20., 30.])].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.markdown("#### Allowed vs blocked original opportunities")
-    st.dataframe(participation.round(4), hide_index=True, width="stretch")
+    st.dataframe(participation.round(4), hide_index=True, use_container_width=True)
     st.caption("Blocked-trade PnL is a counterfactual classification of original control trades. Gated-run PnL comes from an independent backtest; later opportunities can differ.")

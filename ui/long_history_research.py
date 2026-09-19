@@ -83,7 +83,7 @@ def render_long_history_research(report_dir: Path = REPORT_DIR) -> None:
             "gap_before_missing_candles", "usable", "exclusion_reason",
             "signals", "completed_trades", "net_pnl", "max_drawdown_percent",
         ]
-        st.dataframe(rows[columns], width="stretch", hide_index=True)
+        st.dataframe(rows[columns], use_container_width=True, hide_index=True)
 
     st.subheader("Year Results")
     yearly_path = report_dir / "yearly_results.csv"
@@ -98,7 +98,7 @@ def render_long_history_research(report_dir: Path = REPORT_DIR) -> None:
             "win_rate_percent": 2, "profit_factor": 3,
             "average_r": 3, "expectancy_r": 3, "net_pnl": 2,
             "worst_segment_drawdown_percent": 2,
-        }), width="stretch", hide_index=True)
+        }), use_container_width=True, hide_index=True)
 
     st.subheader("Monthly Results")
     monthly_path = report_dir / "monthly_results.csv"
@@ -117,7 +117,7 @@ def render_long_history_research(report_dir: Path = REPORT_DIR) -> None:
         ]].round({
             "win_rate_percent": 2, "profit_factor": 3,
             "average_r": 3, "net_pnl": 2,
-        }), width="stretch", hide_index=True, height=280)
+        }), use_container_width=True, hide_index=True, height=280)
 
     st.subheader("Long vs Short")
     side_rows = []
@@ -138,7 +138,7 @@ def render_long_history_research(report_dir: Path = REPORT_DIR) -> None:
     st.dataframe(pd.DataFrame(side_rows).round({
         "Win Rate %": 2, "Profit Factor": 3, "Net PnL $": 2,
         "Average R": 3, "Expectancy R": 3, "Worst Segment DD %": 2,
-    }), width="stretch", hide_index=True)
+    }), use_container_width=True, hide_index=True)
 
     st.subheader("Download Research CSV Files")
     files = (

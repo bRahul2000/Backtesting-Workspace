@@ -45,16 +45,16 @@ def render_exness_cost_calibration(report_dir: Path = OUTPUT) -> None:
     st.subheader("Cost comparison")
     st.dataframe(all_rows[["view", "scenario", "trades", "executable_trades",
                            "profit_factor", "average_r", "net_pnl", "cost_per_trade",
-                           "cost_r_per_trade"]].round(4), hide_index=True, width="stretch")
+                           "cost_r_per_trade"]].round(4), hide_index=True, use_container_width=True)
     st.subheader("$5–$30 spread sensitivity")
     whole = sensitivity.loc[sensitivity.scope == "all"]
     fig = px.line(whole, x="spread_usd_per_btc", y="net_pnl", color="view", markers=True,
                   title="Frozen-trade net PnL by assumed spread", template="plotly_dark")
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
     st.dataframe(whole[["view", "spread_usd_per_btc", "trades", "executable_trades",
                         "gross_pre_cost_pnl", "spread_cost", "net_pnl", "profit_factor",
                         "average_r", "expectancy_r", "final_balance_arithmetic_reference"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
 
     st.subheader("Theoretical quantity vs Exness lot size")
     cards = st.columns(3)
@@ -67,19 +67,19 @@ def render_exness_cost_calibration(report_dir: Path = OUTPUT) -> None:
                                "planned_risk_before_rounding", "planned_risk_after_rounding",
                                "structural_risk_before_rounding", "structural_risk_after_rounding",
                                "risk_reduction_percent"]].round(6),
-                     hide_index=True, width="stretch")
+                     hide_index=True, use_container_width=True)
 
     st.subheader("Development vs forward validation")
     split = comparison.loc[(comparison.scenario == "spread_$10") & (comparison.scope != "all")]
     st.dataframe(split[["view", "scope", "trades", "executable_trades",
                         "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.subheader("Year by year · $10 spread")
     st.dataframe(yearly[["view", "year", "executable_trades", "profit_factor",
-                         "average_r", "net_pnl"]].round(4), hide_index=True, width="stretch")
+                         "average_r", "net_pnl"]].round(4), hide_index=True, use_container_width=True)
     st.subheader("Long vs short · $10 spread")
     st.dataframe(direction[["view", "direction", "executable_trades", "profit_factor",
-                            "average_r", "net_pnl"]].round(4), hide_index=True, width="stretch")
+                            "average_r", "net_pnl"]].round(4), hide_index=True, use_container_width=True)
     st.caption("Signals and historical movement remain from Bitstamp BTC/USD. This reprices frozen completed trades only. A broker-native backtest requires longer Exness Bid/Ask history and tick-level execution replay. The arithmetic final balance is not a compounded equity curve across data gaps.")
 
     calibrated = CALIBRATED_OUTPUT
@@ -101,31 +101,31 @@ def render_exness_cost_calibration(report_dir: Path = OUTPUT) -> None:
     old_row = new_comparison.loc[(new_comparison.scope == "all") &
                                  (new_comparison.scenario == "old_0.05pct_per_side")]
     st.dataframe(old_row[["trades", "profit_factor", "average_r", "net_pnl",
-                          "worst_segment_dd_percent"]].round(4), hide_index=True, width="stretch")
+                          "worst_segment_dd_percent"]].round(4), hide_index=True, use_container_width=True)
     st.markdown("**B. Historical Bitstamp + Exness-calibrated fixed spread approximation**")
     ten = new_comparison.loc[new_comparison.scenario == "spread_$10"]
     st.dataframe(ten[["scope", "trades", "win_rate_percent", "profit_factor",
                       "average_r", "net_pnl", "total_spread_cost",
-                      "worst_segment_dd_percent"]].round(4), hide_index=True, width="stretch")
+                      "worst_segment_dd_percent"]].round(4), hide_index=True, use_container_width=True)
     st.markdown("**C. Synthetic Exness-like Bid/Ask execution**")
     st.caption("Research-only quote-side trigger and exit replay; Bitstamp remains the historical price source.")
     st.dataframe(mechanics[["view", "scope", "pending_fills", "pending_expiries",
                             "trades", "win_rate_percent", "profit_factor", "average_r",
                             "net_pnl", "worst_segment_dd_percent"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.markdown("**Fixed-spread sensitivity · cost-only**")
     whole = new_sensitivity.loc[new_sensitivity.scope == "all"]
     for metric, title in (("profit_factor", "Profit factor"),
                           ("average_r", "Average R"), ("net_pnl", "Net PnL")):
         fig = px.line(whole, x="spread_usd_per_btc", y=metric, markers=True,
                       title=title, template="plotly_dark")
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
     with st.expander("Spread bps by year and secondary frozen candidates", expanded=False):
-        st.dataframe(bps.round(4), hide_index=True, width="stretch")
+        st.dataframe(bps.round(4), hide_index=True, use_container_width=True)
         st.caption("C2, C3, and ADX25 were frozen in Phase 4E. These are secondary cost-only views, not newly selected strategies.")
         st.dataframe(candidates[["candidate", "scope", "trades", "profit_factor",
                                  "average_r", "net_pnl", "worst_segment_dd_percent"]].round(4),
-                     hide_index=True, width="stretch")
+                     hide_index=True, use_container_width=True)
     _render_synthetic_audit(SYNTHETIC_AUDIT_OUTPUT)
 
 
@@ -155,7 +155,7 @@ def _render_synthetic_audit(report_dir: Path) -> None:
                              "synthetic_only", "original_only", "timing_changed",
                              "price_changed", "trades", "win_rate_percent",
                              "profit_factor", "average_r", "net_pnl"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     with st.expander("Exclusive fills and reconciliation details", expanded=False):
         st.caption("Each order is matched by segment, signal time, direction, and setup ID. Exclusive fills include their signal-time state and causal explanation.")
         for label, category in (("Synthetic-only", "SYNTHETIC_ONLY_FILL"),
@@ -164,22 +164,22 @@ def _render_synthetic_audit(report_dir: Path) -> None:
             part = reconciliation.loc[reconciliation.classification == category]
             st.dataframe(part[["segment_id", "signal_time", "direction", "trigger_price",
                                "original_status", "synthetic_status", "reason", "explanation"]],
-                         hide_index=True, width="stretch")
+                         hide_index=True, use_container_width=True)
     st.markdown("**Frozen candidates · $10 synthetic execution**")
     st.dataframe(results[["candidate", "scope", "signals", "pending_fills", "trades",
                           "long_trades", "short_trades", "win_rate_percent",
                           "profit_factor", "average_r", "median_r", "net_pnl",
                           "worst_segment_dd_percent", "maximum_consecutive_losses"]].round(4),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     with st.expander("Long vs short robustness and descriptive flags", expanded=False):
         st.dataframe(side_results[["candidate", "scope", "direction", "trades",
                                    "profit_factor", "average_r", "net_pnl"]].round(4),
-                     hide_index=True, width="stretch")
-        st.dataframe(flags, hide_index=True, width="stretch")
+                     hide_index=True, use_container_width=True)
+        st.dataframe(flags, hide_index=True, use_container_width=True)
     st.markdown("**Synthetic spread sensitivity · $5 / $10 / $15 / $20**")
     for metric, title in (("profit_factor", "Profit factor"),
                           ("average_r", "Average R"), ("net_pnl", "Net PnL")):
         fig = px.line(spreads, x="spread_usd_per_btc", y=metric, color="candidate",
                       facet_col="scope", markers=True, title=title, template="plotly_dark")
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
     st.caption("The $10 synthetic spread is embedded in Bid/Ask execution prices. Commission is $0; no second spread is deducted. No candidate is selected for deployment.")

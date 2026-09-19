@@ -313,13 +313,13 @@ def _render_loaded(snapshot: FeedSnapshot, count: int, show_trades: bool,
             column.metric(label, value)
     st.caption("Historical replay only. Markers and pending levels are theoretical; no broker order is submitted.")
     st.plotly_chart(chart_figure(analysis, count, show_trades, show_m15, show_h1),
-                    width="stretch", config={"scrollZoom": True, "displaylogo": False})
+                    use_container_width=True, config={"scrollZoom": True, "displaylogo": False})
     left, middle, right = st.columns([1.25, 1, 1])
     with left:
         st.subheader("Setup A rule status")
         st.caption("Latest completed M15 candle · frozen evaluator stages")
         if analysis.rule_status:
-            st.dataframe(pd.DataFrame(analysis.rule_status), width="stretch", hide_index=True,
+            st.dataframe(pd.DataFrame(analysis.rule_status), use_container_width=True, hide_index=True,
                          height=510)
         else:
             st.caption("Indicator warm-up is incomplete for this segment.")
@@ -342,7 +342,7 @@ def _render_loaded(snapshot: FeedSnapshot, count: int, show_trades: bool,
                     "Exness rounded lot": f"{levels['rounded_lots']:.2f}",
                     "Planned risk": f"${levels['planned_risk']:,.2f}"}
             st.dataframe(pd.DataFrame(data.items(), columns=["Field", "Value"]),
-                         width="stretch", hide_index=True)
+                         use_container_width=True, hide_index=True)
     with right:
         st.subheader("Confirmed H1 context")
         h1 = analysis.h1_context

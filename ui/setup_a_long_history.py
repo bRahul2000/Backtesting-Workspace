@@ -38,31 +38,31 @@ def render_setup_a_long_history() -> None:
                          "short_trades", "win_rate_percent", "profit_factor", "average_r",
                          "median_r", "net_pnl", "worst_segment_dd_percent",
                          "max_losing_streak", "trades_per_observed_month"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.markdown("#### Independent periods")
     st.dataframe(periods[["period", "trades", "profit_factor", "average_r", "net_pnl",
                           "worst_segment_dd_percent", "signals_per_observed_month",
                           "fills_per_observed_month", "trades_per_observed_month"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.markdown("#### Long vs Short")
     st.dataframe(directions[["period", "direction", "trades", "profit_factor",
                              "average_r", "net_pnl"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.markdown("#### MFE / MAE after fill")
     st.caption("Conservative M15 OHLC excursions censor unknown entry- and exit-bar extremes.")
-    st.dataframe(mfe.round(2), hide_index=True, width="stretch")
+    st.dataframe(mfe.round(2), hide_index=True, use_container_width=True)
     st.markdown("#### Pre-Exness history · 2021 through 2023-11-08")
     st.dataframe(pre[["period", "direction", "trades", "win_rate_percent",
                       "profit_factor", "average_r", "net_pnl"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     st.markdown("#### Yearly signal-time regime medians")
-    st.dataframe(regimes.round(3), hide_index=True, width="stretch")
+    st.dataframe(regimes.round(3), hide_index=True, use_container_width=True)
     st.markdown("#### Existing exact-timestamp Exness overlap")
     native = pd.read_csv(ROOT / "reports/setup_a/native_results.csv")
     overlap = native.loc[native.scope.eq("exact_common_timestamps") &
                          native.cost_view.eq("zero_cost")]
     st.dataframe(overlap[["feed", "trades", "profit_factor", "average_r"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     match = json.loads((ROOT / "reports/setup_a/setup_a_validation_summary.json").read_text())["signal_overlap"]
     st.caption(f"Exact match {match['exact_percent_of_exness']:.2f}%; "
                f"exact + near match {100 * match['exact_plus_near_match_rate']:.2f}%. "
@@ -72,6 +72,6 @@ def render_setup_a_long_history() -> None:
     st.dataframe(costs.loc[costs.period.isin(["Full 2021–2026", "Pre-Exness"]),
                         ["period", "spread_usd_per_btc", "trades",
                          "profit_factor", "average_r", "net_pnl"]].round(3),
-                 hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     with st.expander("Continuous segment coverage and excluded segments"):
-        st.dataframe(segments, hide_index=True, width="stretch")
+        st.dataframe(segments, hide_index=True, use_container_width=True)

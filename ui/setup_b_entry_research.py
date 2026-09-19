@@ -21,7 +21,7 @@ def _table(path: Path, columns: dict[str, str]) -> None:
         st.caption("No predefined combinations met the shortlist rule.")
         return
     data = data[[name for name in columns if name in data]].rename(columns=columns)
-    st.dataframe(data.round(3), width="stretch", hide_index=True)
+    st.dataframe(data.round(3), use_container_width=True, hide_index=True)
 
 
 def render_entry_research(report_dir: Path = REPORT_DIR) -> None:
@@ -58,18 +58,18 @@ def render_entry_research(report_dir: Path = REPORT_DIR) -> None:
                      "PF", "Avg R", "Net $", "Worst DD %", "Max losing streak",
                      "Positive years", "Negative years", "Low sample", "Zero-cost PF",
                      "Zero-cost Avg R"]
-    st.dataframe(shown.round(3), width="stretch", hide_index=True)
+    st.dataframe(shown.round(3), use_container_width=True, hide_index=True)
     st.caption("LOW SAMPLE FOR DEVELOPMENT: fewer than 250 completed trades. No result is hidden.")
 
     a, b = st.columns(2)
     retention = px.line(selected, x="value", y="trade_retention_percent", markers=True,
                         title="Trade retention %", template="plotly_dark")
-    a.plotly_chart(retention, width="stretch")
+    a.plotly_chart(retention, use_container_width=True)
     performance = selected.melt(id_vars="value", value_vars=["profit_factor", "average_r"],
                                 var_name="Measure", value_name="Value")
     figure = px.line(performance, x="value", y="Value", color="Measure", markers=True,
                      title="PF and average-R sensitivity", template="plotly_dark")
-    b.plotly_chart(figure, width="stretch")
+    b.plotly_chart(figure, use_container_width=True)
 
     with st.expander("Year stability", expanded=False):
         _table(report_dir / "year_stability.csv", {

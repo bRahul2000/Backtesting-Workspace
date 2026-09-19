@@ -225,7 +225,7 @@ def _render_v3_split(result: BacktestResult, data: pd.DataFrame) -> None:
     table = table.rename(columns={"trades": "Trades", "win_rate": "WR %",
                                   "profit_factor": "PF", "average_r": "Avg R",
                                   "net_pnl": "PnL $"})
-    st.dataframe(table, width="stretch", hide_index=True)
+    st.dataframe(table, use_container_width=True, hide_index=True)
 
 
 def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
@@ -283,29 +283,29 @@ def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
     }
     st.dataframe(pd.DataFrame([(key, str(value)) for key, value in details.items()],
                             columns=["Statistic", "Value"]),
-                 width="stretch", hide_index=True)
+                 use_container_width=True, hide_index=True)
 
     if strategy_name == V3_STRATEGY_NAME:
         _render_v3_split(result, data)
 
     first_time = data["timestamp"].iloc[0]
-    st.plotly_chart(equity_figure(result, first_time), width="stretch")
-    st.plotly_chart(drawdown_figure(result, first_time), width="stretch")
+    st.plotly_chart(equity_figure(result, first_time), use_container_width=True)
+    st.plotly_chart(drawdown_figure(result, first_time), use_container_width=True)
     chart, factor = price_figure(data, result)
-    st.plotly_chart(chart, width="stretch")
+    st.plotly_chart(chart, use_container_width=True)
     if factor > 1:
         st.caption(f"Price chart aggregates up to {factor} source candles per plotted candle; trade markers retain exact times and prices.")
 
     st.subheader("Completed Trade Log")
     table = trades_table(result)
-    st.dataframe(table, width="stretch", hide_index=True)
+    st.dataframe(table, use_container_width=True, hide_index=True)
     st.download_button("Download Trades CSV", table.to_csv(index=False).encode("utf-8"),
                        file_name="demo_backtest_trades.csv", mime="text/csv",
                        disabled=table.empty)
     if result.order_events:
         st.subheader("Pending Order Diagnostics")
         st.caption("Triggered, expired, cancelled, and still-active orders are listed separately from completed trades.")
-        st.dataframe(order_events_table(result), width="stretch", hide_index=True)
+        st.dataframe(order_events_table(result), use_container_width=True, hide_index=True)
     if diagnostics is not None:
         st.subheader("Signal Diagnostics / Filter Funnel")
         if strategy_name == V3_STRATEGY_NAME:
@@ -334,7 +334,7 @@ def render_results(result: BacktestResult, data: pd.DataFrame, start, end,
             [(label, counts.get(label, 0)) for label in labels],
             columns=["Stage", "Candles / Orders / Trades"],
         )
-        st.dataframe(diagnostic_table, width="stretch", hide_index=True)
+        st.dataframe(diagnostic_table, use_container_width=True, hide_index=True)
         st.download_button("Download Signal Diagnostics CSV",
                            diagnostic_table.to_csv(index=False).encode("utf-8"),
                            file_name=file_name, mime="text/csv")

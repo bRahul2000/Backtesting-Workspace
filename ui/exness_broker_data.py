@@ -46,12 +46,12 @@ def _render_mt5_samples(summary: dict, report_dir: Path) -> None:
         view = coverage[["sample_date", "day_type", "filename", "tick_count", "bid_15m_bars",
                          "missing_15m_intervals", "spread_median", "spread_p95",
                          "spread_maximum", "median_spread_bps"]]
-        st.dataframe(view, hide_index=True, width="stretch")
+        st.dataframe(view, hide_index=True, use_container_width=True)
         groups = coverage.groupby("day_type", as_index=False).agg(
             samples=("sample_id", "count"), ticks=("tick_count", "sum"),
             intervals=("bid_15m_bars", "sum"))
         st.markdown("**Weekend vs weekday observations (server calendar)**")
-        st.dataframe(groups, hide_index=True, width="stretch")
+        st.dataframe(groups, hide_index=True, use_container_width=True)
     hourly_path = report_dir / "spread_by_hour.csv"
     if hourly_path.exists():
         hourly = pd.read_csv(hourly_path)
@@ -59,7 +59,7 @@ def _render_mt5_samples(summary: dict, report_dir: Path) -> None:
             fig = px.line(hourly, x="server_hour", y="median_spread_price", markers=True,
                           title="Median spread by MT5 server hour", template="plotly_dark")
             fig.update_xaxes(dtick=1)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
     distribution_path = report_dir / "spread_distribution.csv"
     if distribution_path.exists():
         distribution = pd.read_csv(distribution_path)
@@ -68,15 +68,15 @@ def _render_mt5_samples(summary: dict, report_dir: Path) -> None:
             fig = px.bar(price, x="metric", y="value",
                          title="Combined historical spread distribution", template="plotly_dark")
             fig.update_xaxes(tickangle=-30)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
     gaps_path = report_dir / "sample_data_gaps.csv"
     if gaps_path.exists():
         with st.expander("Sample gaps and import details", expanded=False):
             gaps = pd.read_csv(gaps_path)
             st.caption(f"{len(gaps):,} internal gaps across {summary['sample_count']} separate samples.")
             if not gaps.empty:
-                st.dataframe(gaps, hide_index=True, width="stretch")
-            st.dataframe(pd.DataFrame(summary["samples"]), hide_index=True, width="stretch")
+                st.dataframe(gaps, hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(summary["samples"]), hide_index=True, use_container_width=True)
 
 
 def render_exness_broker_data(report_dir: Path = REPORT_DIR,
@@ -131,13 +131,13 @@ def render_exness_broker_data(report_dir: Path = REPORT_DIR,
                 fig = px.line(hourly, x=f"{clock}_hour", y="median_spread_price", markers=True,
                               title=f"Median spread by {clock_label} hour", template="plotly_dark")
                 fig.update_xaxes(dtick=1)
-                st.plotly_chart(fig, width="stretch")
+                st.plotly_chart(fig, use_container_width=True)
                 with st.expander(f"Spread by {clock_label} hour and weekday", expanded=False):
-                    st.dataframe(hourly.round(3), hide_index=True, width="stretch")
+                    st.dataframe(hourly.round(3), hide_index=True, use_container_width=True)
                     weekday_path = report_dir / ("spread_by_server_weekday.csv" if server_time else "spread_by_weekday.csv")
                     if weekday_path.exists():
                         st.dataframe(pd.read_csv(weekday_path).round(3),
-                                     hide_index=True, width="stretch")
+                                     hide_index=True, use_container_width=True)
         distribution_path = report_dir / "spread_distribution.csv"
         if distribution_path.exists():
             spread = pd.read_csv(distribution_path)
@@ -146,21 +146,21 @@ def render_exness_broker_data(report_dir: Path = REPORT_DIR,
                 fig = px.bar(price, x="metric", y="value", title="Tick spread distribution quantiles",
                              template="plotly_dark")
                 fig.update_xaxes(tickangle=-30)
-                st.plotly_chart(fig, width="stretch")
+                st.plotly_chart(fig, use_container_width=True)
         gaps_path = report_dir / ("data_gaps_server_time.csv" if server_time else "data_gaps.csv")
         if gaps_path.exists():
             with st.expander("15-minute data gaps and extreme spread periods", expanded=False):
                 gaps = pd.read_csv(gaps_path)
                 st.caption(f"{len(gaps):,} gaps · No candles were fabricated.")
                 if not gaps.empty:
-                    st.dataframe(gaps, hide_index=True, width="stretch")
+                    st.dataframe(gaps, hide_index=True, use_container_width=True)
                 extremes = report_dir / ("extreme_spread_periods_server_time.csv" if server_time
                                         else "extreme_spread_periods.csv")
                 if extremes.exists():
                     extreme_rows = pd.read_csv(extremes)
                     st.caption(f"{len(extreme_rows):,} {clock_label} 15-minute periods contained ticks above P99 spread; none removed.")
                     if not extreme_rows.empty:
-                        st.dataframe(extreme_rows.head(100), hide_index=True, width="stretch")
+                        st.dataframe(extreme_rows.head(100), hide_index=True, use_container_width=True)
     else:
         st.info("No Exness BTCUSDm tick history has been imported. Historical spread and candle metrics are unavailable.")
     st.caption("MT5 screenshot sanity check: Ask ≈ 76839.14, Bid ≈ 76829.14, spread ≈ $10/BTC at that instant. Historical ticks determine research costs.")
@@ -187,7 +187,7 @@ def render_exness_broker_data(report_dir: Path = REPORT_DIR,
             label = f"{Path(schema.file).name}/{schema.member}" if schema.member else Path(schema.file).name
             st.caption(f"{label}: {', '.join(schema.columns)} · delimiter {schema.delimiter!r}")
             if schema.sample:
-                st.dataframe(pd.DataFrame(schema.sample), hide_index=True, width="stretch")
+                st.dataframe(pd.DataFrame(schema.sample), hide_index=True, use_container_width=True)
         mt5_columns = ("<DATE>", "<TIME>", "<BID>", "<ASK>", "<LAST>", "<VOLUME>", "<FLAGS>")
         if all(schema.member is None and schema.columns == mt5_columns for schema in schemas):
             st.caption("MT5 mode reconstructs partial Bid/Ask updates in original row order. Each file is separate; Exness server time is UTC+0.")

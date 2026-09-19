@@ -37,12 +37,12 @@ def render_exness_m15_data(report_dir: Path = REPORT) -> None:
     if not year.empty:
         st.markdown("**Annual spread history**")
         st.dataframe(year[["group", "candles", "minimum", "median", "mean", "p95", "maximum"]].round(2),
-                     hide_index=True, width="stretch")
+                 hide_index=True, use_container_width=True)
     if not month.empty:
         fig = px.line(month, x="group", y=["median", "p95"], markers=True,
                       title="Monthly minimum-spread descriptors", template="plotly_dark")
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
     gap_path = report_dir.parent / "m15_data_gaps.csv"
     if gap_path.exists():
         with st.expander("M15 missing intervals", expanded=False):
-            st.dataframe(pd.read_csv(gap_path), hide_index=True, width="stretch")
+            st.dataframe(pd.read_csv(gap_path), hide_index=True, use_container_width=True)
