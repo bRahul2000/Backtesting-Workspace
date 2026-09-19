@@ -22,12 +22,21 @@ from research.walk_forward import (
     guard_walk_forward, parameter_drift, run_walk_forward, stitch_oos,
     walk_forward_summary,
 )
+from research.robustness import (
+    CapitalModel, RobustnessBlocked, RobustnessConfig, RobustnessMethod,
+    RobustnessStore, compute_source_fingerprint, deterministic_fixture_trades,
+    reserved_data_warning, run_robustness_analysis, trades_from_trade_log,
+    trades_from_walk_forward_oos,
+)
+from experiments.ledger import ExperimentLedger
 from strategies.base_strategy import StrategyStatus
 from strategies.registry import discover_builtin_strategies
 
 ROOT = Path(__file__).resolve().parents[1]
 STORE = OptimizationStore(ROOT / "experiments" / "optimizations.sqlite3")
 WF_STORE = WalkForwardStore(ROOT / "experiments" / "walk_forward.sqlite3")
+LEDGER = ExperimentLedger(ROOT / "experiments" / "experiments.sqlite3")
+ROBUSTNESS_STORE = RobustnessStore(ROOT / "experiments" / "robustness.sqlite3")
 
 
 def _fixture_candidates(optimization_id: str, parameters: list[dict]) -> list[CandidateResult]:
@@ -76,7 +85,10 @@ def _fixture_space() -> list[SearchParameter]:
 def render_research_lab() -> None:
     st.markdown("# Research Lab")
     st.caption("Parameter surfaces, stability, and reproducibility. Results report differences; they do not choose winners.")
-    tabs = st.tabs(["Optimizer", "Stability", "Optimization History", "Walk-Forward", "Walk-Forward History"])
+    tabs = st.tabs([
+        "Optimizer", "Stability", "Optimization History", "Walk-Forward", "Walk-Forward History",
+        "Robustness", "Robustness History",
+    ])
     with tabs[0]:
         _render_optimizer()
     with tabs[1]:
@@ -87,6 +99,10 @@ def render_research_lab() -> None:
         _render_walk_forward_setup()
     with tabs[4]:
         _render_walk_forward_history()
+    with tabs[5]:
+        _render_robustness_setup()
+    with tabs[6]:
+        _render_robustness_history()
 
 
 def _render_optimizer() -> None:
@@ -457,3 +473,242 @@ def _render_walk_forward_history() -> None:
         st.session_state["active_walk_forward_id"] = selected
         st.success(f"Loaded {selected} without rerunning folds.")
         _render_walk_forward_results(selected)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3D: Robustness Lab (Monte Carlo / bootstrap)
+# ---------------------------------------------------------------------------
+
+
+def _wf_oos_trades_from_store(walk_forward_id: str):
+    """Rebuilds the stitched Phase 3C OOS trade series from persisted fold summaries —
+    one representative trade per successful fold (its stored validation Avg R/PnL) at the
+    fold's validation_start. This reads stored data only; it never reruns selection."""
+    fold_rows = WF_STORE.load_folds(walk_forward_id)
+    fold_results = _fold_results_from_rows(fold_rows)
+    fold_trades = {
+        f.fold_id: [StitchedTrade(f.fold_id, f.validation_start + timedelta(days=1),
+                                   (f.validation or {}).get("average_r"), (f.validation or {}).get("pnl"))]
+        for f in fold_results if f.status == "SELECTED"
+    }
+    return trades_from_walk_forward_oos(fold_results, fold_trades, walk_forward_id=walk_forward_id)
+
+
+def _experiment_source_options() -> list[dict]:
+    return LEDGER.list_runs()
+
+
+def _render_robustness_setup() -> None:
+    st.markdown("### Robustness Setup")
+    st.caption("Post-backtest analysis of an already-completed audited trade sequence. "
+               "It never alters strategy parameters and never generates new trading signals.")
+
+    source_kind = st.selectbox("Source", ["Experiment", "Walk-Forward Run", "Deterministic Test Fixture"], key="rb_source_kind")
+
+    trades = None
+    dataset_role = None
+    strategy_id = strategy_version = strategy_status = None
+    source_run_id = None
+
+    if source_kind == "Experiment":
+        experiments = _experiment_source_options()
+        if not experiments:
+            st.info("No stored experiments yet. Run a backtest in the Universal Workspace first.")
+            return
+        labels = [f"{row['run_id']} · {row['strategy_id']} · {row['dataset_role']} · {row['strategy_status']}" for row in experiments]
+        selected_label = st.selectbox("Experiment run", labels, key="rb_experiment")
+        row = experiments[labels.index(selected_label)]
+        trade_log = (row.get("results_json") or {}).get("trade_log") or []
+        if not trade_log:
+            st.warning("This experiment has no trade_log to analyze.")
+            return
+        dataset_role = row["dataset_role"]
+        source_run_id = row["run_id"]
+        strategy_id, strategy_version, strategy_status = row["strategy_id"], row.get("strategy_version"), row["strategy_status"]
+        try:
+            trades = trades_from_trade_log(trade_log, dataset_role=dataset_role, source_run_id=source_run_id)
+        except RobustnessBlocked as error:
+            st.error(str(error))
+            return
+
+    elif source_kind == "Walk-Forward Run":
+        runs = WF_STORE.list_runs()
+        if not runs:
+            st.info("No stored walk-forward runs yet. Run one in the Walk-Forward tab first.")
+            return
+        labels = [run.walk_forward_id for run in runs]
+        selected_label = st.selectbox("Walk-forward run", labels, key="rb_wf_run")
+        run = runs[labels.index(selected_label)]
+        try:
+            trades = _wf_oos_trades_from_store(run.walk_forward_id)
+        except RobustnessBlocked as error:
+            st.error(str(error))
+            return
+        if not trades:
+            st.warning("This walk-forward run has no SELECTED folds to analyze.")
+            return
+        dataset_role = "WALK_FORWARD_OOS"
+        source_run_id = run.walk_forward_id
+        strategy_id, strategy_version, strategy_status = run.strategy_id, run.strategy_version, None
+
+    else:
+        trades = deterministic_fixture_trades()
+        dataset_role = "DEVELOPMENT"
+        source_run_id = "FIXTURE-RUN"
+        strategy_id, strategy_version, strategy_status = "FIXTURE", "1", "RESEARCH"
+
+    st.caption(f"Strategy status: {strategy_status or 'UNKNOWN'} · Dataset role: {dataset_role} · Source: {source_run_id}")
+    warning = reserved_data_warning(dataset_role)
+    if warning:
+        st.error(warning)
+
+    method = RobustnessMethod(st.selectbox(
+        "Method", [m.value for m in RobustnessMethod], key="rb_method",
+        format_func=lambda v: v.replace("_", " ").title(),
+    ))
+    col1, col2 = st.columns(2)
+    simulations = col1.number_input("Simulations", min_value=1, max_value=20000, value=5000, step=100, key="rb_simulations")
+    seed = col2.number_input("Seed", value=42, step=1, key="rb_seed")
+
+    block_length = 5
+    if method is RobustnessMethod.BLOCK_BOOTSTRAP:
+        block_length = st.number_input("Block length", min_value=1, value=5, step=1, key="rb_block_length")
+
+    col3, col4 = st.columns(2)
+    rolling_n = col3.number_input("Rolling-N window (trades)", min_value=1, value=20, step=1, key="rb_rolling_n")
+    drawdown_threshold = col4.number_input("Drawdown breach threshold (R)", min_value=0.0, value=5.0, step=0.5, key="rb_dd_threshold")
+
+    st.markdown("**Optional capital / risk-of-ruin model**")
+    st.caption("Without this, Risk of Ruin = N/A. A ruin threshold is never inferred.")
+    enable_ruin = st.checkbox("Enable explicit capital model", value=False, key="rb_enable_ruin")
+    capital_model = None
+    if enable_ruin:
+        col5, col6, col7 = st.columns(3)
+        starting_capital = col5.number_input("Starting capital", min_value=1.0, value=10000.0, step=100.0, key="rb_capital")
+        risk_fraction = col6.number_input("Risk fraction per trade", min_value=0.0001, max_value=0.99, value=0.0025, step=0.0005, format="%.4f", key="rb_risk_fraction")
+        ruin_dd_percent = col7.number_input("Ruin drawdown % from peak", min_value=1.0, max_value=100.0, value=50.0, step=1.0, key="rb_ruin_dd")
+        capital_model = CapitalModel(starting_capital=starting_capital, risk_fraction=risk_fraction, ruin_drawdown_percent=ruin_dd_percent)
+
+    if st.button("Start Robustness Analysis", type="primary", disabled=not trades):
+        try:
+            config = RobustnessConfig(
+                method=method, simulations=int(simulations), seed=int(seed), block_length=int(block_length),
+                rolling_loss_window=int(rolling_n), drawdown_threshold_r=float(drawdown_threshold), capital_model=capital_model,
+            )
+            run, result = run_robustness_analysis(
+                trades=trades, config=config, engine_version="phase3d", dataset_role=dataset_role,
+                source_run_id=source_run_id, strategy_id=strategy_id, strategy_version=strategy_version,
+                strategy_status=strategy_status, store=ROBUSTNESS_STORE,
+            )
+        except RobustnessBlocked as error:
+            st.error(str(error))
+            return
+        st.session_state["active_robustness_id"] = run.robustness_run_id
+        st.success(f"Completed {run.robustness_run_id}: {config.simulations} simulations.")
+
+    active_id = st.session_state.get("active_robustness_id")
+    if active_id:
+        st.divider()
+        _render_robustness_results(active_id)
+
+
+def _render_robustness_results(robustness_run_id: str) -> None:
+    run = ROBUSTNESS_STORE.load_run(robustness_run_id)
+    result = ROBUSTNESS_STORE.load_result(robustness_run_id)
+    if not run or not result:
+        st.info("No robustness results stored yet for this run.")
+        return
+
+    st.markdown(f"### Robustness Results · {robustness_run_id}")
+    if result.get("reserved_data_warning"):
+        st.error(result["reserved_data_warning"])
+
+    st.markdown("#### Summary")
+    observed = result["observed"]
+    st.json({
+        "observed_total_r": observed.get("terminal_r"), "observed_avg_r": None,
+        "observed_max_dd_r": observed.get("max_dd_r"), "simulations": run.simulations,
+        "method": run.method, "seed": run.seed, "source": run.source_run_id,
+        "path_semantics": result["path_semantics"],
+    })
+
+    st.markdown("#### Drawdown")
+    dd = result["drawdown_risk"]
+    st.json(dd)
+    dd_dist = result["distributions"].get("max_dd_r")
+    if dd_dist:
+        fig = go.Figure(go.Bar(x=["min", "p5", "p10", "p25", "median", "p75", "p90", "p95", "max"],
+                               y=[dd_dist[k] for k in ("minimum", "p5", "p10", "p25", "median", "p75", "p90", "p95", "maximum")]))
+        fig.add_hline(y=observed.get("max_dd_r"), line_dash="dash", annotation_text="Observed")
+        fig.update_layout(title="Max DD (R) distribution")
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("#### Streaks")
+    streak_dist = result["distributions"].get("losing_streak")
+    if streak_dist:
+        st.json({"distribution": streak_dist, "observed_losing_streak": observed.get("losing_streak")})
+
+    st.markdown("#### Terminal Outcomes")
+    if result.get("terminal_r_unchanged_by_construction"):
+        st.info("Terminal R is unchanged by construction under trade-order permutation — the trade multiset is identical.")
+    else:
+        st.json({
+            "terminal_r_distribution": result["distributions"].get("terminal_r"),
+            "probability_terminal_r_positive": result.get("probability_terminal_r_positive"),
+        })
+
+    st.markdown("#### Path Envelope")
+    st.caption("Percentile cumulative-R envelope across simulations. Empirical resampling only — not a market forecast.")
+    envelope = result["cumulative_r_envelope"]
+    fig = go.Figure()
+    for key, series in envelope.items():
+        fig.add_trace(go.Scatter(y=series, mode="lines", name=key))
+    fig.update_layout(title="Cumulative R percentile envelope")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("#### Outlier Dependence")
+    st.json(result["outlier_dependence"])
+
+    st.markdown("#### Sequence Dependency")
+    if result.get("sequence_dependency"):
+        st.json(result["sequence_dependency"])
+    else:
+        st.info("Sequence dependency is only computed for the PERMUTATION method.")
+
+    st.markdown("#### Risk of Ruin")
+    st.json(result["risk_of_ruin"])
+
+    st.markdown("#### Tail Loss")
+    st.json(result["tail_loss"])
+
+    st.markdown("#### Robustness Integrity Panel")
+    st.json({
+        "source_fingerprint": run.source_fingerprint, "strategy_fingerprint": None,
+        "dataset_fingerprint": None, "source_role": run.dataset_role,
+        "resampling_method": run.method, "seed": run.seed, "simulation_count": run.simulations,
+        "block_length": run.config.get("block_length"), "path_semantics": result["path_semantics"],
+        "assumptions": {
+            "IID_BOOTSTRAP": "Destroys ordering/clustering; assumes exchangeable trades.",
+            "BLOCK_BOOTSTRAP": "Preserves only local sampled blocks.",
+            "PERMUTATION": "Changes ordering but not the empirical trade set.",
+            "general": "Historical empirical resampling is not a forecast of future markets.",
+        },
+        "capital_model": run.config.get("capital_model"),
+        "ruin_definition": result["risk_of_ruin"].get("ruin_definition"),
+        "reproducible": "YES",
+        "simulation_fingerprint": run.simulation_fingerprint,
+    })
+
+
+def _render_robustness_history() -> None:
+    runs = ROBUSTNESS_STORE.list_runs()
+    if not runs:
+        st.info("No robustness runs stored yet.")
+        return
+    frame = pd.DataFrame([asdict(run) for run in runs])
+    st.dataframe(frame, use_container_width=True, hide_index=True)
+    selected = st.selectbox("Open robustness run", frame.robustness_run_id.tolist())
+    if st.button("Open Stored Robustness Run"):
+        st.session_state["active_robustness_id"] = selected
+        st.success(f"Loaded {selected} without rerunning simulations.")
+        _render_robustness_results(selected)
