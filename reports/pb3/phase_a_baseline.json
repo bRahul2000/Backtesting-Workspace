@@ -1,0 +1,447 @@
+{
+  "phase": "PB3 Phase A \u2014 confirmed pivot reclaim & acceptance baseline (LONG only)",
+  "strategy_id": "BTC_PB3_PIVOT_ACCEPTANCE_LONG_V1",
+  "dataset_role": "DEVELOPMENT",
+  "period": {
+    "start": "2021-01-01T00:00:00+00:00",
+    "end": "2023-12-31T23:45:00+00:00"
+  },
+  "years_present": [
+    2021,
+    2022,
+    2023
+  ],
+  "strategy_fingerprint": "7ad6dc8a9eb347d1db2e09536af5e9576c0c94ae3ef89aa93335ed1ddf3de966",
+  "parameter_fingerprint": "2749cbd02856f3ff325aee731e2239f3e23460d4c64a9ae2884eae3bd000542b",
+  "parameter_fingerprint_recomputed": "2749cbd02856f3ff325aee731e2239f3e23460d4c64a9ae2884eae3bd000542b",
+  "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+  "baseline_parameters": {
+    "h1_fast_ema": 50,
+    "h1_slow_ema": 200,
+    "h1_atr_length": 14,
+    "h1_slope_lookback": 4,
+    "m15_atr_length": 14,
+    "m15_ema20_length": 20,
+    "m15_ema50_length": 50,
+    "pivot_left_bars": 2,
+    "pivot_right_bars": 2,
+    "maximum_pivot_age_bars": 24,
+    "breakout_minimum_range_atr": 1.0,
+    "breakout_minimum_body_percent": 0.6,
+    "breakout_close_location_percent": 0.3,
+    "retest_tolerance_atr": 0.15,
+    "retest_maximum_bars": 6,
+    "reclaim_minimum_body_percent": 0.5,
+    "reclaim_close_location_percent": 0.35,
+    "reclaim_maximum_range_atr": 2.0,
+    "entry_buffer_atr": 0.05,
+    "pending_expiry_bars": 2,
+    "stop_buffer_atr": 0.2,
+    "minimum_stop_atr": 0.5,
+    "maximum_stop_atr": 2.5,
+    "reward_multiple": 3.0
+  },
+  "no_lookahead_proof": {
+    "breakout_decisions_checked": 26709,
+    "decisions_using_a_pivot_not_yet_confirmed": 0,
+    "minimum_confirmation_to_decision_lag_bars": 1,
+    "holds": true,
+    "rule": "Every breakout decision must reference a pivot whose confirmation timestamp is strictly earlier than the deciding bar. A pivot needs both right-side bars, and PB3 registers it only after the bar's own decisions, so the minimum lag is one bar."
+  },
+  "metrics": {
+    "closed_trades": 48,
+    "total_entries": 48,
+    "open_at_end": 0,
+    "trades_per_month": 1.50583122181662,
+    "win_rate": 18.75,
+    "profit_factor": 0.7196939664854974,
+    "average_r": -0.22114804301939664,
+    "total_r": -10.615106064931037,
+    "pnl": -266.5305273189182,
+    "max_drawdown_percent": 1.9173348478991006,
+    "max_losing_streak": 7,
+    "average_holding_minutes": 243.75,
+    "median_holding_minutes": 105.0
+  },
+  "yearly": {
+    "2021": {
+      "trades": 9,
+      "win_rate": 33.33333333333333,
+      "profit_factor": 1.4944146526323854,
+      "average_r": 0.3333333333333333,
+      "total_r": 3.0,
+      "max_drawdown_percent_within_year": 0.9962562460937401
+    },
+    "2022": {
+      "trades": 13,
+      "win_rate": 7.6923076923076925,
+      "profit_factor": 0.24727481471325038,
+      "average_r": -0.7021847784069929,
+      "total_r": -9.128402119290907,
+      "max_drawdown_percent_within_year": 2.5123388198798953
+    },
+    "2023": {
+      "trades": 26,
+      "win_rate": 19.230769230769234,
+      "profit_factor": 0.7722566326812424,
+      "average_r": -0.17256553637077424,
+      "total_r": -4.48670394564013,
+      "max_drawdown_percent_within_year": 1.9173318677391262
+    }
+  },
+  "year_consistency": {
+    "years": {
+      "2021": {
+        "trades": 9,
+        "percent_of_trades": 18.75,
+        "total_r": 3.0,
+        "positive_r": 9.0,
+        "percent_of_gross_positive_r": 32.750935800408705
+      },
+      "2022": {
+        "trades": 13,
+        "percent_of_trades": 27.083333333333332,
+        "total_r": -9.128402119290907,
+        "positive_r": 3.0,
+        "percent_of_gross_positive_r": 10.916978600136234
+      },
+      "2023": {
+        "trades": 26,
+        "percent_of_trades": 54.166666666666664,
+        "total_r": -4.48670394564013,
+        "positive_r": 15.48013081167497,
+        "percent_of_gross_positive_r": 56.33208559945506
+      }
+    },
+    "positive_development_years": "1/3",
+    "positive_years": [
+      "2021"
+    ],
+    "negative_years": [
+      "2022",
+      "2023"
+    ],
+    "one_year_concentration": true,
+    "concentrated_years": [
+      "2023"
+    ],
+    "negative_year_dependency": true,
+    "flag_rule": "one_year_concentration when a single year holds >= 50% of trades or >= 60% of gross positive R; negative_year_dependency when any DEVELOPMENT year has negative total R.",
+    "caveat": "Descriptive only. Phase A makes no cross-regime claim."
+  },
+  "funnel": {
+    "counts": {
+      "context_evaluated": 26342,
+      "context_rejected": 35523,
+      "pivot_confirmed": 14527,
+      "pivot_expired": 12,
+      "breakout_evaluated": 25926,
+      "breakout_rejected": 25143,
+      "breakout_confirmed": 783,
+      "waiting_retest": 783,
+      "retest_detected": 490,
+      "retest_expired": 315,
+      "structure_invalidated": 218,
+      "reclaim_evaluated": 1508,
+      "reclaim_rejected": 1254,
+      "reclaim_confirmed": 254,
+      "acceptance_evaluated": 250,
+      "acceptance_failed": 138,
+      "acceptance_confirmed": 112,
+      "risk_evaluated": 112,
+      "risk_rejected": 39,
+      "pending_created": 73,
+      "pending_expired": 18,
+      "pending_cancelled": 0,
+      "trade_entered": 48,
+      "trade_exited": 48
+    },
+    "confirmed_pivots": 14527,
+    "eligible_pivots": 4153,
+    "pivots_that_produced_a_breakout": 783,
+    "risk_valid_setups": 73,
+    "pending_created_in_tradeable_window": 66,
+    "engine_order_events": {
+      "triggered": 48,
+      "expired": 18
+    },
+    "entries": 48,
+    "exits": 48,
+    "expired_pendings": 18,
+    "reconciliation": {
+      "tradeable_pendings": 66,
+      "engine_triggered_plus_expired": 66,
+      "strategy_pending_expired": 18,
+      "engine_trade_entered": 48,
+      "engine_trade_exited": 48,
+      "closed_trades": 48,
+      "note": "pending_created counts every rule decision, including signals emitted before the warmup boundary that the engine always discards; the tradeable-window count is what reaches the order book."
+    },
+    "largest_rejection_reasons": {
+      "context_rejected/H1 EMA50 not above EMA200": 34902,
+      "breakout_rejected/candle not bullish": 12606,
+      "breakout_rejected/close did not break the pivot high": 10926,
+      "breakout_rejected/insufficient range": 1075,
+      "reclaim_rejected/candle not bullish": 799,
+      "context_rejected/H1 regime not yet warmed up": 621,
+      "breakout_rejected/insufficient body": 478,
+      "reclaim_rejected/insufficient body": 285,
+      "retest_expired/pivot level never retested": 221,
+      "structure_invalidated/close below the breakout candle low": 218,
+      "reclaim_rejected/close did not reclaim the pivot level": 118,
+      "acceptance_failed/close did not hold the reclaim close": 113,
+      "retest_expired/no reclaim within the retest window": 94,
+      "breakout_rejected/close not in the upper range": 58,
+      "risk_rejected/stop distance outside the safety range": 39
+    }
+  },
+  "frequency_versus_pb2_long": {
+    "pb3_closed_trades": 48,
+    "pb3_trades_per_month": 1.50583122181662,
+    "pb2_long_historical": {
+      "closed_trades": 29,
+      "trades_per_month": 0.91,
+      "source": "reports/pb2/RESEARCH_SUMMARY.md"
+    },
+    "note": "Historical context only. PB2 is REJECTED and closed; nothing about PB3 is changed because of this comparison in Phase A."
+  },
+  "sample_size": {
+    "closed_trades": 48,
+    "band": "VERY_SMALL",
+    "research_policy": "DO_NOT_OPTIMIZE_PB3",
+    "bands": "<30 INSUFFICIENT, 30-59 VERY_SMALL, 60-119 SMALL, 120-249 MODERATE, >=250 SUBSTANTIAL",
+    "policy_rule": "<60 do not optimize PB3; 60-119 only narrowly scoped architecture diagnosis; >=120 eligible for a controlled DEVELOPMENT stability search depending on year-by-year behaviour. Not overridable by PF."
+  },
+  "excursion": {
+    "model": "BAR_BASED_APPROXIMATION",
+    "mfe_r": {
+      "n": 48,
+      "mean": 1.2584152574600156,
+      "median": 0.6888773632484286,
+      "p75": 1.8412769184568094,
+      "p90": 3.219502337754736,
+      "p95": 3.478501174009516,
+      "max": 7.1982332985916875
+    },
+    "mae_r": {
+      "n": 48,
+      "mean": 1.1390926197633269,
+      "median": 1.1951954492804275,
+      "p75": 1.3507423615788885,
+      "p90": 1.6125658624554515,
+      "p95": 1.7203714466882003,
+      "max": 2.220582438505277
+    },
+    "note": "Excursions use whole entry-to-exit-bar OHLC, so they include price action inside the exit bar beyond the modelled fill; they are not an exact tick path and must not be read as achievable pre-exit movement."
+  },
+  "descriptive_buckets": {
+    "pivot_age_bars": [
+      {
+        "bucket": "(-0.001, 5.0]",
+        "trades": 31,
+        "profit_factor": 0.6016705538679334,
+        "average_r": -0.3235524123529029,
+        "win_rate": 16.129032258064516
+      },
+      {
+        "bucket": "(5.0, 9.0]",
+        "trades": 14,
+        "profit_factor": 1.2437513921237806,
+        "average_r": 0.1725013370006394,
+        "win_rate": 28.57142857142857
+      },
+      {
+        "bucket": "(9.0, 15.0]",
+        "trades": 3,
+        "profit_factor": 0.0,
+        "average_r": -1.0,
+        "win_rate": 0.0
+      }
+    ],
+    "breakout_range_atr": [
+      {
+        "bucket": "(-0.001, 1.25]",
+        "trades": 12,
+        "profit_factor": 0.0,
+        "average_r": -0.9810610054851973,
+        "win_rate": 0.0
+      },
+      {
+        "bucket": "(1.25, 1.5]",
+        "trades": 15,
+        "profit_factor": 0.48336859042511715,
+        "average_r": -0.4263192676040736,
+        "win_rate": 13.333333333333334
+      },
+      {
+        "bucket": "(1.5, 2.0]",
+        "trades": 14,
+        "profit_factor": 1.7565547910338228,
+        "average_r": 0.47630875811416856,
+        "win_rate": 35.714285714285715
+      },
+      {
+        "bucket": "(2.0, inf]",
+        "trades": 7,
+        "profit_factor": 1.166722050238466,
+        "average_r": 0.12629891447915337,
+        "win_rate": 28.57142857142857
+      }
+    ],
+    "breakout_distance_atr": [
+      {
+        "bucket": "(-0.001, 0.25]",
+        "trades": 14,
+        "profit_factor": 0.5153312174533896,
+        "average_r": -0.4012337967433294,
+        "win_rate": 14.285714285714285
+      },
+      {
+        "bucket": "(0.25, 0.5]",
+        "trades": 14,
+        "profit_factor": 1.231314453635533,
+        "average_r": 0.16150640956115406,
+        "win_rate": 28.57142857142857
+      },
+      {
+        "bucket": "(0.5, 1.0]",
+        "trades": 16,
+        "profit_factor": 0.46286935398928236,
+        "average_r": -0.46692311240514117,
+        "win_rate": 12.5
+      },
+      {
+        "bucket": "(1.0, inf]",
+        "trades": 4,
+        "profit_factor": 1.0693459329740715,
+        "average_r": 0.052961788525418746,
+        "win_rate": 25.0
+      }
+    ],
+    "bars_to_retest": [
+      {
+        "bucket": "(-0.001, 1.0]",
+        "trades": 36,
+        "profit_factor": 0.6292467736179306,
+        "average_r": -0.30119130576847786,
+        "win_rate": 16.666666666666664
+      },
+      {
+        "bucket": "(1.0, 2.0]",
+        "trades": 7,
+        "profit_factor": 2.2418808786326014,
+        "average_r": 0.7142857142857143,
+        "win_rate": 42.857142857142854
+      },
+      {
+        "bucket": "(2.0, 3.0]",
+        "trades": 2,
+        "profit_factor": 0.0,
+        "average_r": -1.0014036383206562,
+        "win_rate": 0.0
+      },
+      {
+        "bucket": "(3.0, inf]",
+        "trades": 3,
+        "profit_factor": 0.0,
+        "average_r": -0.9231372602081743,
+        "win_rate": 0.0
+      }
+    ],
+    "retest_overshoot_atr": [
+      {
+        "bucket": "(-inf, -0.1]",
+        "trades": 3,
+        "profit_factor": 1.8517676827689746,
+        "average_r": 0.5065661698621989,
+        "win_rate": 33.33333333333333
+      },
+      {
+        "bucket": "(-0.1, 0.0]",
+        "trades": 7,
+        "profit_factor": 0.51915098048343,
+        "average_r": -0.3984203961717325,
+        "win_rate": 14.285714285714285
+      },
+      {
+        "bucket": "(0.0, 0.1]",
+        "trades": 10,
+        "profit_factor": 0.7681480197520913,
+        "average_r": -0.17671214044272343,
+        "win_rate": 20.0
+      },
+      {
+        "bucket": "(0.1, inf]",
+        "trades": 28,
+        "profit_factor": 0.6670870598176585,
+        "average_r": -0.27066929988886695,
+        "win_rate": 17.857142857142858
+      }
+    ],
+    "acceptance_distance_atr": [
+      {
+        "bucket": "(0.25, 0.5]",
+        "trades": 4,
+        "profit_factor": 1.0587969200744747,
+        "average_r": 0.03935215065098119,
+        "win_rate": 25.0
+      },
+      {
+        "bucket": "(0.5, 1.0]",
+        "trades": 21,
+        "profit_factor": 0.5284907443621315,
+        "average_r": -0.38120497970073797,
+        "win_rate": 14.285714285714285
+      },
+      {
+        "bucket": "(1.0, inf]",
+        "trades": 23,
+        "profit_factor": 0.8426152530273034,
+        "average_r": -0.12031348233997675,
+        "win_rate": 21.73913043478261
+      }
+    ],
+    "stop_atr": [
+      {
+        "bucket": "(-0.001, 1.0]",
+        "trades": 1,
+        "profit_factor": 0.0,
+        "average_r": -0.9844616328505229,
+        "win_rate": 0.0
+      },
+      {
+        "bucket": "(1.0, 1.5]",
+        "trades": 13,
+        "profit_factor": 0.6021682731219616,
+        "average_r": -0.3165985387970922,
+        "win_rate": 15.384615384615385
+      },
+      {
+        "bucket": "(1.5, 2.0]",
+        "trades": 24,
+        "profit_factor": 0.8144129692814136,
+        "average_r": -0.14264563975780142,
+        "win_rate": 20.833333333333336
+      },
+      {
+        "bucket": "(2.0, 2.5]",
+        "trades": 10,
+        "profit_factor": 0.7388105595472615,
+        "average_r": -0.20913680735310827,
+        "win_rate": 20.0
+      }
+    ]
+  },
+  "data_exposure": {
+    "development_only": true,
+    "validation_2024_accessed": false,
+    "forward_validation_2025_2026_accessed": false
+  },
+  "baseline_classification": {
+    "classification": "INSUFFICIENT_SAMPLE",
+    "rule": "closed trades < 60 -> INSUFFICIENT_SAMPLE regardless of profit factor. Otherwise: Avg R > +0.10 with at least 2 of 3 positive DEVELOPMENT years -> PROMISING_SAMPLE; Avg R < -0.10 -> NEGATIVE_SAMPLE; else NEAR_BREAKEVEN_SAMPLE. Descriptive only \u2014 Phase A claims nothing about stability across regimes.",
+    "closed_trades": 48,
+    "average_r": -0.22114804301939664,
+    "positive_development_years": "1/3"
+  }
+}

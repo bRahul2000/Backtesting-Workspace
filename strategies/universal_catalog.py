@@ -38,6 +38,9 @@ from strategies.btc_pb2_reclaim_acceptance import (
 )
 from strategies.btc_pb2_reclaim_long import BtcPB2ReclaimLong
 from strategies.btc_pb2_reclaim_short import BtcPB2ReclaimShort
+from strategies.btc_pb3_pivot_acceptance_long import (
+    BtcPB3PivotAcceptanceLong, PB3Parameters,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -287,6 +290,71 @@ register_strategy(StrategyDescriptor(
     required_indicators=_PB2_INDICATORS,
     required_timeframes=("15m", "1h"), warmup_resolver=_pb2_warmup,
     parameterized_factory=_parameterized(BtcPB2ReclaimShort, PB2Parameters),
+    execution_profile="EXNESS_SYNTHETIC_BID_ASK",
+))
+
+
+def _pb3_warmup(start):
+    params = PB3Parameters()
+    h1_bars = params.h1_slow_ema + params.h1_slope_lookback
+    # The longest M15 chain PB3 can need: the pivot detection window, the pivot
+    # age it is still allowed to carry, the retest window and the acceptance bar.
+    structure_bars = (params.pivot_left_bars + params.pivot_right_bars + 1
+                      + params.maximum_pivot_age_bars + params.retest_maximum_bars + 2)
+    m15_bars = max(params.m15_ema50_length, params.m15_atr_length, structure_bars)
+    h1_ready = start.ceil("h") + pd.Timedelta(hours=h1_bars)
+    m15_ready = start + pd.Timedelta(minutes=15 * (m15_bars - 1))
+    return max(h1_ready, m15_ready)
+
+
+register_strategy(StrategyDescriptor(
+    metadata=_meta("BTC_PB3_PIVOT_ACCEPTANCE_LONG_V1",
+                   "BTC PB3 — Confirmed Pivot Reclaim & Acceptance Long [Research]", "1.0",
+                   StrategyStatus.RESEARCH, "trend_continuation",
+                   "H1 bullish context -> break of a confirmed M15 swing/pivot high -> retest of "
+                   "that pivot level -> strict reclaim -> strict next-bar acceptance -> stop "
+                   "entry. Phase A research baseline: DEVELOPMENT 2021-2023 only, zero "
+                   "optimization. Independent of PB1 and PB2; the pivot is unusable until both "
+                   "right-side confirmation bars have completed.",
+                   "btc_pb3_pivot_acceptance_long.py"),
+    factory=BtcPB3PivotAcceptanceLong,
+    parameters=(
+        _mutable("pivot_left_bars", ParameterType.INTEGER, 2, 1, 5, 1,
+                 "Completed M15 bars to the left that a swing high must exceed."),
+        _mutable("pivot_right_bars", ParameterType.INTEGER, 2, 1, 5, 1,
+                 "Completed M15 bars to the right that confirm a swing high."),
+        _mutable("maximum_pivot_age_bars", ParameterType.INTEGER, 24, 8, 48, 1,
+                 "Oldest confirmed pivot, in completed M15 bars, still eligible for a breakout."),
+        _mutable("breakout_minimum_range_atr", ParameterType.ATR_MULTIPLE, 1.00, 0.50, 2.50, 0.10,
+                 "Minimum breakout candle range in ATR."),
+        _mutable("breakout_minimum_body_percent", ParameterType.PERCENTAGE, 0.60, 0.40, 0.90, 0.05,
+                 "Minimum breakout body as a share of its range."),
+        _mutable("breakout_close_location_percent", ParameterType.PERCENTAGE, 0.30, 0.05, 0.45, 0.05,
+                 "Breakout must close within this fraction of its high."),
+        _mutable("retest_tolerance_atr", ParameterType.ATR_MULTIPLE, 0.15, 0.0, 0.50, 0.05,
+                 "How far above the pivot level a low still counts as a retest, in ATR."),
+        _mutable("retest_maximum_bars", ParameterType.INTEGER, 6, 2, 12, 1,
+                 "Completed M15 bars allowed for retest and reclaim before the structure expires."),
+        _mutable("reclaim_minimum_body_percent", ParameterType.PERCENTAGE, 0.50, 0.30, 0.90, 0.05,
+                 "Minimum reclaim candle body as a share of its range."),
+        _mutable("reclaim_close_location_percent", ParameterType.PERCENTAGE, 0.35, 0.10, 0.49, 0.05,
+                 "Reclaim must close within this fraction of its high."),
+        _mutable("reclaim_maximum_range_atr", ParameterType.ATR_MULTIPLE, 2.00, 1.00, 4.00, 0.25,
+                 "Maximum reclaim candle range in ATR."),
+        _mutable("entry_buffer_atr", ParameterType.ATR_MULTIPLE, 0.05, 0.0, 0.50, 0.05,
+                 "Stop-entry trigger above the acceptance candle high, in ATR."),
+        _mutable("stop_buffer_atr", ParameterType.ATR_MULTIPLE, 0.20, 0.0, 0.50, 0.05,
+                 "Structural stop buffer below the retest/reclaim/acceptance low, in ATR."),
+        _mutable("minimum_stop_atr", ParameterType.ATR_MULTIPLE, 0.50, 0.25, 1.00, 0.05,
+                 "Minimum accepted stop distance, in ATR."),
+        _mutable("maximum_stop_atr", ParameterType.ATR_MULTIPLE, 2.50, 1.50, 4.00, 0.25,
+                 "Maximum accepted stop distance, in ATR."),
+        _frozen("reward_multiple", ParameterType.FLOAT, 3.0,
+                "Fixed R-multiple target applied by the audited engine."),
+    ),
+    required_indicators=("H1 EMA50", "H1 EMA200", "H1 ATR14", "M15 EMA20", "M15 EMA50", "M15 ATR14"),
+    required_timeframes=("15m", "1h"), warmup_resolver=_pb3_warmup,
+    parameterized_factory=_parameterized(BtcPB3PivotAcceptanceLong, PB3Parameters),
     execution_profile="EXNESS_SYNTHETIC_BID_ASK",
 ))
 
