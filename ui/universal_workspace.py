@@ -19,7 +19,9 @@ from core.result import UniversalBacktestResult
 from experiments.ledger import ExperimentLedger
 from instruments.btcusd import BTCUSD
 from instruments.xauusd import XAUUSD, load_xauusd_profile
-from strategies.base_strategy import StrategyDescriptor, StrategyStatus, parameter_fingerprint
+from strategies.base_strategy import (
+    StrategyDescriptor, StrategyStatus, effective_parameter_payload, parameter_fingerprint,
+)
 from strategies.registry import discover_builtin_strategies
 from services.gold_spec import load_mt5_gold_snapshot
 from utils.data_validation import continuous_segments, load_ohlcv_csv, missing_gaps, validate_ohlcv
@@ -203,7 +205,7 @@ def verify_reproduction(row: dict[str, Any], descriptor: StrategyDescriptor,
         "broker fingerprint": row["broker_fingerprint"] == broker_fingerprint,
         "instrument fingerprint": row.get("instrument_fingerprint", "") == instrument_fingerprint,
         "parameter fingerprint": row["parameter_fingerprint"] == parameter_fingerprint(
-            json.loads(row["config_json"]).get("strategy_parameters", {})),
+            effective_parameter_payload(descriptor, json.loads(row["config_json"]).get("strategy_parameters", {}))),
     }
     mismatches = [name for name, matches in checks.items() if not matches]
     if mismatches:

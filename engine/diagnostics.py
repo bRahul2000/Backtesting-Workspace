@@ -90,10 +90,13 @@ def enrich_trade(trade: Trade, candles: pd.DataFrame, *, spread: float = 0.0,
         adverse_exit = max(float(trade.exit_price - trade.entry_price), 0.0)
     mfe_amount = max(abs(mfe_price - trade.entry_price), 0.0)
     mae_amount = max(abs(mae_price - trade.entry_price), 0.0)
-    risk = float(trade.initial_risk)
+    # R-multiples must be normalized by the price-distance to stop, not by
+    # trade.initial_risk (a dollar-denominated, quantity-scaled risk amount) —
+    # dividing a raw price excursion by a dollar amount produced a bogus,
+    # per-trade-varying ratio whenever quantity != 1.
     stop_distance = abs(float(trade.entry_price - trade.stop_loss))
-    mfe_r = mfe_amount / risk if risk > 0 else None
-    mae_r = mae_amount / risk if risk > 0 else None
+    mfe_r = mfe_amount / stop_distance if stop_distance > 0 else None
+    mae_r = mae_amount / stop_distance if stop_distance > 0 else None
     capture = favorable_exit / mfe_amount if mfe_amount > 0 else None
     adverse = adverse_exit / mae_amount if mae_amount > 0 else None
     entry_atr = None

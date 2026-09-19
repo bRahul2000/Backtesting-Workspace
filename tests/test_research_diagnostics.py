@@ -67,9 +67,30 @@ def test_short_mfe_mae_uses_short_favorable_and_adverse_sides():
     assert result.capture_efficiency == pytest.approx(.5)
 
 
+def test_mfe_mae_r_normalizes_by_stop_distance_not_dollar_risk():
+    """initial_risk is a dollar-denominated, quantity-scaled risk amount. Dividing a
+    raw price excursion by it (instead of by the price distance to stop) produces a
+    bogus, per-trade-varying ratio whenever quantity != 1 — the actual root cause of
+    PB1's implausible 13R/10R mean MFE/MAE. R-multiples must track realized R, which
+    is always priced off the stop distance regardless of position size."""
+    scaled = trade(Direction.LONG, entry=100.0, stop=95.0, exit_price=102.0)
+    scaled = scaled.__class__(**{**scaled.__dict__, "quantity": 10.0, "initial_risk": 50.0})
+    result = enrich_trade(scaled, candles([
+        ["2026-01-01 00:00+00:00", 100, 101, 99, 100, 1],
+        ["2026-01-01 00:15+00:00", 100, 103, 98, 101, 1],
+        ["2026-01-01 00:30+00:00", 101, 102, 99, 102, 1],
+        ["2026-01-01 00:45+00:00", 102, 102, 100, 102, 1],
+    ]))
+    assert result.mfe_amount == 3
+    assert result.mae_amount == 2
+    assert result.mfe_r == pytest.approx(.6)  # 3 / stop_distance(5), not 3 / initial_risk(50)
+    assert result.mae_r == pytest.approx(.4)  # 2 / stop_distance(5), not 2 / initial_risk(50)
+
+
 def test_zero_risk_and_zero_mfe_are_safe():
     zero_risk = trade(Direction.LONG)
-    zero_risk = zero_risk.__class__(**{**zero_risk.__dict__, "initial_risk": 0.0})
+    zero_risk = zero_risk.__class__(
+        **{**zero_risk.__dict__, "initial_risk": 0.0, "stop_loss": zero_risk.entry_price})
     result = enrich_trade(zero_risk, candles([
         ["2026-01-01 00:15+00:00", 100, 100, 100, 100, 1],
         ["2026-01-01 00:30+00:00", 100, 100, 100, 100, 1],

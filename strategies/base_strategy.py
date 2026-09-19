@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
 from hashlib import sha256
 import inspect
@@ -144,6 +144,28 @@ class StrategyDescriptor:
                 )
             return self.parameterized_factory(overrides)
         return self.factory()
+
+
+def effective_parameter_payload(descriptor: StrategyDescriptor, overrides: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Resolve the parameter values a strategy will actually run with.
+
+    ``config.strategy_parameters`` only carries the caller-supplied *overrides*
+    (typically empty, since most research runs use defaults), so fingerprinting
+    that mapping directly hashes an empty payload rather than the effective
+    configuration. Strategies built from a typed frozen-dataclass ``params``
+    (the Phase 3B pattern) expose their true effective values on the
+    instantiated object; this merges overrides onto defaults the same way the
+    descriptor itself does, so identical effective parameters always fingerprint
+    identically regardless of whether a value was passed explicitly or left at
+    its default. Strategies with no such ``params`` attribute (frozen, non-
+    overridable strategies) fall back to the raw overrides, unchanged from prior
+    behavior.
+    """
+    strategy = descriptor.create(overrides)
+    params = getattr(strategy, "params", None)
+    if is_dataclass(params) and not isinstance(params, type):
+        return asdict(params)
+    return dict(overrides or {})
 
 
 class AuditedStrategyAdapter:

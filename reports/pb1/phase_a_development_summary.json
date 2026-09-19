@@ -2,7 +2,7 @@
   "label": "DEVELOPMENT_2021_2023",
   "run_id": "BT-2026-000001",
   "strategy_fingerprint": "c3c1bc5b46d12b6d178045452fda03faefd6845ab127a976d7cd05f161278397",
-  "parameter_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "parameter_fingerprint": "9dd5e8642bcfbf48b1950552be1f7bb7415f77994358f4e3f30f86c896aa8ac8",
   "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
   "period": {
     "start": "2021-01-01T00:00:00+00:00",
@@ -344,9 +344,26 @@
     "risk_stop_rejected/stop distance outside safety range": 85
   },
   "mfe_mae": {
-    "mean_mfe_r": 13.389487658846406,
-    "mean_mae_r": 10.631520929899457,
-    "n": 810
+    "mean_mfe_r": 1.5078573125398138,
+    "mean_mae_r": 1.1689485856007693,
+    "n": 810,
+    "mfe_r_distribution": {
+      "mean": 1.5078573125398138,
+      "median": 0.7288393017052113,
+      "p75": 2.8071867848140983,
+      "p90": 3.648829178188117,
+      "p95": 4.2030736671556745,
+      "max": 16.890725402390785
+    },
+    "mae_r_distribution": {
+      "mean": 1.1689485856007693,
+      "median": 1.1255463546306541,
+      "p75": 1.371010449795246,
+      "p90": 1.6754054032891004,
+      "p95": 2.0171444606705524,
+      "max": 6.675483082838256
+    },
+    "note": "BAR_BASED_APPROXIMATION: mfe/mae use full entry-to-exit-bar OHLC (engine/diagnostics.py::enrich_trade), including the entire exit bar's high/low, not just the wick up to the modeled fill price. These are NOT achievable post-entry-pre-exit excursion; they include price action within the exit bar beyond the modeled fill, by construction of the bar-based model."
   },
   "winner_loser_profile": {
     "winners": {
@@ -389,5 +406,38 @@
     "[2.0,2.5)": 143,
     "[2.5,10.0)": 84,
     "[0.0,0.5)": 1
-  }
+  },
+  "total_entries": 813,
+  "open_positions_at_end": [
+    {
+      "segment_index": 3,
+      "trade_id": 16,
+      "direction": "LONG",
+      "setup_id": "PB1_SHALLOW_PULLBACK",
+      "entry_time": "2021-10-19T17:00:00+00:00",
+      "entry_price": 63237.69143891378,
+      "state": "OPEN_AT_DATASET_END",
+      "reason": "Position remained open when its continuous data segment ended; no closed Trade exists because the engine does not fabricate exits at segment or dataset boundaries."
+    },
+    {
+      "segment_index": 4,
+      "trade_id": 15,
+      "direction": "SHORT",
+      "setup_id": "PB1_SHALLOW_PULLBACK",
+      "entry_time": "2021-11-24T01:45:00+00:00",
+      "entry_price": 57096.08524047944,
+      "state": "OPEN_AT_DATASET_END",
+      "reason": "Position remained open when its continuous data segment ended; no closed Trade exists because the engine does not fabricate exits at segment or dataset boundaries."
+    },
+    {
+      "segment_index": 10,
+      "trade_id": 5,
+      "direction": "LONG",
+      "setup_id": "PB1_SHALLOW_PULLBACK",
+      "entry_time": "2022-08-10T07:15:00+00:00",
+      "entry_price": 23002.08,
+      "state": "OPEN_AT_DATASET_END",
+      "reason": "Position remained open when its continuous data segment ended; no closed Trade exists because the engine does not fabricate exits at segment or dataset boundaries."
+    }
+  ]
 }

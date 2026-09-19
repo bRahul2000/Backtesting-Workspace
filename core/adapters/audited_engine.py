@@ -20,7 +20,7 @@ from instruments.btcusd import BTCUSD
 from instruments.xauusd import XAUUSD
 from research.exness_cost_calibrated import run_synthetic_segment
 from research.v3_regime_adaptive_baseline import add_closed_trade_equity
-from strategies.base_strategy import AuditedStrategyAdapter, parameter_fingerprint
+from strategies.base_strategy import AuditedStrategyAdapter, effective_parameter_payload, parameter_fingerprint
 from strategies.diagnostics import DiagnosticStrategyObserver
 from strategies.registry import discover_builtin_strategies
 from utils.data_validation import continuous_segments, load_ohlcv_csv
@@ -129,7 +129,10 @@ def run_universal_backtest(
     if data.empty:
         raise ValueError("No data in requested date range.")
 
-    parameter_hash = parameter_fingerprint(config.strategy_parameters)
+    # Fingerprint the *effective* configuration (defaults merged with overrides),
+    # not the raw override mapping — a default-only run must not fingerprint as
+    # an empty payload. See strategies.base_strategy.effective_parameter_payload.
+    parameter_hash = parameter_fingerprint(effective_parameter_payload(descriptor, config.strategy_parameters))
     dataset_hash = sha256_file(path)
     broker_hash = EXNESS.fingerprint()
     instrument_hash = stable_fingerprint(asdict(BTCUSD if config.instrument == "BTCUSD" else XAUUSD))
@@ -196,6 +199,26 @@ def run_universal_backtest(
 
     max_dd = max(calculate_metrics(item).max_drawdown_percent for item in results)
     total = len(pooled)
+    # "trade_entered" is emitted generically by DiagnosticStrategyObserver for every
+    # strategy. total_entries can exceed total_trades (closed only) when a position
+    # is still open when its continuous segment ends — the engine never fabricates
+    # an exit at a segment/dataset boundary, so that position has no closed Trade.
+    total_entries = sum(1 for segment in results for event in segment.diagnostic_events
+                        if event.stage == "trade_entered")
+    open_positions_at_end = [
+        {
+            "segment_index": index, "trade_id": segment.open_position.trade_id,
+            "direction": segment.open_position.direction.value,
+            "setup_id": segment.open_position.setup_id,
+            "entry_time": segment.open_position.entry_time.isoformat(),
+            "entry_price": segment.open_position.entry_price,
+            "state": "OPEN_AT_DATASET_END",
+            "reason": "Position remained open when its continuous data segment ended; "
+                      "no closed Trade exists because the engine does not fabricate "
+                      "exits at segment or dataset boundaries.",
+        }
+        for index, segment in enumerate(results, 1) if segment.open_position is not None
+    ]
     forward_count = ledger.forward_run_count(descriptor.metadata.strategy_id)
     forward_warning = None
     if (config.dataset_role is DatasetRole.FORWARD_VALIDATION
@@ -217,6 +240,8 @@ def run_universal_backtest(
         period={"start": start.isoformat(), "end": end.isoformat()},
         dataset_role=config.dataset_role.value,
         total_trades=total,
+        total_entries=total_entries,
+        open_positions_at_end=open_positions_at_end,
         trades_per_month=total / usable_months if usable_months else 0.0,
         win_rate=100 * sum(t.pnl > 1e-9 for t in pooled) / total if total else 0.0,
         profit_factor=_profit_factor(pooled),

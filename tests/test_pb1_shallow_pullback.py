@@ -1,10 +1,11 @@
+from dataclasses import asdict
 from datetime import timedelta
 
 import pandas as pd
 import pytest
 
 from engine.models import Candle, Direction, ExecutionState, PendingOrder, Position, Trade
-from strategies.base_strategy import StrategyStatus
+from strategies.base_strategy import StrategyStatus, effective_parameter_payload, parameter_fingerprint
 from strategies.btc_pb1_shallow_pullback import (
     BtcPB1ShallowPullback, PB1Parameters, STRATEGY_ID, SETUP_ID, _Structure,
 )
@@ -289,6 +290,47 @@ def test_registry_supports_parameter_overrides():
     descriptor = discover_builtin_strategies().get(STRATEGY_ID)
     strategy = descriptor.create({"impulse_minimum_range_atr": 1.8})
     assert strategy.params.impulse_minimum_range_atr == pytest.approx(1.8)
+
+
+# --- Parameter fingerprint integrity -------------------------------------------------------
+
+
+def test_default_run_parameter_payload_matches_effective_pb1_defaults():
+    """A default (no-override) run must fingerprint the real PB1 configuration,
+    not an empty override mapping — config.strategy_parameters is only the caller's
+    overrides, which are legitimately empty on a baseline run."""
+    descriptor = discover_builtin_strategies().get(STRATEGY_ID)
+    payload = effective_parameter_payload(descriptor, {})
+    assert payload == asdict(PB1Parameters())
+    assert parameter_fingerprint(payload) != parameter_fingerprint({})
+
+
+def test_identical_pb1_parameters_produce_identical_fingerprint():
+    descriptor = discover_builtin_strategies().get(STRATEGY_ID)
+    overrides = {"impulse_minimum_range_atr": 1.8, "pullback_maximum_bars": 2}
+    first = parameter_fingerprint(effective_parameter_payload(descriptor, overrides))
+    second = parameter_fingerprint(effective_parameter_payload(descriptor, dict(overrides)))
+    assert first == second
+
+
+def test_changed_pb1_parameter_changes_fingerprint():
+    descriptor = discover_builtin_strategies().get(STRATEGY_ID)
+    baseline = parameter_fingerprint(effective_parameter_payload(descriptor, {}))
+    changed = parameter_fingerprint(effective_parameter_payload(descriptor, {"impulse_minimum_range_atr": 1.8}))
+    assert baseline != changed
+
+
+def test_parameter_fingerprint_payload_includes_non_ui_exposed_fields():
+    """Fields never exposed as a tunable/frozen StrategyParameter (indicator lengths,
+    pending_expiry_bars) must still be represented in the reproducibility payload —
+    UI tunable/non-tunable metadata must not silently drop effective values."""
+    descriptor = discover_builtin_strategies().get(STRATEGY_ID)
+    exposed_names = {p.name for p in descriptor.parameters}
+    assert "h1_fast_ema" not in exposed_names and "pending_expiry_bars" not in exposed_names
+    payload = effective_parameter_payload(descriptor, {})
+    assert payload["h1_fast_ema"] == PB1Parameters().h1_fast_ema
+    assert payload["pending_expiry_bars"] == PB1Parameters().pending_expiry_bars
+    assert payload["reward_multiple"] == PB1Parameters().reward_multiple
 
 
 # --- Parameter validation -----------------------------------------------------------------

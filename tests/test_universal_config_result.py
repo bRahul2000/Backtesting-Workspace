@@ -38,5 +38,5 @@ def test_result_has_universal_schema_fields():
     for key in ("run_id", "strategy_fingerprint", "parameter_fingerprint",
                 "dataset_fingerprint", "broker_fingerprint", "yearly_statistics",
                 "monthly_statistics", "trade_log", "equity_curve", "mfe_mae",
-                "execution_diagnostics"):
+                "execution_diagnostics", "total_entries", "open_positions_at_end"):
         assert key in payload

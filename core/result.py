@@ -32,6 +32,8 @@ class UniversalBacktestResult:
     max_drawdown_percent: float
     drawdown_duration: Any = None
     max_losing_streak: int = 0
+    total_entries: int = 0
+    open_positions_at_end: list[dict[str, Any]] = field(default_factory=list)
     long_statistics: DirectionStatistics = field(default_factory=DirectionStatistics)
     short_statistics: DirectionStatistics = field(default_factory=DirectionStatistics)
     yearly_statistics: dict[str, Any] = field(default_factory=dict)

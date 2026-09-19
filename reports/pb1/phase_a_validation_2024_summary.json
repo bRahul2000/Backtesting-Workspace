@@ -2,7 +2,7 @@
   "label": "VALIDATION_2024",
   "run_id": "BT-2026-000002",
   "strategy_fingerprint": "c3c1bc5b46d12b6d178045452fda03faefd6845ab127a976d7cd05f161278397",
-  "parameter_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "parameter_fingerprint": "9dd5e8642bcfbf48b1950552be1f7bb7415f77994358f4e3f30f86c896aa8ac8",
   "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
   "period": {
     "start": "2024-01-01T00:00:00+00:00",
@@ -165,9 +165,26 @@
     "pending_order_cancelled/H1 context invalidated": 1
   },
   "mfe_mae": {
-    "mean_mfe_r": 19.819762411942026,
-    "mean_mae_r": 14.660544672328053,
-    "n": 311
+    "mean_mfe_r": 1.4807693390275016,
+    "mean_mae_r": 1.1348593993034874,
+    "n": 311,
+    "mfe_r_distribution": {
+      "mean": 1.4807693390275016,
+      "median": 0.8443298570645101,
+      "p75": 3.0421421447872294,
+      "p90": 3.603340967621357,
+      "p95": 3.915988226381856,
+      "max": 7.04576082537119
+    },
+    "mae_r_distribution": {
+      "mean": 1.1348593993034874,
+      "median": 1.123828749278946,
+      "p75": 1.3714216943659392,
+      "p90": 1.7239441990251458,
+      "p95": 1.9819913035510914,
+      "max": 3.577790762482794
+    },
+    "note": "BAR_BASED_APPROXIMATION: mfe/mae use full entry-to-exit-bar OHLC (engine/diagnostics.py::enrich_trade), including the entire exit bar's high/low, not just the wick up to the modeled fill price. These are NOT achievable post-entry-pre-exit excursion; they include price action within the exit bar beyond the modeled fill, by construction of the bar-based model."
   },
   "winner_loser_profile": {
     "winners": {
@@ -208,5 +225,7 @@
     "[2.5,10.0)": 27,
     "[0.5,1.0)": 60,
     "[2.0,2.5)": 52
-  }
+  },
+  "total_entries": 311,
+  "open_positions_at_end": []
 }

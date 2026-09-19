@@ -26,6 +26,9 @@ def test_universal_adapter_reproduces_core_development(tmp_path):
     assert isclose(r.profit_factor, 1.224225831450077, abs_tol=1e-12)
     assert isclose(r.average_r, 0.1566547327105722, abs_tol=1e-12)
     assert isclose(r.max_drawdown_percent, 3.2036378489188793, abs_tol=1e-12)
+    # entries can exceed closed trades only by positions still open when their
+    # continuous segment ended — never fabricated, always reconciled explicitly.
+    assert r.total_entries == r.total_trades + len(r.open_positions_at_end)
 
 
 def test_universal_adapter_reproduces_core_forward(tmp_path):
@@ -34,3 +37,4 @@ def test_universal_adapter_reproduces_core_forward(tmp_path):
     assert isclose(r.profit_factor, 1.1688791449202893, abs_tol=1e-12)
     assert isclose(r.average_r, 0.12097903854454335, abs_tol=1e-12)
     assert isclose(r.max_drawdown_percent, 3.7455941320390216, abs_tol=1e-12)
+    assert r.total_entries == r.total_trades + len(r.open_positions_at_end)
