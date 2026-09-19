@@ -449,13 +449,33 @@ def test_xray_exposes_rule_level_values():
 # --- Registry and fingerprints --------------------------------------------------------------
 
 
-def test_both_components_register_as_research():
+def test_both_components_register_as_rejected_after_research_closure():
+    """PB2 v1 was closed as REJECTED for DEVELOPMENT sample insufficiency.
+
+    Closure is governance only: ids, parameter schema, defaults and architecture
+    modes are preserved so every historical PB2 result stays reproducible.
+    """
     registry = discover_builtin_strategies()
     for strategy_id in (LONG_ID, SHORT_ID):
         descriptor = registry.get(strategy_id)
-        assert descriptor.metadata.status is StrategyStatus.RESEARCH
+        assert descriptor.metadata.status is StrategyStatus.REJECTED
         assert descriptor.metadata.supported_instruments == ("BTCUSD",)
         assert set(descriptor.required_timeframes) == {"15m", "1h"}
+        assert descriptor.metadata.strategy_id == strategy_id
+        assert effective_parameter_payload(descriptor, {}) == asdict(PB2Parameters())
+
+
+def test_rejected_pb2_components_cannot_start_optimization_or_walk_forward():
+    from research.optimizer import guard_optimization
+    from research.walk_forward import WalkForwardBlocked, guard_walk_forward
+
+    registry = discover_builtin_strategies()
+    for strategy_id in (LONG_ID, SHORT_ID):
+        descriptor = registry.get(strategy_id)
+        with pytest.raises(ValueError, match="REJECTED STRATEGY"):
+            guard_optimization(descriptor, DatasetRole.DEVELOPMENT)
+        with pytest.raises(WalkForwardBlocked, match="REJECTED STRATEGY"):
+            guard_walk_forward(descriptor, DatasetRole.DEVELOPMENT)
 
 
 def test_components_have_independent_strategy_fingerprints():

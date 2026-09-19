@@ -250,10 +250,17 @@ _PB2_INDICATORS =("H1 EMA50", "H1 EMA200", "H1 ATR14", "M15 EMA20", "M15 EMA50",
 _PB2_CORE_FILE = "btc_pb2_reclaim_acceptance.py"
 
 register_strategy(StrategyDescriptor(
-    metadata=_meta("BTC_PB2_RECLAIM_LONG_V1", "BTC PB2 — Reclaim & Acceptance Long [Research]", "1.0",
-                   StrategyStatus.RESEARCH, "trend_continuation",
+    metadata=_meta("BTC_PB2_RECLAIM_LONG_V1", "BTC PB2 — Reclaim & Acceptance Long [Rejected]", "1.0",
+                   StrategyStatus.REJECTED, "trend_continuation",
                    "Displacement through a prior M15 structure high -> retest -> reclaim -> one "
-                   "acceptance bar above the level -> stop entry. Phase A baseline, not optimized.",
+                   "acceptance bar above the level -> stop entry. "
+                   "REJECTED — DEVELOPMENT sample insufficiency and unresolved cross-regime "
+                   "robustness. Strict reclaim acceptance showed localized positive selectivity, "
+                   "but the architecture generated only 29 closed LONG trades across 2021-2023 "
+                   "and remained negative in 2022. The sample is insufficient for responsible "
+                   "parameter optimization or robustness claims. Parameters, defaults, "
+                   "architecture modes and source behavior are preserved unchanged for "
+                   "historical reproduction. See reports/pb2/RESEARCH_SUMMARY.md.",
                    "btc_pb2_reclaim_long.py", _PB2_CORE_FILE),
     factory=BtcPB2ReclaimLong,
     parameters=_pb2_parameters(),
@@ -264,10 +271,16 @@ register_strategy(StrategyDescriptor(
 ))
 
 register_strategy(StrategyDescriptor(
-    metadata=_meta("BTC_PB2_RECLAIM_SHORT_V1", "BTC PB2 — Reclaim & Acceptance Short [Research]", "1.0",
-                   StrategyStatus.RESEARCH, "trend_continuation",
+    metadata=_meta("BTC_PB2_RECLAIM_SHORT_V1", "BTC PB2 — Reclaim & Acceptance Short [Rejected]", "1.0",
+                   StrategyStatus.REJECTED, "trend_continuation",
                    "Displacement through a prior M15 structure low -> retest -> reclaim -> one "
-                   "acceptance bar below the level -> stop entry. Phase A baseline, not optimized.",
+                   "acceptance bar below the level -> stop entry. "
+                   "REJECTED — DEVELOPMENT sample insufficiency and no stable positive "
+                   "expectancy. The SHORT architecture produced only 14 baseline trades; "
+                   "acceptance ablations increased frequency only modestly and did not establish "
+                   "coherent cross-year positive expectancy. Parameters, defaults, architecture "
+                   "modes and source behavior are preserved unchanged for historical "
+                   "reproduction. See reports/pb2/RESEARCH_SUMMARY.md.",
                    "btc_pb2_reclaim_short.py", _PB2_CORE_FILE),
     factory=BtcPB2ReclaimShort,
     parameters=_pb2_parameters(),
