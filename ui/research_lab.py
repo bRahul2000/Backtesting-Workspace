@@ -88,7 +88,12 @@ def _render_optimizer() -> None:
     if frozen:
         st.error("OPTIMIZATION DISABLED - FROZEN STRATEGY")
     fixture_mode = st.checkbox("Use deterministic test fixture surface", value=True)
-    role = DatasetRole(st.selectbox("Optimization dataset role", ("DEVELOPMENT", "VALIDATION", "FORWARD_VALIDATION", "HOLDOUT")))
+    st.markdown("### Optimization Dataset")
+    st.caption("DEVELOPMENT ONLY")
+    role = DatasetRole(st.selectbox("Optimization dataset role", [DatasetRole.DEVELOPMENT.value], index=0))
+    st.markdown("### Optional Validation Dataset")
+    st.caption("SECONDARY EVALUATION ONLY")
+    validation_role = st.selectbox("Validation dataset role", ["NONE", DatasetRole.VALIDATION.value], index=0)
     method = st.selectbox("Search method", ("Grid Search", "Random Search"))
     seed = st.number_input("Random seed", value=42, step=1)
     safety = st.number_input("Safety limit", min_value=1, max_value=100000, value=1000, step=100)
@@ -101,11 +106,15 @@ def _render_optimizer() -> None:
     except ValueError as error:
         st.error(str(error))
     st.info(f"{combinations} parameter combinations · estimated backtests: {combinations}")
-    if st.button("Start Optimization", type="primary", disabled=frozen or role in {DatasetRole.FORWARD_VALIDATION, DatasetRole.HOLDOUT} or combinations == 0):
+    if st.button("Start Optimization", type="primary", disabled=frozen or combinations == 0):
         try:
             guard_optimization(descriptor, role)
+            if validation_role != "NONE":
+                guard_validation_dataset(DatasetRole(validation_role))
         except ValueError as error:
             st.error(str(error))
+            if "Parameter search is restricted to DEVELOPMENT data" in str(error):
+                st.error("OPTIMIZATION BLOCKED\nParameter search is restricted to DEVELOPMENT data.")
             return
         optimization_id = "OPT-" + uuid.uuid4().hex[:10].upper()
         values = generate_grid(parameters, safety_limit=int(safety))
@@ -118,6 +127,11 @@ def _render_optimizer() -> None:
             descriptor.metadata.version, method, int(seed) if method == "Random Search" else None,
             {parameter.name: list(parameter.values()) for parameter in parameters}, len(values), role.value,
             "fixture", descriptor.metadata.strategy_fingerprint, "fixture", "phase3b", "COMPLETED",
+            optimization_dataset_role=role.value,
+            optimization_dataset_fingerprint="fixture",
+            development_dataset_fingerprint="fixture",
+            validation_dataset_role=DatasetRole.VALIDATION.value if validation_role != "NONE" else None,
+            validation_dataset_fingerprint=None,
         )
         STORE.save_run(run)
         st.session_state["active_optimization_id"] = optimization_id

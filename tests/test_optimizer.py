@@ -7,8 +7,9 @@ from core.config import DatasetRole
 from research.optimizer import (
     CandidateResult, OptimizationRun, OptimizationStore, SearchParameter,
     StabilityConfig, apply_analysis_filters, candidate_fingerprint,
-    generate_grid, generate_random, guard_optimization, one_dimensional_analysis,
-    run_candidates, stability_for, two_dimensional_heatmap, validation_comparison,
+    generate_grid, generate_random, guard_optimization, guard_validation_dataset,
+    one_dimensional_analysis, run_candidates, stability_for,
+    two_dimensional_heatmap, validate_resume_compatibility, validation_comparison,
 )
 from strategies.base_strategy import StrategyStatus
 from strategies.registry import discover_builtin_strategies
@@ -44,8 +45,41 @@ def test_safety_limit_and_data_role_protection():
     with pytest.raises(ValueError, match="FROZEN"):
         guard_optimization(descriptor, DatasetRole.DEVELOPMENT)
     research_descriptor = SimpleNamespace(metadata=SimpleNamespace(status=StrategyStatus.RESEARCH))
-    with pytest.raises(ValueError, match="FORWARD_VALIDATION"):
-        guard_optimization(research_descriptor, DatasetRole.FORWARD_VALIDATION)
+    for role in (DatasetRole.VALIDATION, DatasetRole.FORWARD_VALIDATION, DatasetRole.HOLDOUT):
+        with pytest.raises(ValueError, match="DEVELOPMENT data"):
+            guard_optimization(research_descriptor, role)
+    guard_optimization(research_descriptor, DatasetRole.DEVELOPMENT)
+    guard_validation_dataset(DatasetRole.VALIDATION)
+    with pytest.raises(ValueError, match="VALIDATION only"):
+        guard_validation_dataset(DatasetRole.DEVELOPMENT)
+
+
+def test_validation_metrics_do_not_change_candidate_fingerprints_or_count():
+    params = {"x": 3, "y": 4}
+    fingerprint = candidate_fingerprint(params)
+    result = candidate("validation-only", 3, 4, 1.8, 0.2, 120, trades=40)
+    result = CandidateResult(**{**result.__dict__, "validation": {"profit_factor": 0.5, "average_r": 0.1, "max_drawdown": 7.0}})
+    assert result.parameter_fingerprint == fingerprint
+    assert result.total_trades == 40
+    assert len([result]) == 1
+
+    development = [candidate("dev-a", 1, 1, 1.5, 0.1, 12, trades=20), candidate("dev-b", 2, 2, 1.7, 0.2, 18, trades=26)]
+    kept = [CandidateResult(**{**item.__dict__, "validation": {"profit_factor": 3.0, "average_r": 0.3, "max_drawdown": 9.0}}) for item in development]
+    assert [item.parameters for item in kept] == [item.parameters for item in development]
+    assert [item.parameter_fingerprint for item in kept] == [item.parameter_fingerprint for item in development]
+
+
+def test_validation_resume_rejects_changed_validation_fingerprints():
+    run = OptimizationRun(
+        "OPT-RESUME", "now", "fixture", "1", "GRID", None, {"x": [1, 2]}, 2,
+        "DEVELOPMENT", "dev-fp", "instrument", "broker", "phase3b", "RUNNING",
+        development_dataset_fingerprint="dev-fp", validation_dataset_role="VALIDATION",
+        validation_dataset_fingerprint="val-fp",
+    )
+    with pytest.raises(ValueError, match="validation dataset fingerprint mismatch"):
+        validate_resume_compatibility(run, development_dataset_fingerprint="dev-fp", validation_dataset_fingerprint="new-fp")
+    validated = validate_resume_compatibility(run, development_dataset_fingerprint="dev-fp", validation_dataset_fingerprint="val-fp")
+    assert validated.validation_dataset_fingerprint == "val-fp"
 
 
 def test_stability_plateau_peak_boundary_and_missing_cells():

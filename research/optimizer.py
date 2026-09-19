@@ -104,6 +104,19 @@ class OptimizationRun:
     engine_version: str
     status: str
     runtime_seconds: float | None = None
+    optimization_dataset_role: str | None = None
+    optimization_dataset_fingerprint: str | None = None
+    development_dataset_fingerprint: str | None = None
+    validation_dataset_role: str | None = None
+    validation_dataset_fingerprint: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.optimization_dataset_role is None:
+            object.__setattr__(self, "optimization_dataset_role", self.dataset_role)
+        if self.optimization_dataset_fingerprint is None:
+            object.__setattr__(self, "optimization_dataset_fingerprint", self.dataset_fingerprint)
+        if self.development_dataset_fingerprint is None:
+            object.__setattr__(self, "development_dataset_fingerprint", self.optimization_dataset_fingerprint or self.dataset_fingerprint)
 
 
 def search_parameters(descriptor: StrategyDescriptor) -> tuple[SearchParameter, ...]:
@@ -119,10 +132,38 @@ def search_parameters(descriptor: StrategyDescriptor) -> tuple[SearchParameter, 
 def guard_optimization(descriptor: StrategyDescriptor, role: DatasetRole) -> None:
     if descriptor.metadata.status is StrategyStatus.FROZEN:
         raise ValueError("OPTIMIZATION DISABLED - FROZEN STRATEGY")
-    if role in {DatasetRole.FORWARD_VALIDATION, DatasetRole.HOLDOUT}:
-        raise ValueError(f"OPTIMIZATION BLOCKED: {role.value} data is reserved for evaluation, not search.")
-    if role not in {DatasetRole.DEVELOPMENT, DatasetRole.VALIDATION}:
-        raise ValueError(f"OPTIMIZATION BLOCKED: unsupported dataset role {role.value}.")
+    if role is not DatasetRole.DEVELOPMENT:
+        raise ValueError("OPTIMIZATION BLOCKED: Parameter search is restricted to DEVELOPMENT data.")
+
+
+def guard_validation_dataset(role: DatasetRole | None) -> None:
+    if role is None:
+        return
+    if role is not DatasetRole.VALIDATION:
+        raise ValueError("OPTIMIZATION BLOCKED: Optional validation dataset must be VALIDATION only for secondary evaluation.")
+
+
+def validate_resume_compatibility(run: OptimizationRun, *, development_dataset_fingerprint: str | None,
+                                 validation_dataset_fingerprint: str | None = None) -> OptimizationRun:
+    expected_development = run.development_dataset_fingerprint or run.optimization_dataset_fingerprint or run.dataset_fingerprint
+    if development_dataset_fingerprint is not None and expected_development != development_dataset_fingerprint:
+        raise ValueError(
+            f"OPTIMIZATION BLOCKED: development dataset fingerprint mismatch for {run.optimization_id}; "
+            f"expected {expected_development}, got {development_dataset_fingerprint}."
+        )
+
+    if validation_dataset_fingerprint is not None:
+        expected_validation = run.validation_dataset_fingerprint
+        if expected_validation != validation_dataset_fingerprint:
+            raise ValueError(
+                f"OPTIMIZATION BLOCKED: validation dataset fingerprint mismatch for {run.optimization_id}; "
+                f"expected {expected_validation}, got {validation_dataset_fingerprint}."
+            )
+
+    if run.validation_dataset_role is not None and run.validation_dataset_role != DatasetRole.VALIDATION.value:
+        raise ValueError(f"OPTIMIZATION BLOCKED: validation dataset role mismatch for {run.optimization_id}.")
+
+    return run
 
 
 def generate_grid(parameters: Iterable[SearchParameter], *, safety_limit: int = DEFAULT_SAFETY_LIMIT) -> list[dict[str, Any]]:
