@@ -1,0 +1,393 @@
+{
+  "label": "DEVELOPMENT_2021_2023",
+  "run_id": "BT-2026-000001",
+  "strategy_fingerprint": "c3c1bc5b46d12b6d178045452fda03faefd6845ab127a976d7cd05f161278397",
+  "parameter_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+  "period": {
+    "start": "2021-01-01T00:00:00+00:00",
+    "end": "2023-12-31T23:45:00+00:00"
+  },
+  "dataset_role": "DEVELOPMENT",
+  "metrics": {
+    "total_trades": 810,
+    "trades_per_month": 25.410901868155463,
+    "win_rate": 23.209876543209877,
+    "profit_factor": 0.9267538477539468,
+    "average_r": -0.05081890315227994,
+    "total_r": -41.163311553346745,
+    "pnl": -1065.8603187193364,
+    "max_drawdown_percent": 8.409865210502652,
+    "max_losing_streak": 22,
+    "long_statistics": {
+      "trades": 448,
+      "win_rate": 21.205357142857142,
+      "profit_factor": 0.8102345541441982,
+      "average_r": -0.14204834800165184,
+      "pnl": -1608.1726728725425
+    },
+    "short_statistics": {
+      "trades": 362,
+      "win_rate": 25.69060773480663,
+      "profit_factor": 1.0892367659193882,
+      "average_r": 0.0620838352248433,
+      "pnl": 542.3123541532063
+    }
+  },
+  "yearly_statistics": {
+    "2021": {
+      "trades": 269,
+      "win_rate": 23.79182156133829,
+      "profit_factor": 0.935367002128042,
+      "average_r": -0.04747496665082032,
+      "pnl": -333.1516266508433
+    },
+    "2022": {
+      "trades": 217,
+      "win_rate": 19.35483870967742,
+      "profit_factor": 0.7379122321077307,
+      "average_r": -0.19923851496901138,
+      "pnl": -1082.001249210703
+    },
+    "2023": {
+      "trades": 324,
+      "win_rate": 25.308641975308642,
+      "profit_factor": 1.0662938545703324,
+      "average_r": 0.04580929698765244,
+      "pnl": 349.29255714221
+    }
+  },
+  "monthly_statistics": {
+    "2021-01": {
+      "trades": 18,
+      "win_rate": 11.11111111111111,
+      "profit_factor": 0.3824015542364001,
+      "average_r": -0.5490983766297531,
+      "pnl": -245.1225854260543
+    },
+    "2021-02": {
+      "trades": 27,
+      "win_rate": 33.333333333333336,
+      "profit_factor": 1.491136947180007,
+      "average_r": 0.3331648074992126,
+      "pnl": 218.78433298198013
+    },
+    "2021-03": {
+      "trades": 23,
+      "win_rate": 26.08695652173913,
+      "profit_factor": 1.0518845139661124,
+      "average_r": 0.04197335938185717,
+      "pnl": 21.8874731049726
+    },
+    "2021-04": {
+      "trades": 17,
+      "win_rate": 47.05882352941177,
+      "profit_factor": 2.6204130293386827,
+      "average_r": 0.8742085911093419,
+      "pnl": 372.35749256953443
+    },
+    "2021-05": {
+      "trades": 32,
+      "win_rate": 25.0,
+      "profit_factor": 0.9950260160949042,
+      "average_r": -2.7755575615628914e-17,
+      "pnl": -3.0421225993419156
+    },
+    "2021-06": {
+      "trades": 27,
+      "win_rate": 18.51851851851852,
+      "profit_factor": 0.6763461914234595,
+      "average_r": -0.25925925925925924,
+      "pnl": -178.55839714322505
+    },
+    "2021-07": {
+      "trades": 25,
+      "win_rate": 44.0,
+      "profit_factor": 2.3310618638617764,
+      "average_r": 0.753439584392721,
+      "pnl": 478.17996623399233
+    },
+    "2021-08": {
+      "trades": 29,
+      "win_rate": 3.4482758620689653,
+      "profit_factor": 0.11033318889416315,
+      "average_r": -0.8586963721624353,
+      "pnl": -633.2451698164608
+    },
+    "2021-09": {
+      "trades": 17,
+      "win_rate": 11.764705882352942,
+      "profit_factor": 0.39326842768481196,
+      "average_r": -0.5379989519974124,
+      "pnl": -223.4140151933633
+    },
+    "2021-10": {
+      "trades": 18,
+      "win_rate": 27.77777777777778,
+      "profit_factor": 1.1860314481502936,
+      "average_r": 0.13931009409097903,
+      "pnl": 60.86731477625088
+    },
+    "2021-11": {
+      "trades": 11,
+      "win_rate": 9.090909090909092,
+      "profit_factor": 0.3000794729393419,
+      "average_r": -0.6363636363636364,
+      "pnl": -174.48993378949933
+    },
+    "2021-12": {
+      "trades": 25,
+      "win_rate": 24.0,
+      "profit_factor": 0.9431822860398713,
+      "average_r": -0.0401909077457756,
+      "pnl": -27.355982349628935
+    },
+    "2022-01": {
+      "trades": 15,
+      "win_rate": 20.0,
+      "profit_factor": 0.7474535794846313,
+      "average_r": -0.2004396659047189,
+      "pnl": -75.89281308129893
+    },
+    "2022-02": {
+      "trades": 14,
+      "win_rate": 14.285714285714286,
+      "profit_factor": 0.4993650419103629,
+      "average_r": -0.43097353308030373,
+      "pnl": -149.61630394259575
+    },
+    "2022-03": {
+      "trades": 27,
+      "win_rate": 11.11111111111111,
+      "profit_factor": 0.3817406774606054,
+      "average_r": -0.5506231916106764,
+      "pnl": -368.2521128043249
+    },
+    "2022-04": {
+      "trades": 20,
+      "win_rate": 25.0,
+      "profit_factor": 1.008100346367833,
+      "average_r": 0.009681029940372343,
+      "pnl": 2.8861218707192826
+    },
+    "2022-05": {
+      "trades": 16,
+      "win_rate": 31.25,
+      "profit_factor": 1.3966872198957234,
+      "average_r": 0.2683405325949218,
+      "pnl": 104.93282559799259
+    },
+    "2022-06": {
+      "trades": 25,
+      "win_rate": 28.0,
+      "profit_factor": 1.160520385776649,
+      "average_r": 0.12000000000000002,
+      "pnl": 73.28096382504481
+    },
+    "2022-07": {
+      "trades": 6,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "average_r": -0.9979551079200808,
+      "pnl": -150.41930303625404
+    },
+    "2022-08": {
+      "trades": 11,
+      "win_rate": 9.090909090909092,
+      "profit_factor": 0.299437467537263,
+      "average_r": -0.6387668210617242,
+      "pnl": -175.46965771131076
+    },
+    "2022-09": {
+      "trades": 23,
+      "win_rate": 21.73913043478261,
+      "profit_factor": 0.8384492490716835,
+      "average_r": -0.12409637567000327,
+      "pnl": -72.55500050848875
+    },
+    "2022-10": {
+      "trades": 24,
+      "win_rate": 12.5,
+      "profit_factor": 0.45062661455063674,
+      "average_r": -0.45414048967572507,
+      "pnl": -266.26522457853565
+    },
+    "2022-11": {
+      "trades": 17,
+      "win_rate": 29.41176470588235,
+      "profit_factor": 1.3117297271436077,
+      "average_r": 0.2030937822148738,
+      "pnl": 81.55881553602383
+    },
+    "2022-12": {
+      "trades": 19,
+      "win_rate": 15.789473684210526,
+      "profit_factor": 0.6681867672806684,
+      "average_r": -0.18419034048654168,
+      "pnl": -86.18956037767477
+    },
+    "2023-01": {
+      "trades": 38,
+      "win_rate": 23.68421052631579,
+      "profit_factor": 0.9938897252671052,
+      "average_r": -0.0009023055074936029,
+      "pnl": -3.8142643752251226
+    },
+    "2023-02": {
+      "trades": 26,
+      "win_rate": 26.923076923076923,
+      "profit_factor": 1.0957180322863675,
+      "average_r": 0.0724088009905036,
+      "pnl": 44.55966114124267
+    },
+    "2023-03": {
+      "trades": 15,
+      "win_rate": 26.666666666666668,
+      "profit_factor": 1.137651899791681,
+      "average_r": 0.10087388796991405,
+      "pnl": 36.492579527318355
+    },
+    "2023-04": {
+      "trades": 22,
+      "win_rate": 27.272727272727273,
+      "profit_factor": 1.086615913609515,
+      "average_r": 0.0573112784478865,
+      "pnl": 29.910920814817864
+    },
+    "2023-05": {
+      "trades": 29,
+      "win_rate": 20.689655172413794,
+      "profit_factor": 0.8182578977615501,
+      "average_r": -0.1262529722462744,
+      "pnl": -93.48947989966523
+    },
+    "2023-06": {
+      "trades": 20,
+      "win_rate": 25.0,
+      "profit_factor": 1.167253105763714,
+      "average_r": 0.11189013733520571,
+      "pnl": 53.94046654753065
+    },
+    "2023-07": {
+      "trades": 16,
+      "win_rate": 31.25,
+      "profit_factor": 1.4835007105615818,
+      "average_r": 0.2245618082349652,
+      "pnl": 89.20116749158475
+    },
+    "2023-08": {
+      "trades": 33,
+      "win_rate": 21.21212121212121,
+      "profit_factor": 0.8720405694309412,
+      "average_r": -0.06969912403408038,
+      "pnl": -59.535297335104886
+    },
+    "2023-09": {
+      "trades": 28,
+      "win_rate": 28.571428571428573,
+      "profit_factor": 1.29971066924534,
+      "average_r": 0.17242615803073624,
+      "pnl": 119.57788633870615
+    },
+    "2023-10": {
+      "trades": 32,
+      "win_rate": 21.875,
+      "profit_factor": 0.8793619487368886,
+      "average_r": -0.07783969656434005,
+      "pnl": -65.24327174878785
+    },
+    "2023-11": {
+      "trades": 29,
+      "win_rate": 31.03448275862069,
+      "profit_factor": 1.2726155591344002,
+      "average_r": 0.19271603911488436,
+      "pnl": 138.88323391494637
+    },
+    "2023-12": {
+      "trades": 36,
+      "win_rate": 25.0,
+      "profit_factor": 1.0929444030722015,
+      "average_r": 0.06735285841106985,
+      "pnl": 58.8089547248463
+    }
+  },
+  "signal_funnel": {
+    "bars_evaluated": 104583,
+    "setup_detected": 1227,
+    "order_created": 1227,
+    "trade_entered": 813,
+    "trade_exited": 810,
+    "h1_context_rejected": 621,
+    "h1_context_evaluated": 103780,
+    "impulse_rejected": 68211,
+    "impulse_detected": 8991,
+    "pullback_started": 4859,
+    "pullback_rejected": 7764,
+    "pullback_depth_valid": 7309,
+    "confirmation_rejected": 5997,
+    "confirmation_evaluated": 1312,
+    "risk_stop_valid": 1227,
+    "pending_order_created": 1227,
+    "risk_stop_rejected": 85,
+    "entry": 813,
+    "pending_order_expired": 312,
+    "exit": 810
+  },
+  "rejection_reasons": {
+    "impulse_rejected/insufficient range": 39223,
+    "impulse_rejected/wrong net direction": 28988,
+    "confirmation_rejected/confirmation criteria not met": 5997,
+    "pullback_rejected/retracement exceeded maximum": 5719,
+    "pullback_rejected/no confirmation within pullback window": 2045,
+    "h1_context_rejected/H1 regime not yet warmed up": 621,
+    "pending_order_expired/expiry reached without fill": 312,
+    "risk_stop_rejected/stop distance outside safety range": 85
+  },
+  "mfe_mae": {
+    "mean_mfe_r": 13.389487658846406,
+    "mean_mae_r": 10.631520929899457,
+    "n": 810
+  },
+  "winner_loser_profile": {
+    "winners": {
+      "n": 188,
+      "avg_r": 2.874770635827862,
+      "avg_duration_minutes": 265.9308510638298
+    },
+    "losers": {
+      "n": 622,
+      "avg_r": -0.9350806930691075,
+      "avg_duration_minutes": 162.70900321543408
+    }
+  },
+  "impulse_size_atr_buckets": {
+    "[1.0,1.5)": 29196,
+    "[1.5,2.0)": 19586,
+    "[2.0,3.0)": 13246,
+    ">=10.0": 10029,
+    "[3.0,5.0)": 4521,
+    "[5.0,10.0)": 624
+  },
+  "pullback_depth_percent_buckets": {
+    "[0.0,0.2)": 3063,
+    "[0.36,0.45)": 2762,
+    "[0.28,0.36)": 2422,
+    "[0.2,0.28)": 2114,
+    ">=0.45": 11
+  },
+  "confirmation_body_percent_buckets": {
+    "[0.5,0.65)": 1255,
+    "[0.0,0.5)": 4315,
+    "[0.65,0.8)": 970,
+    "[0.8,1.0)": 681,
+    ">=1.0": 88
+  },
+  "stop_atr_buckets": {
+    "[1.0,1.5)": 543,
+    "[1.5,2.0)": 369,
+    "[0.5,1.0)": 172,
+    "[2.0,2.5)": 143,
+    "[2.5,10.0)": 84,
+    "[0.0,0.5)": 1
+  }
+}

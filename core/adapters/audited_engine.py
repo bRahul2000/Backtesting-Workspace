@@ -168,18 +168,21 @@ def run_universal_backtest(
         min_quantity=0.0,
     )
 
-    pooled, results, usable_months = [], [], 0.0
+    pooled, results, usable_months, xray_evaluations = [], [], 0.0, []
     order_status = {}
     for segment in continuous_segments(data):
         frame = data.loc[data.timestamp.between(segment.start, segment.end)].reset_index(drop=True)
         trade_start = descriptor.warmup_resolver(segment.start) if descriptor.warmup_resolver else segment.start
         if trade_start > segment.end:
             continue
-        strategy = DiagnosticStrategyObserver(
-            adapter.create_legacy_strategy(config.strategy_parameters), descriptor.metadata.strategy_id
-        )
+        inner_strategy = adapter.create_legacy_strategy(config.strategy_parameters)
+        strategy = DiagnosticStrategyObserver(inner_strategy, descriptor.metadata.strategy_id)
         result = run_synthetic_segment(frame, strategy, config.spread, trade_start, settings)
-        result.diagnostic_events = strategy.events
+        # Strategies may optionally emit their own rule-level diagnostics/X-Ray evaluations
+        # (see strategies/btc_pb1_shallow_pullback.py). This never changes fill/risk/target
+        # behavior — frozen strategies without these attributes are unaffected.
+        result.diagnostic_events = list(strategy.events) + list(getattr(inner_strategy, "diagnostic_events", ()))
+        xray_evaluations.extend(getattr(inner_strategy, "xray_evaluations", ()))
         enrich_result(result, frame, spread=config.spread)
         add_closed_trade_equity(result)
         results.append(result)
@@ -229,6 +232,7 @@ def run_universal_backtest(
         equity_curve=_equity_rows(results),
         mfe_mae={"available": bool(pooled), "model": "BAR_BASED_APPROXIMATION"},
         signal_diagnostics=[asdict(event) for segment in results for event in segment.diagnostic_events],
+        xray_diagnostics=[asdict(event) for event in xray_evaluations],
         execution_ambiguities=[asdict(item) for segment in results for item in segment.execution_ambiguities],
         excursion_model="BAR_BASED_APPROXIMATION" if pooled else "UNAVAILABLE",
         execution_diagnostics={

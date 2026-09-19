@@ -1,0 +1,212 @@
+{
+  "label": "VALIDATION_2024",
+  "run_id": "BT-2026-000002",
+  "strategy_fingerprint": "c3c1bc5b46d12b6d178045452fda03faefd6845ab127a976d7cd05f161278397",
+  "parameter_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+  "period": {
+    "start": "2024-01-01T00:00:00+00:00",
+    "end": "2024-12-31T23:45:00+00:00"
+  },
+  "dataset_role": "VALIDATION",
+  "metrics": {
+    "total_trades": 311,
+    "trades_per_month": 29.673567789968654,
+    "win_rate": 26.04501607717042,
+    "profit_factor": 1.0434362356927092,
+    "average_r": 0.03251926905645731,
+    "total_r": 10.113492676558224,
+    "pnl": 239.7106858551589,
+    "max_drawdown_percent": 3.713318035209968,
+    "max_losing_streak": 13,
+    "long_statistics": {
+      "trades": 200,
+      "win_rate": 27.5,
+      "profit_factor": 1.1268629978484246,
+      "average_r": 0.08940568981905665,
+      "pnl": 438.4245250439349
+    },
+    "short_statistics": {
+      "trades": 111,
+      "win_rate": 23.423423423423422,
+      "profit_factor": 0.9036674567467532,
+      "average_r": -0.06997878637164962,
+      "pnl": -198.71383918877598
+    }
+  },
+  "yearly_statistics": {
+    "2024": {
+      "trades": 311,
+      "win_rate": 26.04501607717042,
+      "profit_factor": 1.0434362356927092,
+      "average_r": 0.03251926905645731,
+      "pnl": 239.7106858551589
+    }
+  },
+  "monthly_statistics": {
+    "2024-01": {
+      "trades": 21,
+      "win_rate": 23.80952380952381,
+      "profit_factor": 0.9195996147663015,
+      "average_r": -0.057587094040901635,
+      "pnl": -32.01683305329481
+    },
+    "2024-02": {
+      "trades": 31,
+      "win_rate": 29.032258064516128,
+      "profit_factor": 1.2527674392192052,
+      "average_r": 0.17843783049549292,
+      "pnl": 136.36645245680333
+    },
+    "2024-03": {
+      "trades": 33,
+      "win_rate": 18.181818181818183,
+      "profit_factor": 0.6929739080942561,
+      "average_r": -0.23935181760314495,
+      "pnl": -196.9539655328078
+    },
+    "2024-04": {
+      "trades": 11,
+      "win_rate": 18.181818181818183,
+      "profit_factor": 0.6625111007356524,
+      "average_r": -0.27272727272727276,
+      "pnl": -75.554552465673
+    },
+    "2024-05": {
+      "trades": 33,
+      "win_rate": 27.272727272727273,
+      "profit_factor": 1.0880024331074967,
+      "average_r": 0.06674256464314231,
+      "pnl": 51.77221380744572
+    },
+    "2024-06": {
+      "trades": 30,
+      "win_rate": 26.666666666666668,
+      "profit_factor": 1.1106045111103975,
+      "average_r": 0.06993112874727272,
+      "pnl": 50.2762755606578
+    },
+    "2024-07": {
+      "trades": 31,
+      "win_rate": 29.032258064516128,
+      "profit_factor": 1.1479787168166982,
+      "average_r": 0.10474853984692395,
+      "pnl": 78.91211756945725
+    },
+    "2024-08": {
+      "trades": 23,
+      "win_rate": 30.434782608695652,
+      "profit_factor": 1.3147081778834862,
+      "average_r": 0.22402925111952146,
+      "pnl": 128.50807152288715
+    },
+    "2024-09": {
+      "trades": 25,
+      "win_rate": 28.0,
+      "profit_factor": 1.1242870848620647,
+      "average_r": 0.08487611969662949,
+      "pnl": 52.30445301615973
+    },
+    "2024-10": {
+      "trades": 30,
+      "win_rate": 26.666666666666668,
+      "profit_factor": 0.9947130608097434,
+      "average_r": -0.0004546423583312661,
+      "pnl": -2.789343891954065
+    },
+    "2024-11": {
+      "trades": 30,
+      "win_rate": 30.0,
+      "profit_factor": 1.285457722261315,
+      "average_r": 0.19823665348928315,
+      "pnl": 150.8869754731812
+    },
+    "2024-12": {
+      "trades": 13,
+      "win_rate": 15.384615384615385,
+      "profit_factor": 0.5986261146946492,
+      "average_r": -0.3127554189253191,
+      "pnl": -102.00117860770355
+    }
+  },
+  "signal_funnel": {
+    "bars_evaluated": 34707,
+    "setup_detected": 450,
+    "order_created": 450,
+    "trade_entered": 311,
+    "trade_exited": 311,
+    "order_cancelled": 1,
+    "h1_context_rejected": 218,
+    "h1_context_evaluated": 34423,
+    "impulse_rejected": 21795,
+    "impulse_detected": 2843,
+    "pullback_rejected": 2392,
+    "pullback_started": 1643,
+    "pullback_depth_valid": 2308,
+    "confirmation_evaluated": 477,
+    "risk_stop_valid": 450,
+    "pending_order_created": 450,
+    "confirmation_rejected": 1831,
+    "risk_stop_rejected": 27,
+    "entry": 311,
+    "exit": 311,
+    "pending_order_expired": 116,
+    "pending_order_cancelled": 1
+  },
+  "rejection_reasons": {
+    "impulse_rejected/insufficient range": 12269,
+    "impulse_rejected/wrong net direction": 9526,
+    "confirmation_rejected/confirmation criteria not met": 1831,
+    "pullback_rejected/retracement exceeded maximum": 1707,
+    "pullback_rejected/no confirmation within pullback window": 685,
+    "h1_context_rejected/H1 regime not yet warmed up": 218,
+    "pending_order_expired/expiry reached without fill": 116,
+    "risk_stop_rejected/stop distance outside safety range": 27,
+    "pending_order_cancelled/H1 context invalidated": 1
+  },
+  "mfe_mae": {
+    "mean_mfe_r": 19.819762411942026,
+    "mean_mae_r": 14.660544672328053,
+    "n": 311
+  },
+  "winner_loser_profile": {
+    "winners": {
+      "n": 81,
+      "avg_r": 2.8172490936861068,
+      "avg_duration_minutes": 363.7037037037037
+    },
+    "losers": {
+      "n": 230,
+      "avg_r": -0.9481899300522453,
+      "avg_duration_minutes": 162.19565217391303
+    }
+  },
+  "impulse_size_atr_buckets": {
+    "[1.5,2.0)": 6228,
+    "[2.0,3.0)": 4506,
+    "[1.0,1.5)": 9103,
+    ">=10.0": 3166,
+    "[3.0,5.0)": 1487,
+    "[5.0,10.0)": 148
+  },
+  "pullback_depth_percent_buckets": {
+    "[0.28,0.36)": 760,
+    "[0.0,0.2)": 1204,
+    "[0.2,0.28)": 650,
+    "[0.36,0.45)": 898
+  },
+  "confirmation_body_percent_buckets": {
+    "[0.5,0.65)": 378,
+    "[0.8,1.0)": 263,
+    "[0.65,0.8)": 350,
+    "[0.0,0.5)": 1293,
+    ">=1.0": 24
+  },
+  "stop_atr_buckets": {
+    "[1.0,1.5)": 208,
+    "[1.5,2.0)": 130,
+    "[2.5,10.0)": 27,
+    "[0.5,1.0)": 60,
+    "[2.0,2.5)": 52
+  }
+}

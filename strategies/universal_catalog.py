@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import pandas as pd
+
 from core.fingerprints import sha256_file
 from research.v3_l2_trend_pullback_baseline import warmup_plan as l2_warmup
 from research.v3_m1_momentum_expansion_baseline import warmup_plan as m1_warmup
@@ -30,6 +32,7 @@ from strategies.btc_v3_m1_momentum_expansion_continuation import (
 from strategies.btc_v3_mr1_intraday_overshoot_mean_reversion import (
     BtcV3MR1IntradayOvershootMeanReversion, V3MR1Parameters,
 )
+from strategies.btc_pb1_shallow_pullback import BtcPB1ShallowPullback, PB1Parameters
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -121,6 +124,58 @@ def _parameterized(cls, params_cls):
         params = params_cls()
         return cls(replace(params, **dict(overrides)))
     return build
+
+
+def _pb1_warmup(start):
+    params = PB1Parameters()
+    h1_bars = params.h1_slow_ema + params.h1_slope_lookback
+    m15_bars = max(params.m15_ema_slow, params.m15_atr_length,
+                   params.impulse_window_bars + params.pullback_maximum_bars + 1)
+    first_full_hour = start.ceil("h")
+    h1_ready = first_full_hour + pd.Timedelta(hours=h1_bars)
+    m15_ready = start + pd.Timedelta(minutes=15 * (m15_bars - 1))
+    return max(h1_ready, m15_ready)
+
+
+register_strategy(StrategyDescriptor(
+    metadata=_meta("BTC_PB1_SHALLOW_PULLBACK_V1", "BTC PB1 — Shallow Trend Pullback Continuation [Research]", "1.0",
+                   StrategyStatus.RESEARCH, "trend_continuation",
+                   "Impulse -> shallow controlled retracement -> continuation trigger. "
+                   "Phase A baseline, not yet optimized.", "btc_pb1_shallow_pullback.py"),
+    factory=BtcPB1ShallowPullback,
+    parameters=(
+        _mutable("impulse_window_bars", ParameterType.INTEGER, 3, 2, 5, 1,
+                 "M15 candles spanning the measured impulse leg."),
+        _mutable("impulse_minimum_range_atr", ParameterType.ATR_MULTIPLE, 1.5, 1.0, 3.0, 0.1,
+                 "Minimum impulse range (high-low across the window) in ATR."),
+        _mutable("pullback_maximum_bars", ParameterType.INTEGER, 3, 1, 5, 1,
+                 "Maximum M15 candles allowed for the pullback before timeout."),
+        _mutable("pullback_minimum_retracement_percent", ParameterType.PERCENTAGE, 0.20, 0.05, 0.40, 0.05,
+                 "Minimum retracement of the impulse range."),
+        _mutable("pullback_maximum_retracement_percent", ParameterType.PERCENTAGE, 0.45, 0.30, 0.70, 0.05,
+                 "Maximum retracement of the impulse range before invalidation."),
+        _mutable("confirmation_close_location_percent", ParameterType.PERCENTAGE, 0.35, 0.10, 0.49, 0.05,
+                 "Confirmation candle must close within this fraction of its extreme."),
+        _mutable("confirmation_minimum_body_percent", ParameterType.PERCENTAGE, 0.50, 0.30, 0.90, 0.05,
+                 "Minimum confirmation candle body as a percent of its range."),
+        _mutable("confirmation_maximum_range_atr", ParameterType.ATR_MULTIPLE, 2.0, 1.0, 4.0, 0.25,
+                 "Maximum confirmation candle range in ATR."),
+        _mutable("entry_buffer_atr", ParameterType.ATR_MULTIPLE, 0.10, 0.0, 0.50, 0.05,
+                 "Entry trigger buffer beyond the confirmation candle extreme, in ATR."),
+        _mutable("stop_buffer_atr", ParameterType.ATR_MULTIPLE, 0.20, 0.0, 0.50, 0.05,
+                 "Structural stop buffer beyond the deepest pullback price, in ATR."),
+        _mutable("minimum_stop_atr", ParameterType.ATR_MULTIPLE, 0.50, 0.25, 1.00, 0.05,
+                 "Minimum accepted stop distance, in ATR."),
+        _mutable("maximum_stop_atr", ParameterType.ATR_MULTIPLE, 2.50, 1.50, 4.00, 0.25,
+                 "Maximum accepted stop distance, in ATR."),
+        _frozen("reward_multiple", ParameterType.FLOAT, 3.0,
+                "Fixed R-multiple target applied by the audited engine."),
+    ),
+    required_indicators=("H1 EMA50", "H1 EMA200", "H1 ATR14", "M15 EMA20", "M15 EMA50", "M15 ATR14"),
+    required_timeframes=("15m", "1h"), warmup_resolver=_pb1_warmup,
+    parameterized_factory=_parameterized(BtcPB1ShallowPullback, PB1Parameters),
+    execution_profile="EXNESS_SYNTHETIC_BID_ASK",
+))
 
 
 for descriptor in (
