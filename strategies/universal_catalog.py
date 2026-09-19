@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from core.fingerprints import sha256_file
+from core.fingerprints import sha256_file, stable_fingerprint
 from research.v3_l2_trend_pullback_baseline import warmup_plan as l2_warmup
 from research.v3_m1_momentum_expansion_baseline import warmup_plan as m1_warmup
 from research.v3_mr1_intraday_overshoot_mean_reversion_baseline import warmup_plan as mr1_warmup
@@ -33,12 +33,23 @@ from strategies.btc_v3_mr1_intraday_overshoot_mean_reversion import (
     BtcV3MR1IntradayOvershootMeanReversion, V3MR1Parameters,
 )
 from strategies.btc_pb1_shallow_pullback import BtcPB1ShallowPullback, PB1Parameters
+from strategies.btc_pb2_reclaim_acceptance import PB2Parameters
+from strategies.btc_pb2_reclaim_long import BtcPB2ReclaimLong
+from strategies.btc_pb2_reclaim_short import BtcPB2ReclaimShort
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _source_hash(filename: str) -> str:
-    return sha256_file(ROOT / "strategies" / filename)
+def _source_hash(*filenames: str) -> str:
+    """Fingerprint a strategy's source.
+
+    A single-file strategy hashes exactly as before. A strategy split across a
+    component file and a shared implementation core hashes all of its files, so
+    the fingerprint still moves when any code the strategy actually runs
+    changes — a thin subclass alone would not be a meaningful fingerprint.
+    """
+    hashes = [sha256_file(ROOT / "strategies" / filename) for filename in filenames]
+    return hashes[0] if len(hashes) == 1 else stable_fingerprint(hashes)
 
 
 def _frozen(name: str, typ: ParameterType, default, description: str = "") -> StrategyParameter:
@@ -52,12 +63,12 @@ def _mutable(name: str, typ: ParameterType, default, minimum=None, maximum=None,
                              optimization_allowed=True, frozen=False)
 
 
-def _meta(strategy_id, name, version, status, category, description, filename):
+def _meta(strategy_id, name, version, status, category, description, *filenames):
     return StrategyMetadata(
         strategy_id=strategy_id, name=name, version=version, status=status,
         category=category, supported_instruments=("BTCUSD",),
         supported_timeframes=("15m",), description=description,
-        created_date="2026-09-18", strategy_fingerprint=_source_hash(filename),
+        created_date="2026-09-18", strategy_fingerprint=_source_hash(*filenames),
     )
 
 
@@ -178,6 +189,82 @@ register_strategy(StrategyDescriptor(
     required_indicators=("H1 EMA50", "H1 EMA200", "H1 ATR14", "M15 EMA20", "M15 EMA50", "M15 ATR14"),
     required_timeframes=("15m", "1h"), warmup_resolver=_pb1_warmup,
     parameterized_factory=_parameterized(BtcPB1ShallowPullback, PB1Parameters),
+    execution_profile="EXNESS_SYNTHETIC_BID_ASK",
+))
+
+
+def _pb2_warmup(start):
+    params = PB2Parameters()
+    h1_bars = params.h1_slow_ema + params.h1_slope_lookback
+    m15_bars = max(params.m15_ema50_length, params.m15_atr_length,
+                   params.structure_lookback + params.retest_maximum_bars + 2)
+    h1_ready = start.ceil("h") + pd.Timedelta(hours=h1_bars)
+    m15_ready = start + pd.Timedelta(minutes=15 * (m15_bars - 1))
+    return max(h1_ready, m15_ready)
+
+
+def _pb2_parameters() -> tuple[StrategyParameter, ...]:
+    """One schema, registered independently on both PB2 components."""
+    return (
+        _mutable("structure_lookback", ParameterType.INTEGER, 12, 6, 24, 1,
+                 "Completed M15 bars preceding the displacement that define the structure level."),
+        _mutable("displacement_minimum_range_atr", ParameterType.ATR_MULTIPLE, 1.30, 0.80, 2.50, 0.10,
+                 "Minimum displacement candle range in ATR."),
+        _mutable("displacement_minimum_body_percent", ParameterType.PERCENTAGE, 0.70, 0.40, 0.90, 0.05,
+                 "Minimum displacement body as a share of its range."),
+        _mutable("displacement_close_location_percent", ParameterType.PERCENTAGE, 0.20, 0.05, 0.45, 0.05,
+                 "Displacement must close within this fraction of its extreme."),
+        _mutable("retest_tolerance_atr", ParameterType.ATR_MULTIPLE, 0.10, 0.0, 0.50, 0.05,
+                 "How far short of the structure level still counts as a retest, in ATR."),
+        _mutable("retest_maximum_bars", ParameterType.INTEGER, 5, 2, 12, 1,
+                 "Completed M15 bars allowed for retest and reclaim before the structure expires."),
+        _mutable("reclaim_minimum_body_percent", ParameterType.PERCENTAGE, 0.50, 0.30, 0.90, 0.05,
+                 "Minimum reclaim candle body as a share of its range."),
+        _mutable("reclaim_close_location_percent", ParameterType.PERCENTAGE, 0.35, 0.10, 0.49, 0.05,
+                 "Reclaim must close within this fraction of its extreme."),
+        _mutable("reclaim_maximum_range_atr", ParameterType.ATR_MULTIPLE, 2.00, 1.00, 4.00, 0.25,
+                 "Maximum reclaim candle range in ATR."),
+        _mutable("entry_buffer_atr", ParameterType.ATR_MULTIPLE, 0.05, 0.0, 0.50, 0.05,
+                 "Stop-entry trigger beyond the acceptance candle extreme, in ATR."),
+        _mutable("stop_buffer_atr", ParameterType.ATR_MULTIPLE, 0.20, 0.0, 0.50, 0.05,
+                 "Structural stop buffer beyond the retest/reclaim/acceptance extreme, in ATR."),
+        _mutable("minimum_stop_atr", ParameterType.ATR_MULTIPLE, 0.50, 0.25, 1.00, 0.05,
+                 "Minimum accepted stop distance, in ATR."),
+        _mutable("maximum_stop_atr", ParameterType.ATR_MULTIPLE, 2.50, 1.50, 4.00, 0.25,
+                 "Maximum accepted stop distance, in ATR."),
+        _frozen("reward_multiple", ParameterType.FLOAT, 3.0,
+                "Fixed R-multiple target applied by the audited engine."),
+    )
+
+
+_PB2_INDICATORS = ("H1 EMA50", "H1 EMA200", "H1 ATR14", "M15 EMA20", "M15 EMA50", "M15 ATR14")
+_PB2_CORE_FILE = "btc_pb2_reclaim_acceptance.py"
+
+register_strategy(StrategyDescriptor(
+    metadata=_meta("BTC_PB2_RECLAIM_LONG_V1", "BTC PB2 — Reclaim & Acceptance Long [Research]", "1.0",
+                   StrategyStatus.RESEARCH, "trend_continuation",
+                   "Displacement through a prior M15 structure high -> retest -> reclaim -> one "
+                   "acceptance bar above the level -> stop entry. Phase A baseline, not optimized.",
+                   "btc_pb2_reclaim_long.py", _PB2_CORE_FILE),
+    factory=BtcPB2ReclaimLong,
+    parameters=_pb2_parameters(),
+    required_indicators=_PB2_INDICATORS,
+    required_timeframes=("15m", "1h"), warmup_resolver=_pb2_warmup,
+    parameterized_factory=_parameterized(BtcPB2ReclaimLong, PB2Parameters),
+    execution_profile="EXNESS_SYNTHETIC_BID_ASK",
+))
+
+register_strategy(StrategyDescriptor(
+    metadata=_meta("BTC_PB2_RECLAIM_SHORT_V1", "BTC PB2 — Reclaim & Acceptance Short [Research]", "1.0",
+                   StrategyStatus.RESEARCH, "trend_continuation",
+                   "Displacement through a prior M15 structure low -> retest -> reclaim -> one "
+                   "acceptance bar below the level -> stop entry. Phase A baseline, not optimized.",
+                   "btc_pb2_reclaim_short.py", _PB2_CORE_FILE),
+    factory=BtcPB2ReclaimShort,
+    parameters=_pb2_parameters(),
+    required_indicators=_PB2_INDICATORS,
+    required_timeframes=("15m", "1h"), warmup_resolver=_pb2_warmup,
+    parameterized_factory=_parameterized(BtcPB2ReclaimShort, PB2Parameters),
     execution_profile="EXNESS_SYNTHETIC_BID_ASK",
 ))
 

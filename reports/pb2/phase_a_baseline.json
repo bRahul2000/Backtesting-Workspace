@@ -1,0 +1,795 @@
+{
+  "phase": "PB2 Phase A \u2014 reclaim & acceptance baseline",
+  "dataset_role": "DEVELOPMENT",
+  "period": {
+    "start": "2021-01-01T00:00:00+00:00",
+    "end": "2023-12-31T23:45:00+00:00"
+  },
+  "years_present": [
+    2021,
+    2022,
+    2023
+  ],
+  "baseline_parameters": {
+    "h1_fast_ema": 50,
+    "h1_slow_ema": 200,
+    "h1_atr_length": 14,
+    "h1_slope_lookback": 4,
+    "m15_atr_length": 14,
+    "m15_ema20_length": 20,
+    "m15_ema50_length": 50,
+    "structure_lookback": 12,
+    "displacement_minimum_range_atr": 1.3,
+    "displacement_minimum_body_percent": 0.7,
+    "displacement_close_location_percent": 0.2,
+    "retest_tolerance_atr": 0.1,
+    "retest_maximum_bars": 5,
+    "reclaim_minimum_body_percent": 0.5,
+    "reclaim_close_location_percent": 0.35,
+    "reclaim_maximum_range_atr": 2.0,
+    "entry_buffer_atr": 0.05,
+    "pending_expiry_bars": 2,
+    "stop_buffer_atr": 0.2,
+    "minimum_stop_atr": 0.5,
+    "maximum_stop_atr": 2.5,
+    "reward_multiple": 3.0
+  },
+  "components": {
+    "LONG": {
+      "component": "LONG",
+      "strategy_id": "BTC_PB2_RECLAIM_LONG_V1",
+      "strategy_fingerprint": "5c4a3f8ec34d97d660dae83f783539467d5dba58841b8936c9c7fe5b403a6a72",
+      "parameter_fingerprint": "a103f11b2f7f8017a819ac8b35bf944fac859569d367b7131115115511d4a6f1",
+      "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+      "effective_parameters": {
+        "h1_fast_ema": 50,
+        "h1_slow_ema": 200,
+        "h1_atr_length": 14,
+        "h1_slope_lookback": 4,
+        "m15_atr_length": 14,
+        "m15_ema20_length": 20,
+        "m15_ema50_length": 50,
+        "structure_lookback": 12,
+        "displacement_minimum_range_atr": 1.3,
+        "displacement_minimum_body_percent": 0.7,
+        "displacement_close_location_percent": 0.2,
+        "retest_tolerance_atr": 0.1,
+        "retest_maximum_bars": 5,
+        "reclaim_minimum_body_percent": 0.5,
+        "reclaim_close_location_percent": 0.35,
+        "reclaim_maximum_range_atr": 2.0,
+        "entry_buffer_atr": 0.05,
+        "pending_expiry_bars": 2,
+        "stop_buffer_atr": 0.2,
+        "minimum_stop_atr": 0.5,
+        "maximum_stop_atr": 2.5,
+        "reward_multiple": 3.0
+      },
+      "period": {
+        "start": "2021-01-01T00:00:00+00:00",
+        "end": "2023-12-31T23:45:00+00:00"
+      },
+      "dataset_role": "DEVELOPMENT",
+      "metrics": {
+        "closed_trades": 29,
+        "total_entries": 29,
+        "open_at_end": 0,
+        "trades_per_month": 0.9097730298475413,
+        "win_rate": 37.93103448275862,
+        "profit_factor": 1.8656360038448085,
+        "average_r": 0.5409916805184694,
+        "total_r": 15.688758735035613,
+        "pnl": 393.183016086768,
+        "max_drawdown_percent": 0.7724014547051793,
+        "max_losing_streak": 3,
+        "average_holding_minutes": 188.27586206896552,
+        "median_holding_minutes": 105.0
+      },
+      "yearly": {
+        "2021": {
+          "trades": 4,
+          "win_rate": 50.0,
+          "profit_factor": 2.9864531486179464,
+          "average_r": 0.9996069497899502,
+          "total_r": 3.998427799159801,
+          "max_drawdown_percent_within_year": 0.25
+        },
+        "2022": {
+          "trades": 7,
+          "win_rate": 14.285714285714285,
+          "profit_factor": 0.49306439245601147,
+          "average_r": -0.43702182731925515,
+          "total_r": -3.0591527912347862,
+          "max_drawdown_percent_within_year": 1.0116309962494092
+        },
+        "2023": {
+          "trades": 18,
+          "win_rate": 44.44444444444444,
+          "profit_factor": 2.4650925353684783,
+          "average_r": 0.8194157626172553,
+          "total_r": 14.749483727110597,
+          "max_drawdown_percent_within_year": 0.7724014547051793
+        }
+      },
+      "funnel": {
+        "context_evaluated": 38861,
+        "context_rejected": 49297,
+        "displacement_evaluated": 38861,
+        "displacement_detected": 540,
+        "displacement_rejected": 38321,
+        "structure_level_created": 540,
+        "waiting_retest": 540,
+        "retest_detected": 308,
+        "retest_expired": 290,
+        "structure_invalidated": 120,
+        "reclaim_evaluated": 895,
+        "reclaim_confirmed": 130,
+        "reclaim_rejected": 765,
+        "acceptance_evaluated": 130,
+        "acceptance_confirmed": 58,
+        "acceptance_failed": 72,
+        "risk_evaluated": 58,
+        "risk_rejected": 19,
+        "pending_created": 39,
+        "pending_expired": 6,
+        "trade_entered": 29,
+        "trade_exited": 29
+      },
+      "funnel_notes": {
+        "pending_created_in_tradeable_window": 35,
+        "engine_order_events": {
+          "triggered": 29,
+          "expired": 6
+        },
+        "explanation": "pending_created counts every rule decision, including signals emitted before the warmup boundary that the engine always discards; the tradeable-window count is what reaches the order book."
+      },
+      "rejection_reasons": {
+        "context_rejected/H1 EMA50/EMA200 not aligned with this component": 48676,
+        "displacement_rejected/candle not directional": 19139,
+        "displacement_rejected/close did not break the structure level": 17379,
+        "displacement_rejected/insufficient range": 1141,
+        "context_rejected/H1 regime not yet warmed up": 621,
+        "displacement_rejected/insufficient body": 558,
+        "reclaim_rejected/candle not directional": 519,
+        "retest_expired/structure level never retested": 194,
+        "reclaim_rejected/insufficient body": 161,
+        "structure_invalidated/close beyond the displacement candle extreme": 120,
+        "displacement_rejected/close not at the extreme": 104,
+        "retest_expired/no reclaim within the retest window": 96,
+        "reclaim_rejected/close did not reclaim the structure level": 57,
+        "acceptance_failed/close did not hold the reclaim close": 49,
+        "acceptance_failed/close fell back through the structure level": 23
+      },
+      "excursion": {
+        "model": "BAR_BASED_APPROXIMATION",
+        "mfe_r": {
+          "n": 29,
+          "mean": 1.7568637490148031,
+          "median": 1.2964415610958853,
+          "p75": 3.1913148335000536,
+          "p90": 3.5519534539360005,
+          "p95": 3.8056754260022925,
+          "max": 5.407368535625939
+        },
+        "mae_r": {
+          "n": 29,
+          "mean": 0.9449604986780776,
+          "median": 1.0145413598447321,
+          "p75": 1.1077331356460585,
+          "p90": 1.3707786778240867,
+          "p95": 1.4585333085476864,
+          "max": 1.9502153157909166
+        },
+        "note": "Excursions use whole entry-to-exit-bar OHLC, so they include price action inside the exit bar beyond the modelled fill; they are not an exact tick path and must not be read as achievable pre-exit movement."
+      },
+      "acceptance_buckets": {
+        "breakout_distance_atr": [
+          {
+            "bucket": "(-0.001, 0.25]",
+            "trades": 6,
+            "profit_factor": 1.4071282337973425,
+            "average_r": 0.29848213751993774,
+            "win_rate": 33.33333333333333
+          },
+          {
+            "bucket": "(0.25, 0.5]",
+            "trades": 4,
+            "profit_factor": 3.5434059521515695,
+            "average_r": 1.131228691922317,
+            "win_rate": 50.0
+          },
+          {
+            "bucket": "(0.5, 1.0]",
+            "trades": 13,
+            "profit_factor": 1.3581216701977565,
+            "average_r": 0.25043862607152956,
+            "win_rate": 30.76923076923077
+          },
+          {
+            "bucket": "(1.0, inf]",
+            "trades": 6,
+            "profit_factor": 3.0443029380387316,
+            "average_r": 1.0195415005494726,
+            "win_rate": 50.0
+          }
+        ],
+        "retest_overshoot_atr": [
+          {
+            "bucket": "(-0.1, 0.0]",
+            "trades": 5,
+            "profit_factor": 11.699616599983232,
+            "average_r": 2.206489655200211,
+            "win_rate": 80.0
+          },
+          {
+            "bucket": "(0.0, 0.1]",
+            "trades": 6,
+            "profit_factor": 1.5696271341788839,
+            "average_r": 0.3882493644601568,
+            "win_rate": 33.33333333333333
+          },
+          {
+            "bucket": "(0.1, inf]",
+            "trades": 18,
+            "profit_factor": 1.1833881997406313,
+            "average_r": 0.12926745957075658,
+            "win_rate": 27.77777777777778
+          }
+        ],
+        "bars_to_retest": [
+          {
+            "bucket": "(-0.001, 1.0]",
+            "trades": 22,
+            "profit_factor": 2.1275677688797545,
+            "average_r": 0.665738752847852,
+            "win_rate": 40.909090909090914
+          },
+          {
+            "bucket": "(1.0, 2.0]",
+            "trades": 5,
+            "profit_factor": 0.8251059855441192,
+            "average_r": -0.13451604325510128,
+            "win_rate": 20.0
+          },
+          {
+            "bucket": "(2.0, 3.0]",
+            "trades": 1,
+            "profit_factor": Infinity,
+            "average_r": 2.7404121038845517,
+            "win_rate": 100.0
+          },
+          {
+            "bucket": "(3.0, inf]",
+            "trades": 1,
+            "profit_factor": 0.0,
+            "average_r": -1.0253257152261772,
+            "win_rate": 0.0
+          }
+        ],
+        "reclaim_body_percent": [
+          {
+            "bucket": "(-0.001, 0.6]",
+            "trades": 4,
+            "profit_factor": 3.5309578624005478,
+            "average_r": 1.1303165409531553,
+            "win_rate": 50.0
+          },
+          {
+            "bucket": "(0.6, 0.75]",
+            "trades": 17,
+            "profit_factor": 0.9158664594816294,
+            "average_r": -0.06828963644818373,
+            "win_rate": 23.52941176470588
+          },
+          {
+            "bucket": "(0.75, 0.9]",
+            "trades": 7,
+            "profit_factor": 7.583326643609013,
+            "average_r": 1.912061783570698,
+            "win_rate": 71.42857142857143
+          },
+          {
+            "bucket": "(0.9, 1.0]",
+            "trades": 1,
+            "profit_factor": 0.0,
+            "average_r": -1.0560160941527705,
+            "win_rate": 0.0
+          }
+        ],
+        "acceptance_distance_atr": [
+          {
+            "bucket": "(0.25, 0.5]",
+            "trades": 3,
+            "profit_factor": 6.260158292308141,
+            "average_r": 1.7382560557957383,
+            "win_rate": 66.66666666666666
+          },
+          {
+            "bucket": "(0.5, 1.0]",
+            "trades": 11,
+            "profit_factor": 1.6660957210315477,
+            "average_r": 0.4284496635176346,
+            "win_rate": 36.36363636363637
+          },
+          {
+            "bucket": "(1.0, inf]",
+            "trades": 15,
+            "profit_factor": 1.5689679740997184,
+            "average_r": 0.38406961793029454,
+            "win_rate": 33.33333333333333
+          }
+        ],
+        "stop_atr": [
+          {
+            "bucket": "(1.0, 1.5]",
+            "trades": 10,
+            "profit_factor": 7.020098772456827,
+            "average_r": 1.8245076353423872,
+            "win_rate": 70.0
+          },
+          {
+            "bucket": "(1.5, 2.0]",
+            "trades": 11,
+            "profit_factor": 0.7063518940814486,
+            "average_r": -0.22885407510954933,
+            "win_rate": 18.181818181818183
+          },
+          {
+            "bucket": "(2.0, 2.5]",
+            "trades": 8,
+            "profit_factor": 0.9942872345702167,
+            "average_r": -0.0048653490229023655,
+            "win_rate": 25.0
+          }
+        ]
+      },
+      "xray_rule_counts": {
+        "displacement_range_atr": {
+          "PASS": 1202,
+          "FAIL": 1141
+        },
+        "displacement_body_percent": {
+          "PASS": 1145,
+          "FAIL": 1198
+        },
+        "displacement_close_location": {
+          "PASS": 1433,
+          "FAIL": 910
+        },
+        "breakout_distance_atr": {
+          "PASS": 2343,
+          "FAIL": 0
+        },
+        "h1_direction": {
+          "PASS": 540,
+          "FAIL": 0
+        },
+        "h1_separation_atr": {
+          "PASS": 540,
+          "FAIL": 0
+        },
+        "h1_fast_slope_atr": {
+          "PASS": 540,
+          "FAIL": 0
+        },
+        "h1_slow_slope_atr": {
+          "PASS": 540,
+          "FAIL": 0
+        },
+        "structure_level": {
+          "PASS": 540,
+          "FAIL": 0
+        },
+        "bars_to_retest": {
+          "PASS": 308,
+          "FAIL": 0
+        },
+        "retest_overshoot_atr": {
+          "PASS": 308,
+          "FAIL": 0
+        },
+        "reclaim_body_percent": {
+          "PASS": 424,
+          "FAIL": 471
+        },
+        "reclaim_close_location": {
+          "PASS": 303,
+          "FAIL": 592
+        },
+        "reclaim_range_atr": {
+          "PASS": 828,
+          "FAIL": 67
+        },
+        "acceptance_distance_atr": {
+          "PASS": 107,
+          "FAIL": 23
+        },
+        "acceptance_range_atr": {
+          "PASS": 130,
+          "FAIL": 0
+        },
+        "stop_atr": {
+          "PASS": 39,
+          "FAIL": 19
+        }
+      },
+      "baseline_classification": {
+        "classification": "INSUFFICIENT_SAMPLE",
+        "rule": "closed trades < 30 -> INSUFFICIENT_SAMPLE; otherwise Avg R > +0.05 -> BASELINE_POSITIVE, Avg R < -0.05 -> BASELINE_NEGATIVE, else BASELINE_NEAR_BREAKEVEN. Descriptive only: no cross-year robustness is claimed and nothing can become FROZEN from Phase A.",
+        "closed_trades": 29,
+        "average_r": 0.5409916805184694
+      }
+    },
+    "SHORT": {
+      "component": "SHORT",
+      "strategy_id": "BTC_PB2_RECLAIM_SHORT_V1",
+      "strategy_fingerprint": "bed29f83b41ec2016033bf925a4a81c157e30bb765ecf6ab8359879b8a9f3eef",
+      "parameter_fingerprint": "a103f11b2f7f8017a819ac8b35bf944fac859569d367b7131115115511d4a6f1",
+      "dataset_fingerprint": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2",
+      "effective_parameters": {
+        "h1_fast_ema": 50,
+        "h1_slow_ema": 200,
+        "h1_atr_length": 14,
+        "h1_slope_lookback": 4,
+        "m15_atr_length": 14,
+        "m15_ema20_length": 20,
+        "m15_ema50_length": 50,
+        "structure_lookback": 12,
+        "displacement_minimum_range_atr": 1.3,
+        "displacement_minimum_body_percent": 0.7,
+        "displacement_close_location_percent": 0.2,
+        "retest_tolerance_atr": 0.1,
+        "retest_maximum_bars": 5,
+        "reclaim_minimum_body_percent": 0.5,
+        "reclaim_close_location_percent": 0.35,
+        "reclaim_maximum_range_atr": 2.0,
+        "entry_buffer_atr": 0.05,
+        "pending_expiry_bars": 2,
+        "stop_buffer_atr": 0.2,
+        "minimum_stop_atr": 0.5,
+        "maximum_stop_atr": 2.5,
+        "reward_multiple": 3.0
+      },
+      "period": {
+        "start": "2021-01-01T00:00:00+00:00",
+        "end": "2023-12-31T23:45:00+00:00"
+      },
+      "dataset_role": "DEVELOPMENT",
+      "metrics": {
+        "closed_trades": 14,
+        "total_entries": 14,
+        "open_at_end": 0,
+        "trades_per_month": 0.4392007730298475,
+        "win_rate": 7.142857142857143,
+        "profit_factor": 0.2309911155042199,
+        "average_r": -0.7142857142857143,
+        "total_r": -10.0,
+        "pnl": -249.6878125,
+        "max_drawdown_percent": 0.7481265625000014,
+        "max_losing_streak": 3,
+        "average_holding_minutes": 222.85714285714286,
+        "median_holding_minutes": 172.5
+      },
+      "yearly": {
+        "2021": {
+          "trades": 5,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "average_r": -1.0,
+          "total_r": -5.0,
+          "max_drawdown_percent_within_year": 1.2475015625000014
+        },
+        "2022": {
+          "trades": 6,
+          "win_rate": 16.666666666666664,
+          "profit_factor": 0.5999992500009375,
+          "average_r": -0.3333333333333333,
+          "total_r": -2.0,
+          "max_drawdown_percent_within_year": 0.9981265625000015
+        },
+        "2023": {
+          "trades": 3,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "average_r": -1.0,
+          "total_r": -3.0,
+          "max_drawdown_percent_within_year": 0.749375
+        }
+      },
+      "funnel": {
+        "context_evaluated": 40330,
+        "context_rejected": 41630,
+        "displacement_evaluated": 40330,
+        "displacement_detected": 538,
+        "displacement_rejected": 39792,
+        "structure_level_created": 538,
+        "waiting_retest": 538,
+        "retest_detected": 354,
+        "retest_expired": 294,
+        "structure_invalidated": 106,
+        "reclaim_evaluated": 1091,
+        "reclaim_confirmed": 138,
+        "reclaim_rejected": 953,
+        "acceptance_evaluated": 138,
+        "acceptance_confirmed": 62,
+        "acceptance_failed": 76,
+        "risk_evaluated": 62,
+        "risk_rejected": 34,
+        "pending_created": 28,
+        "pending_expired": 12,
+        "trade_entered": 14,
+        "trade_exited": 14
+      },
+      "funnel_notes": {
+        "pending_created_in_tradeable_window": 26,
+        "engine_order_events": {
+          "expired": 12,
+          "triggered": 14
+        },
+        "explanation": "pending_created counts every rule decision, including signals emitted before the warmup boundary that the engine always discards; the tradeable-window count is what reaches the order book."
+      },
+      "rejection_reasons": {
+        "context_rejected/H1 EMA50/EMA200 not aligned with this component": 41009,
+        "displacement_rejected/candle not directional": 20080,
+        "displacement_rejected/close did not break the structure level": 18045,
+        "displacement_rejected/insufficient range": 821,
+        "displacement_rejected/insufficient body": 710,
+        "context_rejected/H1 regime not yet warmed up": 621,
+        "reclaim_rejected/candle not directional": 610,
+        "reclaim_rejected/insufficient body": 207,
+        "retest_expired/structure level never retested": 158,
+        "displacement_rejected/close not at the extreme": 136,
+        "retest_expired/no reclaim within the retest window": 136,
+        "structure_invalidated/close beyond the displacement candle extreme": 106,
+        "reclaim_rejected/close did not reclaim the structure level": 100,
+        "acceptance_failed/close did not hold the reclaim close": 56,
+        "risk_rejected/stop distance outside the safety range": 34
+      },
+      "excursion": {
+        "model": "BAR_BASED_APPROXIMATION",
+        "mfe_r": {
+          "n": 14,
+          "mean": 0.9672988440779097,
+          "median": 0.7618642907358435,
+          "p75": 1.501234311516669,
+          "p90": 2.308775121538158,
+          "p95": 2.668888920447641,
+          "max": 3.0771859691332324
+        },
+        "mae_r": {
+          "n": 14,
+          "mean": 1.3188781500769504,
+          "median": 1.260081750465359,
+          "p75": 1.5617072620470616,
+          "p90": 1.8034040123944857,
+          "p95": 1.845608305240927,
+          "max": 1.8623970830110552
+        },
+        "note": "Excursions use whole entry-to-exit-bar OHLC, so they include price action inside the exit bar beyond the modelled fill; they are not an exact tick path and must not be read as achievable pre-exit movement."
+      },
+      "acceptance_buckets": {
+        "breakout_distance_atr": [
+          {
+            "bucket": "(-0.001, 0.25]",
+            "trades": 4,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(0.25, 0.5]",
+            "trades": 4,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(0.5, 1.0]",
+            "trades": 3,
+            "profit_factor": 1.5,
+            "average_r": 0.3333333333333333,
+            "win_rate": 33.33333333333333
+          },
+          {
+            "bucket": "(1.0, inf]",
+            "trades": 3,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          }
+        ],
+        "retest_overshoot_atr": [
+          {
+            "bucket": "(-0.1, 0.0]",
+            "trades": 2,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(0.0, 0.1]",
+            "trades": 3,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(0.1, inf]",
+            "trades": 9,
+            "profit_factor": 0.37511693098082916,
+            "average_r": -0.5555555555555556,
+            "win_rate": 11.11111111111111
+          }
+        ],
+        "bars_to_retest": [
+          {
+            "bucket": "(-0.001, 1.0]",
+            "trades": 12,
+            "profit_factor": 0.2729131948412583,
+            "average_r": -0.6666666666666666,
+            "win_rate": 8.333333333333332
+          },
+          {
+            "bucket": "(1.0, 2.0]",
+            "trades": 1,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(3.0, inf]",
+            "trades": 1,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          }
+        ],
+        "reclaim_body_percent": [
+          {
+            "bucket": "(-0.001, 0.6]",
+            "trades": 4,
+            "profit_factor": 1.0025041718793402,
+            "average_r": 0.0,
+            "win_rate": 25.0
+          },
+          {
+            "bucket": "(0.6, 0.75]",
+            "trades": 6,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(0.75, 0.9]",
+            "trades": 2,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(0.9, 1.0]",
+            "trades": 2,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          }
+        ],
+        "acceptance_distance_atr": [
+          {
+            "bucket": "(0.5, 1.0]",
+            "trades": 4,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(1.0, inf]",
+            "trades": 10,
+            "profit_factor": 0.333425720043262,
+            "average_r": -0.6,
+            "win_rate": 10.0
+          }
+        ],
+        "stop_atr": [
+          {
+            "bucket": "(1.0, 1.5]",
+            "trades": 2,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(1.5, 2.0]",
+            "trades": 3,
+            "profit_factor": 0.0,
+            "average_r": -1.0,
+            "win_rate": 0.0
+          },
+          {
+            "bucket": "(2.0, 2.5]",
+            "trades": 9,
+            "profit_factor": 0.3753518923991242,
+            "average_r": -0.5555555555555556,
+            "win_rate": 11.11111111111111
+          }
+        ]
+      },
+      "xray_rule_counts": {
+        "displacement_range_atr": {
+          "PASS": 1384,
+          "FAIL": 821
+        },
+        "displacement_body_percent": {
+          "PASS": 988,
+          "FAIL": 1217
+        },
+        "displacement_close_location": {
+          "PASS": 1161,
+          "FAIL": 1044
+        },
+        "breakout_distance_atr": {
+          "PASS": 2205,
+          "FAIL": 0
+        },
+        "h1_direction": {
+          "PASS": 538,
+          "FAIL": 0
+        },
+        "h1_separation_atr": {
+          "PASS": 538,
+          "FAIL": 0
+        },
+        "h1_fast_slope_atr": {
+          "PASS": 538,
+          "FAIL": 0
+        },
+        "h1_slow_slope_atr": {
+          "PASS": 538,
+          "FAIL": 0
+        },
+        "structure_level": {
+          "PASS": 538,
+          "FAIL": 0
+        },
+        "bars_to_retest": {
+          "PASS": 354,
+          "FAIL": 0
+        },
+        "retest_overshoot_atr": {
+          "PASS": 354,
+          "FAIL": 0
+        },
+        "reclaim_body_percent": {
+          "PASS": 461,
+          "FAIL": 630
+        },
+        "reclaim_close_location": {
+          "PASS": 363,
+          "FAIL": 728
+        },
+        "reclaim_range_atr": {
+          "PASS": 1034,
+          "FAIL": 57
+        },
+        "acceptance_distance_atr": {
+          "PASS": 118,
+          "FAIL": 20
+        },
+        "acceptance_range_atr": {
+          "PASS": 138,
+          "FAIL": 0
+        },
+        "stop_atr": {
+          "PASS": 28,
+          "FAIL": 34
+        }
+      },
+      "baseline_classification": {
+        "classification": "INSUFFICIENT_SAMPLE",
+        "rule": "closed trades < 30 -> INSUFFICIENT_SAMPLE; otherwise Avg R > +0.05 -> BASELINE_POSITIVE, Avg R < -0.05 -> BASELINE_NEGATIVE, else BASELINE_NEAR_BREAKEVEN. Descriptive only: no cross-year robustness is claimed and nothing can become FROZEN from Phase A.",
+        "closed_trades": 14,
+        "average_r": -0.7142857142857143
+      }
+    }
+  }
+}
