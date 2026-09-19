@@ -35,6 +35,12 @@ class BacktestConfig:
     risk_mode: str = "PERCENT_EQUITY"
     risk_per_trade_percent: float = 0.25
     fixed_risk_dollars: float = 100.0
+    # Fixed-R exit horizon applied by the audited engine to strategy-defined
+    # signals (engine/execution.py derives the target from the actual fill).
+    # 3.0 is the V3 benchmark every existing run uses; it is configurable so an
+    # exit-horizon experiment supplies it explicitly instead of a strategy
+    # silently redefining its own target.
+    risk_reward_ratio: float = 3.0
     spread: float = 10.0
     commission_percent: float = 0.0
     slippage_percent: float = 0.0
@@ -57,6 +63,8 @@ class BacktestConfig:
             raise ValueError("start_date must not exceed end_date.")
         if self.risk_per_trade_percent <= 0 or self.initial_capital <= 0:
             raise ValueError("Capital and risk must be positive.")
+        if self.risk_reward_ratio <= 0:
+            raise ValueError("risk_reward_ratio must be positive.")
         if self.spread < 0 or self.commission_percent < 0 or self.slippage_percent < 0:
             raise ValueError("Costs cannot be negative.")
         if self.max_simultaneous_positions != 1:

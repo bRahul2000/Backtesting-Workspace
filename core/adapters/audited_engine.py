@@ -162,7 +162,9 @@ def run_universal_backtest(
         risk_mode=RiskMode.PERCENT_EQUITY if config.risk_mode == "PERCENT_EQUITY" else RiskMode.FIXED_DOLLARS,
         risk_percent=config.risk_per_trade_percent,
         fixed_risk_dollars=config.fixed_risk_dollars,
-        risk_reward_ratio=3.0,  # strategy-defined frozen signals use audited target logic; matches V3 benchmark
+        # Strategy-defined signals use the audited fixed-R target logic; the
+        # config default is 3.0, matching the V3 benchmark every prior run used.
+        risk_reward_ratio=config.risk_reward_ratio,
         commission_percent=config.commission_percent,
         slippage_percent=config.slippage_percent,
         same_bar_resolution=SameBarResolution.SL_FIRST,
