@@ -40,6 +40,10 @@ class UniversalBacktestResult:
     equity_curve: list[dict[str, Any]] = field(default_factory=list)
     mfe_mae: dict[str, Any] = field(default_factory=dict)
     execution_diagnostics: dict[str, Any] = field(default_factory=dict)
+    signal_diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    xray_diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    execution_ambiguities: list[dict[str, Any]] = field(default_factory=list)
+    excursion_model: str = "UNAVAILABLE"
     legacy_segment_results: list[Any] = field(default_factory=list, repr=False)
     instrument_fingerprint: str = ""
 

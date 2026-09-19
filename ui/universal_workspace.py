@@ -56,6 +56,10 @@ class IntegrityModel:
     forward_exposure_count: int
     reproducible: bool
     mismatch: str = ""
+    ambiguity_count: int = 0
+    signal_diagnostics_available: bool = False
+    xray_available: bool = False
+    forward_exposure_warning: str = ""
 
 
 @dataclass(frozen=True)
@@ -113,8 +117,11 @@ def trades_dataframe(result: UniversalBacktestResult, instrument: str) -> pd.Dat
             "Planned Risk": trade.get("initial_risk"),
             "PnL": trade.get("pnl"),
             "R": trade.get("realized_r") or trade.get("r_multiple"),
-            "MFE": trade.get("mfe"),
-            "MAE": trade.get("mae"),
+            "MFE": trade.get("mfe_amount"),
+            "MFE R": trade.get("mfe_r"),
+            "MAE": trade.get("mae_amount"),
+            "MAE R": trade.get("mae_r"),
+            "Capture Efficiency": trade.get("capture_efficiency"),
             "Duration": trade.get("bars_held"),
             "Strategy Component": trade.get("setup_id"),
             "Experiment ID": result.run_id,
@@ -180,6 +187,10 @@ def build_integrity(
         missing_gapped_candles=report.missing_candles,
         forward_exposure_count=ExperimentLedger(ROOT / "experiments" / "experiments.sqlite3").forward_run_count(
             descriptor.metadata.strategy_id), reproducible=True,
+        ambiguity_count=len(result.execution_ambiguities),
+        signal_diagnostics_available=bool(result.signal_diagnostics),
+        xray_available=bool(result.xray_diagnostics),
+        forward_exposure_warning=result.execution_diagnostics.get("forward_exposure_warning") or "",
     )
 
 
@@ -283,16 +294,48 @@ def _render_tester(run: WorkspaceRun) -> None:
         st.dataframe(table, use_container_width=True, hide_index=True)
         st.download_button("Download trades CSV", table.to_csv(index=False), "trades.csv", "text/csv")
     with tabs[3]:
-        trades = result.trade_log
-        direction = pd.DataFrame([
-            {"Side": "Long", **asdict(result.long_statistics)},
-            {"Side": "Short", **asdict(result.short_statistics)},
-        ])
-        st.dataframe(direction, use_container_width=True, hide_index=True)
-        if trades:
-            analysis = pd.DataFrame(trades)
-            st.plotly_chart(go.Figure(go.Histogram(x=analysis.get("realized_r"))), use_container_width=True)
-            st.plotly_chart(go.Figure(go.Histogram(x=analysis.get("bars_held"))), use_container_width=True)
+        analysis_tabs = st.tabs(["Excursion Analysis", "Signal Funnel", "Strategy X-Ray", "Execution Ambiguities"])
+        trades = pd.DataFrame(result.trade_log)
+        filter_value = analysis_tabs[0].selectbox("Trade subset", ("All", "Long", "Short", "Winners", "Losers"))
+        if not trades.empty:
+            if filter_value == "Long":
+                trades = trades[trades.direction == "LONG"]
+            elif filter_value == "Short":
+                trades = trades[trades.direction == "SHORT"]
+            elif filter_value == "Winners":
+                trades = trades[trades.pnl > 0]
+            elif filter_value == "Losers":
+                trades = trades[trades.pnl < 0]
+        with analysis_tabs[0]:
+            if trades.empty or "mfe_r" not in trades:
+                st.info("Excursion diagnostics are unavailable for this result.")
+            else:
+                st.caption(f"{result.excursion_model}: OHLC extrema are not tick-exact.")
+                for column in ("mfe_r", "mae_r", "capture_efficiency"):
+                    if column in trades:
+                        st.plotly_chart(go.Figure(go.Histogram(x=trades[column], name=column)), use_container_width=True)
+                st.plotly_chart(go.Figure(go.Scatter(x=trades.mfe_r, y=trades.realized_r, mode="markers", name="MFE R vs R")), use_container_width=True)
+        with analysis_tabs[1]:
+            if not result.signal_diagnostics:
+                st.info("Signal Funnel: this strategy emitted no diagnostic events.")
+            else:
+                events = pd.DataFrame(result.signal_diagnostics)
+                funnel = events.groupby("stage", sort=False).agg(
+                    events=("stage", "size"), passed=("passed", lambda values: int((values == True).sum())),
+                    failed=("passed", lambda values: int((values == False).sum())),
+                ).reset_index()
+                funnel["conversion_percent"] = funnel.passed.div(funnel.passed.shift(1)).mul(100)
+                st.dataframe(funnel, use_container_width=True, hide_index=True)
+        with analysis_tabs[2]:
+            if not result.xray_diagnostics:
+                st.info("Strategy X-Ray: no structured rule evaluations were emitted by this strategy.")
+            else:
+                st.dataframe(pd.DataFrame(result.xray_diagnostics), use_container_width=True, hide_index=True)
+        with analysis_tabs[3]:
+            if not result.execution_ambiguities:
+                st.success("No execution ambiguities were detected in this result.")
+            else:
+                st.dataframe(pd.DataFrame(result.execution_ambiguities), use_container_width=True, hide_index=True)
     with tabs[4]:
         _integrity_panel(run.integrity)
 

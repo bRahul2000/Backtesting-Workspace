@@ -13,6 +13,7 @@ from core.config import BacktestConfig, DatasetRole, ExecutionMode
 from core.fingerprints import sha256_file, stable_fingerprint
 from core.result import DirectionStatistics, UniversalBacktestResult
 from engine.metrics import calculate_metrics
+from engine.diagnostics import enrich_result
 from engine.models import BacktestSettings, Direction, RiskCalculation, RiskMode, SameBarResolution
 from experiments.ledger import ExperimentLedger
 from instruments.btcusd import BTCUSD
@@ -20,6 +21,7 @@ from instruments.xauusd import XAUUSD
 from research.exness_cost_calibrated import run_synthetic_segment
 from research.v3_regime_adaptive_baseline import add_closed_trade_equity
 from strategies.base_strategy import AuditedStrategyAdapter, parameter_fingerprint
+from strategies.diagnostics import DiagnosticStrategyObserver
 from strategies.registry import discover_builtin_strategies
 from utils.data_validation import continuous_segments, load_ohlcv_csv
 
@@ -138,6 +140,7 @@ def run_universal_backtest(
     config_dict["execution_mode"] = config.execution_mode.value
     run_id = ledger.start_run(
         strategy_id=descriptor.metadata.strategy_id,
+        strategy_version=descriptor.metadata.version,
         strategy_name=descriptor.metadata.name,
         strategy_status=descriptor.metadata.status.value,
         strategy_fingerprint=descriptor.metadata.strategy_fingerprint,
@@ -172,8 +175,12 @@ def run_universal_backtest(
         trade_start = descriptor.warmup_resolver(segment.start) if descriptor.warmup_resolver else segment.start
         if trade_start > segment.end:
             continue
-        strategy = adapter.create_legacy_strategy(config.strategy_parameters)
+        strategy = DiagnosticStrategyObserver(
+            adapter.create_legacy_strategy(config.strategy_parameters), descriptor.metadata.strategy_id
+        )
         result = run_synthetic_segment(frame, strategy, config.spread, trade_start, settings)
+        result.diagnostic_events = strategy.events
+        enrich_result(result, frame, spread=config.spread)
         add_closed_trade_equity(result)
         results.append(result)
         pooled.extend(result.trades)
@@ -220,7 +227,10 @@ def run_universal_backtest(
         monthly_statistics=_group_stats(pooled, lambda t: t.entry_time.strftime("%Y-%m")),
         trade_log=[_trade_row(t) for t in pooled],
         equity_curve=_equity_rows(results),
-        mfe_mae={"available": False, "reason": "Legacy audited execution result does not compute generic intratrade MFE/MAE."},
+        mfe_mae={"available": bool(pooled), "model": "BAR_BASED_APPROXIMATION"},
+        signal_diagnostics=[asdict(event) for segment in results for event in segment.diagnostic_events],
+        execution_ambiguities=[asdict(item) for segment in results for item in segment.execution_ambiguities],
+        excursion_model="BAR_BASED_APPROXIMATION" if pooled else "UNAVAILABLE",
         execution_diagnostics={
             "segments": len(results), "order_events": order_status,
             "execution_adapter": "research.exness_cost_calibrated.run_synthetic_segment",
@@ -228,6 +238,9 @@ def run_universal_backtest(
             "commission_percent": config.commission_percent,
             "forward_runs_for_strategy": forward_count,
             "forward_validation_warning": forward_warning,
+            "forward_exposure_warning": ledger.exposure_warning(
+                descriptor.metadata.strategy_id, parameter_hash, config.dataset_role.value
+            ),
         },
         legacy_segment_results=results,
     )

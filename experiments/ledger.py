@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS experiments (
     config_json TEXT NOT NULL,
     results_json TEXT,
     notes TEXT NOT NULL DEFAULT ''
+    ,strategy_version TEXT NOT NULL DEFAULT ''
+    ,first_seen_at TEXT NOT NULL DEFAULT ''
+    ,exposure_count INTEGER NOT NULL DEFAULT 1
 );
 """
 
@@ -44,6 +47,11 @@ class ExperimentLedger:
                 conn.execute(
                     "ALTER TABLE experiments ADD COLUMN instrument_fingerprint TEXT NOT NULL DEFAULT ''"
                 )
+            for column, definition in (("strategy_version", "TEXT NOT NULL DEFAULT ''"),
+                                       ("first_seen_at", "TEXT NOT NULL DEFAULT ''"),
+                                       ("exposure_count", "INTEGER NOT NULL DEFAULT 1")):
+                if column not in columns:
+                    conn.execute(f"ALTER TABLE experiments ADD COLUMN {column} {definition}")
 
     def _connect(self):
         return sqlite3.connect(self.path)
@@ -53,21 +61,28 @@ class ExperimentLedger:
                   dataset_fingerprint: str, broker_fingerprint: str,
                   broker_profile: str, instrument: str, date_start: str,
                   date_end: str, dataset_role: str, config: dict[str, Any],
-                                    notes: str = "", instrument_fingerprint: str = "") -> str:
+                  notes: str = "", instrument_fingerprint: str = "",
+                  strategy_version: str = "") -> str:
         with self._connect() as conn:
+            first_seen = datetime.now(timezone.utc).isoformat()
+            exposure_count = conn.execute(
+                "SELECT COUNT(*) FROM experiments WHERE strategy_id=? AND parameter_fingerprint=? AND dataset_role IN ('FORWARD_VALIDATION','HOLDOUT')",
+                (strategy_id, parameter_fingerprint),
+            ).fetchone()[0] + 1
             cursor = conn.execute(
                 """INSERT INTO experiments (
                                 timestamp_utc,strategy_id,strategy_name,strategy_status,
                 strategy_fingerprint,parameter_fingerprint,dataset_fingerprint,
                 broker_fingerprint,instrument_fingerprint,broker_profile,instrument,date_start,date_end,
-                                dataset_role,config_json,notes
-                                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                dataset_role,config_json,notes,strategy_version,first_seen_at,exposure_count
+                                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     datetime.now(timezone.utc).isoformat(), strategy_id, strategy_name,
                     strategy_status, strategy_fingerprint, parameter_fingerprint,
                     dataset_fingerprint, broker_fingerprint, instrument_fingerprint, broker_profile, instrument,
                     date_start, date_end, dataset_role,
-                    json.dumps(config, sort_keys=True, default=str), notes,
+                    json.dumps(config, sort_keys=True, default=str), notes, strategy_version,
+                    first_seen, exposure_count,
                 ),
             )
             seq = cursor.lastrowid
@@ -118,3 +133,16 @@ class ExperimentLedger:
             item["results_json"] = json.loads(item["results_json"]) if item["results_json"] else {}
             output.append(item)
         return output
+
+    def exposure_warning(self, strategy_id: str, parameter_fingerprint: str,
+                         dataset_role: str) -> str | None:
+        if dataset_role not in {"FORWARD_VALIDATION", "HOLDOUT"}:
+            return None
+        with self._connect() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM experiments WHERE strategy_id=? AND parameter_fingerprint=? AND dataset_role IN ('FORWARD_VALIDATION','HOLDOUT')",
+                (strategy_id, parameter_fingerprint),
+            ).fetchone()[0]
+        if count > 1:
+            return "FORWARD DATA HAS BEEN EXPOSED TO THIS CONFIGURATION"
+        return None

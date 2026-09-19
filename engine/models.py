@@ -182,6 +182,24 @@ class Trade:
     gap_through_trigger: bool = False
     entry_gap_amount: float = 0.0
     setup_id: str | None = None
+    mfe_price: float | None = None
+    mfe_amount: float | None = None
+    mfe_r: float | None = None
+    mfe_percent: float | None = None
+    mae_price: float | None = None
+    mae_amount: float | None = None
+    mae_r: float | None = None
+    mae_percent: float | None = None
+    mfe_timestamp: pd.Timestamp | None = None
+    mae_timestamp: pd.Timestamp | None = None
+    duration_minutes: float | None = None
+    initial_stop_distance: float | None = None
+    initial_stop_distance_atr: float | None = None
+    highest_price_while_open: float | None = None
+    lowest_price_while_open: float | None = None
+    capture_efficiency: float | None = None
+    adverse_efficiency: float | None = None
+    excursion_model: str | None = None
 
     @property
     def planned_risk(self) -> float:
@@ -235,6 +253,8 @@ class BacktestResult:
     open_position: Position | None = None
     pending_order: PendingOrder | None = None
     order_events: list[OrderEvent] = field(default_factory=list)
+    diagnostic_events: list[object] = field(default_factory=list)
+    execution_ambiguities: list[object] = field(default_factory=list)
 
     @property
     def final_balance(self) -> float:
