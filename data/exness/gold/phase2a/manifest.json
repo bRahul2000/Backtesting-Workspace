@@ -1,0 +1,97 @@
+{
+  "profile_id": "EXNESS-XAUUSD-v1",
+  "broker": "Exness Technologies Ltd",
+  "server": "Exness-MT5Trial5",
+  "symbol": "XAUUSDm",
+  "source_timezone": "UTC+0 / GMT+0",
+  "fingerprints": {
+    "symbol_specification_sha256": "bf920d3620408bd6b0aa4e78ce0e1845bc86c690de866f9b1ced5be3bbb991b4",
+    "m15_dataset_sha256": "dee9fb6f329c38c5029e2a4c5d79e85fe520a40b3b6b6e66f8958bd0c28ee4e4",
+    "h1_dataset_sha256": "824a2ce046be6becb975ee466941212ba561d04c7e454e91126542660f0d348b",
+    "gold_instrument_profile_sha256": "5de4f1b923e117168f824ab91614491aaf491d9903cdf44c36049222aba36ba1",
+    "exness_broker_profile_sha256": "bcb70c2a7729218888bf9e836761aa9f354d3f6bf22e1d9d79fdaa28d8c1ef34"
+  },
+  "specification": {
+    "digits": 3,
+    "point": 0.001,
+    "tick_size": 0.001,
+    "tick_value": 0.1,
+    "contract_size": 100.0,
+    "minimum_volume": 0.01,
+    "maximum_volume": 200.0,
+    "volume_step": 0.01,
+    "stops_level_points": 0,
+    "freeze_level_points": 0,
+    "margin_initial": 0.0,
+    "margin_maintenance": 0.0,
+    "margin_status": "unverified; zero capture does not imply zero true margin",
+    "leverage_status": "unverified",
+    "commission_status": "unverified"
+  },
+  "datasets": {
+    "M15": {
+      "first_timestamp_utc": "2025-12-23T00:00:00Z",
+      "last_timestamp_utc": "2026-09-18T20:30:00Z",
+      "candles": 17480,
+      "missing_candles": 8427,
+      "continuous_segments": 191,
+      "largest_segment_candles": 92,
+      "invalid_ohlc_rows": 0,
+      "duplicate_timestamps": 0,
+      "missing_values": 0,
+      "spread_price": {
+        "formula": "spread_points * point",
+        "min": 0.16,
+        "median": 0.26,
+        "mean": 0.24789467963386735,
+        "max": 0.779,
+        "unique_values": 30
+      }
+    },
+    "H1": {
+      "first_timestamp_utc": "2025-12-23T00:00:00Z",
+      "last_timestamp_utc": "2026-09-18T19:00:00Z",
+      "candles": 4372,
+      "missing_candles": 2104,
+      "continuous_segments": 191,
+      "largest_segment_candles": 23,
+      "invalid_ohlc_rows": 0,
+      "duplicate_timestamps": 0,
+      "missing_values": 0,
+      "spread_price": {
+        "formula": "spread_points * point",
+        "min": 0.16,
+        "median": 0.26,
+        "mean": 0.24516262580054898,
+        "max": 0.773,
+        "unique_values": 16
+      }
+    }
+  },
+  "alignment": {
+    "h1_bars": 4372,
+    "complete_m15_groups_checked": 4366,
+    "ohlc_mismatches": 0,
+    "session_boundary_groups_not_checkable": 6
+  },
+  "incomplete_bar_status": {
+    "m15_metadata_flag": true,
+    "h1_metadata_flag": true,
+    "m15_import_removed": 0,
+    "h1_import_removed": 0
+  },
+  "execution_checks": {
+    "long_entry_side": "Ask",
+    "long_exit_side": "Bid",
+    "short_entry_side": "Bid",
+    "short_exit_side": "Ask",
+    "spread_application": "historical per-bar spread_points * point; no constant spread forced",
+    "one_lot_one_dollar_move_pnl": 100.0,
+    "one_hundredth_lot_one_dollar_move_pnl": 1.0,
+    "volume_rounding_checked": true,
+    "price_precision_checked": true,
+    "same_bar_handling_checked": true,
+    "gap_segments_checked": true
+  },
+  "raw_files_preserved": true
+}

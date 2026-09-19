@@ -1,0 +1,17 @@
+{
+  "candles": 4372,
+  "captured_at_utc": "2026-09-19T09:06:58.168756+00:00",
+  "continuous_segments": 191,
+  "dataset_sha256": "9465a0ca1e10ab71e5782444a22f29b0f63910ee9e0698fa752bb9725a1cf4db",
+  "duplicates_removed": 0,
+  "first_timestamp_utc": "2025-12-23T00:00:00+00:00",
+  "incomplete_bars_removed": 0,
+  "instrument": "XAUUSD",
+  "invalid_rows_removed": 0,
+  "last_timestamp_utc": "2026-09-18T19:00:00+00:00",
+  "missing_candles": 2104,
+  "source": "Exness Technologies Ltd / Exness-MT5Trial5 / MT5 CopyRates broker history",
+  "source_file_sha256": "824a2ce046be6becb975ee466941212ba561d04c7e454e91126542660f0d348b",
+  "symbol": "XAUUSDm",
+  "timeframe": "H1"
+}

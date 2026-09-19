@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "profile_type": "MT5_SYMBOL_SPECIFICATION",
+  "capture": {
+    "timestamp_utc": "2026.09.19 08:51:53",
+    "timestamp_server": "2026.09.19 08:51:53",
+    "terminal_common_data_path": "C:\\Users\\LEXODD\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common"
+  },
+  "broker": {
+    "company": "Exness Technologies Ltd",
+    "server": "Exness-MT5Trial5"
+  },
+  "symbol": {
+    "name": "XAUUSDm",
+    "description": "Gold vs US Dollar",
+    "currency_base": "XAU",
+    "currency_profit": "USD",
+    "currency_margin": "XAU",
+    "digits": 3,
+    "point": 0.0010000000
+  },
+  "contract": {
+    "tick_size": 0.0010000000,
+    "tick_value": 0.1000000000,
+    "tick_value_profit": 0.1000000000,
+    "tick_value_loss": 0.1000000000,
+    "contract_size": 100.0000000000
+  },
+  "volume": {
+    "minimum": 0.0100000000,
+    "maximum": 200.0000000000,
+    "step": 0.0100000000
+  },
+  "trading": {
+    "trade_calc_mode": 0,
+    "stops_level_points": 0,
+    "freeze_level_points": 0,
+    "spread_points_reported": 260
+  },
+  "margin": {
+    "initial": 0.0000000000,
+    "maintenance": 0.0000000000
+  },
+  "swap": {
+    "mode": 1,
+    "long": -549.3000000000,
+    "short": 0.0000000000
+  },
+  "quote": {
+    "bid": 4378.062,
+    "ask": 4378.322,
+    "last": 0.000,
+    "spread_price": 0.2600000000,
+    "spread_points": 260.0000
+  },
+  "trading_sessions": [{"day_number":0,"day":"Sunday","session_index":0,"from":"22:01","to":"00:00"},{"day_number":1,"day":"Monday","session_index":0,"from":"00:00","to":"20:58"},{"day_number":1,"day":"Monday","session_index":1,"from":"22:00","to":"00:00"},{"day_number":2,"day":"Tuesday","session_index":0,"from":"00:00","to":"20:58"},{"day_number":2,"day":"Tuesday","session_index":1,"from":"22:00","to":"00:00"},{"day_number":3,"day":"Wednesday","session_index":0,"from":"00:00","to":"20:58"},{"day_number":3,"day":"Wednesday","session_index":1,"from":"22:00","to":"00:00"},{"day_number":4,"day":"Thursday","session_index":0,"from":"00:00","to":"20:58"},{"day_number":4,"day":"Thursday","session_index":1,"from":"22:00","to":"00:00"},{"day_number":5,"day":"Friday","session_index":0,"from":"00:00","to":"20:58"}]
+}
