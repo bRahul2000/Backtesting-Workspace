@@ -28,6 +28,14 @@ from research.robustness import (
     reserved_data_warning, run_robustness_analysis, trades_from_trade_log,
     trades_from_walk_forward_oos,
 )
+from research.execution_replay import (
+    ExecutionReplayBlocked, ExecutionReplayStore, ReplayConfig, ReplayMode,
+    ReplayResolution, build_forensic_trace, build_lower_timeframe_dataset,
+    build_tick_dataset, load_exness_btc_tick_sample, reserved_data_warning as replay_reserved_data_warning,
+    run_execution_replay, validate_replay_resume, with_parent_bars,
+)
+from engine.diagnostics import ExecutionAmbiguity, detect_execution_ambiguities
+from engine.models import Direction, OrderEvent, Trade
 from experiments.ledger import ExperimentLedger
 from strategies.base_strategy import StrategyStatus
 from strategies.registry import discover_builtin_strategies
@@ -37,6 +45,8 @@ STORE = OptimizationStore(ROOT / "experiments" / "optimizations.sqlite3")
 WF_STORE = WalkForwardStore(ROOT / "experiments" / "walk_forward.sqlite3")
 LEDGER = ExperimentLedger(ROOT / "experiments" / "experiments.sqlite3")
 ROBUSTNESS_STORE = RobustnessStore(ROOT / "experiments" / "robustness.sqlite3")
+REPLAY_STORE = ExecutionReplayStore(ROOT / "experiments" / "execution_replay.sqlite3")
+REAL_BTC_TICK_SAMPLE = ROOT / "data" / "exness" / "processed" / "btcusdm_s01_ticks_server_time.csv"
 
 
 def _fixture_candidates(optimization_id: str, parameters: list[dict]) -> list[CandidateResult]:
@@ -87,7 +97,7 @@ def render_research_lab() -> None:
     st.caption("Parameter surfaces, stability, and reproducibility. Results report differences; they do not choose winners.")
     tabs = st.tabs([
         "Optimizer", "Stability", "Optimization History", "Walk-Forward", "Walk-Forward History",
-        "Robustness", "Robustness History",
+        "Robustness", "Robustness History", "Execution Replay", "Replay History",
     ])
     with tabs[0]:
         _render_optimizer()
@@ -103,6 +113,10 @@ def render_research_lab() -> None:
         _render_robustness_setup()
     with tabs[6]:
         _render_robustness_history()
+    with tabs[7]:
+        _render_execution_replay_setup()
+    with tabs[8]:
+        _render_execution_replay_history()
 
 
 def _render_optimizer() -> None:
@@ -712,3 +726,237 @@ def _render_robustness_history() -> None:
         st.session_state["active_robustness_id"] = selected
         st.success(f"Loaded {selected} without rerunning simulations.")
         _render_robustness_results(selected)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3E: Execution Replay & Forensics
+# ---------------------------------------------------------------------------
+
+
+def _replay_fixture_trade(trade_id, direction, entry_price, stop_loss, take_profit, exit_price, exit_reason, pnl, r_multiple, entry_time, exit_time):
+    risk = abs(entry_price - stop_loss)
+    return Trade(
+        trade_id=trade_id, direction=direction, signal_time=entry_time, entry_time=entry_time,
+        entry_price=entry_price, stop_loss=stop_loss, take_profit=take_profit,
+        exit_time=exit_time, exit_price=exit_price, exit_reason=exit_reason,
+        quantity=1.0, initial_risk=risk, pnl=pnl, pnl_percent=0.0, r_multiple=r_multiple,
+        bars_held=1, entry_commission=0.0, exit_commission=0.0, duration_minutes=15.0, setup_id="FIXTURE",
+    )
+
+
+def _execution_replay_fixture():
+    """Deterministic scenario: SL-before-TP, TP-before-SL, a non-ambiguous trade, a pending
+    entry that activates then gets stopped, and a lower-TF-still-ambiguous trade."""
+    t1 = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    t2 = datetime(2024, 1, 1, 11, 0, tzinfo=timezone.utc)
+    t3 = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+    t4 = datetime(2024, 1, 1, 13, 0, tzinfo=timezone.utc)
+    t5 = datetime(2024, 1, 1, 14, 0, tzinfo=timezone.utc)
+    bar_timestamps = [t1, t2, t3, t4, t5]
+
+    trades = [
+        _replay_fixture_trade(1, Direction.LONG, 100.0, 95.0, 110.0, 95.0, "Stop loss (ambiguous bar, SL First)", -5.0, -1.0, t1, t1),
+        _replay_fixture_trade(2, Direction.LONG, 100.0, 95.0, 110.0, 95.0, "Stop loss (ambiguous bar, SL First)", -5.0, -1.0, t2, t2),
+        _replay_fixture_trade(3, Direction.LONG, 100.0, 95.0, 110.0, 108.0, "Take profit", 8.0, 1.6, t3, t3),
+        _replay_fixture_trade(4, Direction.LONG, 100.0, 95.0, 130.0, 95.0, "Stop loss", -5.0, -1.0, t4, t4),
+        _replay_fixture_trade(5, Direction.LONG, 100.0, 95.0, 110.0, 95.0, "Stop loss (ambiguous bar, SL First)", -5.0, -1.0, t5, t5),
+    ]
+    orders = [OrderEvent(
+        signal_time=t4, created_time=t4, direction=Direction.LONG, trigger_price=100.0, stop_price=95.0,
+        expiry_time=t4 + timedelta(hours=1), expiry_bar_index=0, status="FILLED",
+        fill_time=t4, fill_price=100.0, setup_id="FIXTURE",
+    )]
+    ambiguities = [
+        ExecutionAmbiguity("SL_AND_TP_SAME_CANDLE", t1, 1, None, {"stop": 95.0, "target": 110.0}, "SL_FIRST"),
+        ExecutionAmbiguity("SL_AND_TP_SAME_CANDLE", t2, 2, None, {"stop": 95.0, "target": 110.0}, "SL_FIRST"),
+        ExecutionAmbiguity("PENDING_ENTRY_AND_STOP_SAME_CANDLE", t4, None, f"{t4.isoformat()}-LONG", {"trigger": 100.0, "stop": 95.0}, "SL_FIRST"),
+        ExecutionAmbiguity("SL_AND_TP_SAME_CANDLE", t5, 5, None, {"stop": 95.0, "target": 110.0}, "SL_FIRST"),
+    ]
+    tick_rows = [
+        {"timestamp": (t1 + timedelta(seconds=1)).isoformat(), "bid": 94.0, "ask": 94.5},
+        {"timestamp": (t1 + timedelta(seconds=2)).isoformat(), "bid": 111.0, "ask": 111.5},
+        {"timestamp": (t2 + timedelta(seconds=1)).isoformat(), "bid": 111.0, "ask": 111.5},
+        {"timestamp": (t2 + timedelta(seconds=2)).isoformat(), "bid": 94.0, "ask": 94.5},
+        {"timestamp": (t4 + timedelta(seconds=1)).isoformat(), "bid": 99.5, "ask": 100.5},
+        {"timestamp": (t4 + timedelta(seconds=2)).isoformat(), "bid": 94.5, "ask": 95.0},
+    ]
+    tick_dataset = build_tick_dataset(tick_rows, instrument="BTCUSD_FIXTURE", broker="FIXTURE")
+    tick_dataset = with_parent_bars(tick_dataset, bar_timestamps, 3600)
+
+    lower_tf_bars = [{"timestamp": (t5 + timedelta(minutes=5)).isoformat(), "low": 90.0, "high": 115.0}]
+    lower_tf_dataset = build_lower_timeframe_dataset(lower_tf_bars, instrument="BTCUSD_FIXTURE", broker="FIXTURE", spread=0.5)
+    lower_tf_dataset = with_parent_bars(lower_tf_dataset, bar_timestamps, 3600)
+
+    return trades, orders, ambiguities, tick_dataset, lower_tf_dataset
+
+
+def _render_execution_replay_setup() -> None:
+    st.markdown("### Execution Replay Setup")
+    st.caption("Post-backtest execution forensics. Never alters strategy signals, parameters, or the baseline result.")
+
+    source_kind = st.selectbox("Baseline source", ["Deterministic Test Fixture", "Stored Experiment"], key="rx_source_kind")
+    fixture = _execution_replay_fixture()
+
+    if source_kind == "Stored Experiment":
+        experiments = LEDGER.list_runs()
+        if not experiments:
+            st.info("No stored experiments yet. Run a backtest in the Universal Workspace first.")
+            return
+        labels = [f"{row['run_id']} · {row['strategy_id']} · {row['dataset_role']} · {row['strategy_status']}" for row in experiments]
+        selected_label = st.selectbox("Baseline experiment", labels, key="rx_experiment")
+        row = experiments[labels.index(selected_label)]
+        results = row.get("results_json") or {}
+        trade_log = results.get("trade_log") or []
+        if not trade_log:
+            st.warning("This experiment has no trade_log to replay.")
+            return
+        baseline_trades = [Trade(**{
+            **{k: v for k, v in item.items() if k in Trade.__dataclass_fields__},
+            "direction": Direction(item["direction"]), "signal_time": datetime.fromisoformat(item["signal_time"]),
+            "entry_time": datetime.fromisoformat(item["entry_time"]), "exit_time": datetime.fromisoformat(item["exit_time"]),
+        }) for item in trade_log]
+        baseline_orders: list[OrderEvent] = []
+        ambiguities = [ExecutionAmbiguity(
+            a["ambiguity_type"], datetime.fromisoformat(a["timestamp"]), a.get("trade_id"), a.get("order_id"),
+            a["levels"], a["resolution_policy"],
+        ) for a in (results.get("execution_ambiguities") or [])]
+        baseline_experiment_id, baseline_fingerprint = row["run_id"], row["dataset_fingerprint"]
+        dataset_role, strategy_id = row["dataset_role"], row["strategy_id"]
+        st.caption(f"Strategy status: {row['strategy_status']} · Dataset role: {dataset_role} · {len(ambiguities)} detected ambiguities")
+        st.caption("Only SL/TP same-candle ambiguities can be replayed from stored experiments; "
+                   "pending-order ambiguities require live order events, not persisted here.")
+        dataset_options = ["None (Baseline Policy Only)"]
+        if REAL_BTC_TICK_SAMPLE.exists():
+            dataset_options.insert(0, "Real Exness BTC Tick Sample (2026-08-01)")
+    else:
+        baseline_trades, baseline_orders, ambiguities, _, _ = fixture
+        baseline_experiment_id, baseline_fingerprint = "FIXTURE-RUN", "fixture-fingerprint"
+        dataset_role, strategy_id = "DEVELOPMENT", "FIXTURE"
+        st.caption(f"{len(ambiguities)} deterministic ambiguities across {len(baseline_trades)} fixture trades.")
+        dataset_options = ["Deterministic Synthetic Ticks", "Deterministic Lower-TF (Still Ambiguous)", "None (Baseline Policy Only)"]
+
+    warning = replay_reserved_data_warning(dataset_role)
+    if warning:
+        st.error(warning)
+
+    dataset_choice = st.selectbox("Replay dataset", dataset_options, key="rx_dataset")
+
+    replay_dataset = lower_tf_dataset = None
+    if dataset_choice == "Real Exness BTC Tick Sample (2026-08-01)":
+        replay_dataset = load_exness_btc_tick_sample(REAL_BTC_TICK_SAMPLE)
+        bar_ts = sorted({t.entry_time for t in baseline_trades} | {t.exit_time for t in baseline_trades})
+        replay_dataset = with_parent_bars(replay_dataset, bar_ts, 900)
+        st.caption(f"Real data coverage: {replay_dataset.coverage_start} → {replay_dataset.coverage_end} · fingerprint {replay_dataset.fingerprint[:16]}…")
+    elif dataset_choice == "Deterministic Synthetic Ticks":
+        replay_dataset = fixture[3]
+    elif dataset_choice == "Deterministic Lower-TF (Still Ambiguous)":
+        lower_tf_dataset = fixture[4]
+
+    mode = ReplayMode(st.selectbox("Replay mode", [m.value for m in ReplayMode], key="rx_mode"))
+    selected_ids: tuple[int, ...] = ()
+    if mode is ReplayMode.SELECTED_TRADES:
+        options = [t.trade_id for t in baseline_trades]
+        selected_ids = tuple(st.multiselect("Selected trades", options, key="rx_selected_trades"))
+
+    if st.button("Run Replay", type="primary", disabled=not ambiguities):
+        config = ReplayConfig(mode=mode, selected_trade_ids=selected_ids)
+        try:
+            run, resolutions, comparisons, summary = run_execution_replay(
+                baseline_experiment_id=baseline_experiment_id, baseline_fingerprint=baseline_fingerprint,
+                baseline_trades=baseline_trades, baseline_orders=baseline_orders, ambiguities=ambiguities,
+                dataset_role=dataset_role, replay_dataset=replay_dataset, lower_tf_dataset=lower_tf_dataset,
+                config=config, engine_version="phase3e",
+            )
+        except ExecutionReplayBlocked as error:
+            st.error(str(error))
+            return
+        REPLAY_STORE.save_run(run)
+        result_payload = {
+            "resolutions": [asdict(r) for r in resolutions], "comparisons": [asdict(c) for c in comparisons],
+            **summary,
+        }
+        REPLAY_STORE.save_result(run.replay_id, result_payload)
+        st.session_state["active_replay_id"] = run.replay_id
+        st.session_state[f"replay_trades::{run.replay_id}"] = {t.trade_id: t for t in baseline_trades}
+        st.success(f"Completed {run.replay_id}: {len(comparisons)} trades compared.")
+
+    active_id = st.session_state.get("active_replay_id")
+    if active_id:
+        st.divider()
+        _render_execution_replay_results(active_id)
+
+
+def _render_execution_replay_results(replay_id: str) -> None:
+    run = REPLAY_STORE.load_run(replay_id)
+    result = REPLAY_STORE.load_result(replay_id)
+    if not run or not result:
+        st.info("No replay results stored yet for this run.")
+        return
+
+    st.markdown(f"### Execution Replay Results · {replay_id}")
+    if result.get("reserved_data_warning"):
+        st.error(result["reserved_data_warning"])
+
+    st.markdown("#### Coverage")
+    st.json(result["coverage"])
+
+    st.markdown("#### Execution Sensitivity")
+    st.json(result["execution_sensitivity"])
+
+    st.markdown("#### Trade Differences")
+    rows = [{
+        "Trade": c["trade_id"], "Side": c["side"], "Baseline Entry": c["baseline_entry"], "Replay Entry": c["replay_entry"],
+        "Baseline Exit": c["baseline_exit"], "Replay Exit": c["replay_exit"], "Baseline Reason": c["baseline_exit_reason"],
+        "Replay Reason": c["replay_exit_reason"], "Baseline R": c["baseline_r"], "Replay R": c["replay_r"],
+        "Classification": c["classification"], "Resolution": c["resolution_source"],
+    } for c in result["comparisons"]]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    st.markdown("#### Forensic Trace")
+    trade_map = st.session_state.get(f"replay_trades::{replay_id}", {})
+    if trade_map:
+        trade_id = st.selectbox("Trade", sorted(trade_map.keys()), key=f"rx_trace_trade_{replay_id}")
+        selected_trade = trade_map[trade_id]
+        matching_resolution = next((r for r in result["resolutions"] if r.get("trade_id") == trade_id), None)
+        trace = [
+            {"stage": "strategy_signal", "timestamp": str(selected_trade.signal_time)},
+            {"stage": "order_creation", "timestamp": str(selected_trade.entry_time), "price": selected_trade.entry_price},
+            {"stage": "final_resolution", "timestamp": str(selected_trade.exit_time),
+             "exit_reason": selected_trade.exit_reason, "exit_price": selected_trade.exit_price,
+             "status": matching_resolution["status"] if matching_resolution else "NOT_AMBIGUOUS"},
+        ]
+        if matching_resolution:
+            trace.insert(2, {"stage": "sl_tp_state", "timestamp": matching_resolution.get("first_relevant_event_timestamp"),
+                             "level": matching_resolution.get("touched_level"), "price": matching_resolution.get("resolved_price"),
+                             "quote_side": matching_resolution.get("quote_side")})
+        st.json(trace)
+    else:
+        st.info("Trade objects for this run are only available in the session that ran it; reopen via history to re-run for a fresh trace.")
+
+    st.markdown("#### Replay-Adjusted Scenario")
+    st.error(result["replay_adjusted_scenario"]["label"])
+    st.json(result["replay_adjusted_scenario"])
+
+    st.markdown("#### Integrity Panel")
+    st.json({
+        "baseline_fingerprint": run.baseline_fingerprint, "replay_dataset_fingerprint": run.replay_dataset_fingerprint,
+        "quote_provenance": "TRUE_QUOTE" if run.resolution == ReplayResolution.TICK.value else "SYNTHETIC_BID_ASK",
+        "resolution": run.resolution, "coverage": result["coverage"],
+        "missing_replay_periods": result["coverage"]["baseline_trades_outside_coverage"],
+        "unresolved_ambiguities": result["execution_sensitivity"]["still_ambiguous"],
+        "reproducible": "YES",
+    })
+
+
+def _render_execution_replay_history() -> None:
+    runs = REPLAY_STORE.list_runs()
+    if not runs:
+        st.info("No execution replay runs stored yet.")
+        return
+    frame = pd.DataFrame([asdict(run) for run in runs])
+    st.dataframe(frame, use_container_width=True, hide_index=True)
+    selected = st.selectbox("Open replay run", frame.replay_id.tolist())
+    if st.button("Open Stored Replay Run"):
+        st.session_state["active_replay_id"] = selected
+        st.success(f"Loaded {selected} without rerunning replay.")
+        _render_execution_replay_results(selected)
