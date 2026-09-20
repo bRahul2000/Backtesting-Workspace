@@ -123,7 +123,8 @@ C4 is arithmetic, not judgement: the disputed trade lost \$23.30441355 on a
 
 ## Verification
 
-* 31/31 static checks PASS, including `header_matches_python_schema`, 76/76
+* Static checks PASS (`python -m tools.check_mt5_core_source`), including
+  `header_matches_python_schema`, 76/76
   columns, `warmup_m15_bars` = 50 and `warmup_h1_bars` = 204 checked against the
   real `warmup_plan`, `resets_pullback_out_of_session`,
   `resets_pullback_at_daily_cap`, `planned_risk_is_budget`, and
@@ -267,7 +268,7 @@ enforces that invariant on any audit, so a silently dropped order cannot pass.
 
 ### Verification
 
-* 38/38 static checks PASS, including `implements_pending_cancellation`,
+* Static checks PASS, including `implements_pending_cancellation`,
   `cancellation_respects_order_ownership`, `only_a4_cancels_on_context`.
 * **756 tests pass** (752 → 756).
 * All seven protected fingerprints unchanged; PB1/PB2/PB3 remain REJECTED.
@@ -345,7 +346,7 @@ seven decision columns.
 
 ### Final state
 
-* **764 tests pass.** 42/42 static checks pass.
+* **764 tests pass.** All 35 static checks pass.
 * All seven protected fingerprints unchanged; PB1/PB2/PB3 remain REJECTED.
 * `AUDIT_ONLY` is the default, `SendOrderGuard` refuses unconditionally, no
   order-submission call exists in the source, DEMO_EXECUTION not enabled.
@@ -363,3 +364,139 @@ exits, same R.
 It does not say anything about whether the strategy is worth trading. Over this
 window the frozen Core returned −5.83R across 22 trades. That is a property of
 the strategy, not of the twin, and it is not a validation result.
+
+
+---
+
+## Certification freeze
+
+Frozen at commit `12777e9`, annotated tag **`btc-core-r4-stage2-certified`**.
+
+### Observed certification artifact
+
+The MT5 audit is the primary evidence and is **not committed**: it is 3.8 MB of
+terminal output under a deliberately gitignored path (`.gitignore:30`
+→ `data/exness/btc/r4/`). Its identity is pinned here instead, so the file can
+be verified later or shown to have been substituted.
+
+| | |
+|---|---|
+| Path | `/Users/apple/Documents/Backtesting/data/exness/btc/r4/mt5_btc_core_v1_audit_20260101_20260301_final.csv` |
+| SHA-256 | `c6f7e6a57589392af143687973b0fd2a20382f420d9c1b8002763efb92b8a84a` |
+| Size | 3,969,903 bytes |
+| Written | 2026-09-20 16:54 UTC |
+| Produced by | `mt5/BTC_V3_Core_V1.mq5` at commit `d14e95d`, compiled 2026.09.20 16:48:27 |
+
+Verify with:
+
+```
+shasum -a 256 data/exness/btc/r4/mt5_btc_core_v1_audit_20260101_20260301_final.csv
+```
+
+The Python half of the comparison,
+`data/exness/btc/r4/python_core_audit_20260101_20260301.csv`, is regenerable
+from committed code:
+
+```
+python tools/export_python_core_audit.py \
+  --data data/exness/btc/phase_r1/processed/btcusdm_M15.csv \
+  --start 2026-01-01 --end 2026-03-01 \
+  --spread-source BROKER_NATIVE_PER_BAR \
+  --output data/exness/btc/r4/python_core_audit_20260101_20260301.csv
+```
+
+### Certified evidence
+
+| | |
+|---|---|
+| Aligned bars | 5,663 |
+| Mismatches | 0 |
+| Whole-bar decision parity | 100.000% |
+| Python trades / MT5 trades | 22 / 22 |
+| Full-trade parity | 22 / 22 |
+| **FULL PARITY** | **True** |
+| Tests | 764 pass |
+| Protected hashes | all seven unchanged, PB1/PB2/PB3 REJECTED |
+| DEMO_EXECUTION | disabled |
+
+Every dimension — OHLC, spread, H1 context, indicators, carried state, A4
+context and signal, T3 context and signal, signal, pending, entry, stop/target,
+exit — is 100% across all 5,663 bars. Realized R matches to ten decimal places
+on all 22 trades.
+
+### WINDOW_BOUNDARY: the two trailing Python bars
+
+`2026-02-28T23:45Z` and `2026-03-01T00:00Z` appear in the Python audit and not
+in MT5. This is structural, not a defect. The EA evaluates
+`ProcessClosedBar(1)` — the just-closed bar — which is the safeguard that stops
+it reading a forming bar, so a run can never log the final bar of its own
+range. Both bars are out of session or not-bullish and carry no signal, pending
+order, entry or exit.
+
+The comparator classifies them `WINDOW_BOUNDARY` under a deliberately narrow
+rule. These all remain hard failures: a Python-only bar **inside** the MT5
+range; **any** MT5-only bar; a trailing bar carrying any of `signal_side`,
+`signal_setup_id`, `a4_signal_pass`, `t3_signal_pass`, `pending_status`,
+`entry_time_utc` or `exit_time_utc`. Nine tests pin those guardrails, including
+a parametrised case for each of the seven decision columns.
+
+---
+
+## Proposed second certification window (not yet run)
+
+Certification so far covers one contiguous 2-month window. The **segment-reset**
+path — indicators, pullback state, day counters, balance and warmup all
+restarting after a data gap — has never been exercised against real MT5 output.
+
+### Largest real M15 gap in the validated R1 dataset
+
+`data/exness/btc/phase_r1/processed/btcusdm_M15.csv` holds 100,239 bars from
+2023-11-10 23:15 to 2026-09-20 07:15 UTC, in 7 continuous segments with 6 gaps.
+
+| Last bar before | First missing | Last missing | First bar after | Missing | Duration |
+|---|---|---|---|---|---|
+| 2025-10-16 15:00 | **2025-10-16 15:15** | **2025-10-16 17:30** | 2025-10-16 17:45 | 10 | 2h 30m |
+
+The next largest is 3 bars (2024-12-21 06:30 → 07:00), so this is the only gap
+big enough to be unambiguous.
+
+### Proposed window
+
+**MT5 Strategy Tester — From `2025.09.01`, To `2025.12.01`** (BTCUSDm, M15,
+AUDIT_ONLY, every tick based on real ticks, same inputs as the certified run).
+
+Confirmed against the real dataset:
+
+| | Segment 1 | Gap | Segment 2 |
+|---|---|---|---|
+| Range | 2025-09-01 00:00 → 2025-10-16 15:00 | 10 bars | 2025-10-16 17:45 → 2025-12-01 00:00 |
+| Bars | 4,381 | — | 4,346 |
+| First signal search | 2025-09-09 12:00 | — | 2025-10-25 06:00 |
+| Tradable span | 37d 03h | — | 36d 18h |
+| Python trades | 13 | — | 22 |
+
+8,727 bars, exactly 2 segments and exactly 1 gap — the largest one — with
+warmup completing and trades occurring on both sides.
+
+### Why it exercises segment reset
+
+1. **Warmup restarts.** The second segment re-derives its own first-search time
+   (2025-10-25 06:00) from its own start, so `CoreFirstSearchTime` and the
+   `*_BEFORE_WINDOW` codes are re-tested on a segment that is not the first.
+2. **Indicators reseed.** At 2025-10-16 17:45 `ema20` returns to the bar close
+   (108315.26) and `atr` goes blank. EMA/RMA/ATR/RSI/DMI seeding and the H1
+   bucket rule are all re-tested mid-file rather than only at file start.
+3. **A position is open when the gap hits.** The Python side records 13 entries
+   but only 12 exits before the gap: one position is abandoned at the boundary.
+   The EA's `ResetAll` clears `g_position.active`, `g_order.active` and
+   `g_balance` to match. This is the highest-value case in the window and is
+   completely untested today.
+4. **Balance and day counters reset**, so position sizing restarts from
+   `InpStartBalance` on both sides — and the leverage-cap path that produced the
+   `planned_risk` defect is re-tested under a fresh balance.
+5. **Both segments trade**, so a reset that quietly disabled the second segment
+   would show up as missing trades rather than as silence.
+
+The Python audit for this window is already exported to
+`data/exness/btc/r4/python_core_audit_20250901_20251201.csv` (8,727 rows, 35
+trades) and is ready for comparison. No MT5 run has been made.
