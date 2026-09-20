@@ -28,3 +28,6 @@ secrets.*
 
 # R4 digital-twin audit exports (generated / MT5 terminal output)
 data/exness/btc/r4/
+
+# Fresh broker re-exports for provenance checking (terminal output, large)
+data/exness/btc/provenance/raw/

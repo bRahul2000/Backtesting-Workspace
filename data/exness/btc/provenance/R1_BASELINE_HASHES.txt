@@ -1,0 +1,8 @@
+# Original validated R1 raw export — SHA-256 baseline, recorded before the
+# provenance re-export. These files must remain byte-for-byte identical.
+# Verify with: shasum -a 256 -c data/exness/btc/provenance/R1_BASELINE_HASHES.txt
+b5ce7d60ab3b30490e42d26614e1ff4b9200b198bee71ea033e21b79d680f43a  data/exness/btc/phase_r1/raw/btcusd_BTCUSDm_M15.csv
+d29182479db73cbd18ebdac3af787caf9a3fdc0bdd473066fffc40f8c6a31f54  data/exness/btc/phase_r1/raw/btcusd_BTCUSDm_M15.csv.metadata.json
+24c0c04ae05900c9b62e9046e497924be4dd15efd1497c006b05a9dfb133250a  data/exness/btc/phase_r1/raw/btcusd_BTCUSDm_H1.csv
+da82f3879b8a2301dd4713444ea64f76ed2563bab7b72c17ec206578285c3615  data/exness/btc/phase_r1/raw/btcusd_BTCUSDm_H1.csv.metadata.json
+a37f11399f92d15370ce93bc7acb878bedc3b77bb9500152d2507f37503ce489  data/exness/btc/phase_r1/raw/btcusd_mt5_spec.json
