@@ -85,7 +85,12 @@ def _split_top_level(text: str) -> list[str]:
 
 
 def file_write_calls(source: str) -> list[list[str]]:
-    """Every FileWrite(g_file, ...) argument list, minus the handle."""
+    """Every FileWrite(g_file, ...) argument list, minus the handle.
+
+    Retained for diagnostics. The EA no longer uses FileWrite for audit rows:
+    MQL5 caps a function at 64 parameters and the schema has 76 columns, so
+    rows are serialized by WriteAuditRow instead.
+    """
     calls = []
     for match in re.finditer(r"FileWrite\s*\(", source):
         start = match.end()
@@ -111,19 +116,70 @@ def file_write_calls(source: str) -> list[list[str]]:
     return calls
 
 
+def _function_body(source: str, signature: str) -> str:
+    """Source text of one function, from its signature to its closing brace."""
+    start = source.index(signature)
+    open_brace = source.index("{", start)
+    depth, index = 0, open_brace
+    while index < len(source):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[open_brace:index + 1]
+        index += 1
+    raise ValueError(f"Unbalanced body for {signature!r}")
+
+
+FIELD_ASSIGNMENT = re.compile(r"fields\[n\+\+\]\s*=\s*(.+?);\s*(?:\n|$)", re.S)
+
+
+def field_assignments(source: str, signature: str) -> list[str]:
+    """Ordered `fields[n++] = ...;` expressions inside one function."""
+    body = _function_body(source, signature)
+    return [re.sub(r"\s+", " ", match.group(1)).strip()
+            for match in FIELD_ASSIGNMENT.finditer(body)]
+
+
+def header_column_names(source: str) -> list[str]:
+    """Header literals in emission order, unquoted."""
+    names = []
+    for expression in field_assignments(source, "bool WriteAuditHeader()"):
+        if expression.startswith('"') and expression.endswith('"'):
+            names.append(expression[1:-1])
+        else:
+            names.append(expression)
+    return names
+
+
 def check(source_path: Path = SOURCE) -> dict[str, object]:
     source = source_path.read_text(encoding="utf-8")
-    calls = file_write_calls(source)
-    header = next((call for call in calls if call and call[0] == '"bar_time_utc"'), None)
-    rows = [call for call in calls if call is not header]
+    code = strip_comments_and_strings(source)
+    header = header_column_names(source)
+    row = field_assignments(source, "void ProcessClosedBar(const int shift)")
+
+    from tools.core_audit_schema import AUDIT_COLUMNS
+
     report: dict[str, object] = {
         "braces_balanced": source.count("{") == source.count("}"),
         "parens_balanced": source.count("(") == source.count(")"),
-        "header_columns": len(header) if header else 0,
-        "row_column_counts": [len(call) for call in rows],
+        "header_columns": len(header),
+        "row_columns": len(row),
+        "row_columns_match_header": len(header) == len(row) > 0,
+        "header_matches_python_schema": header == AUDIT_COLUMNS,
+        "declares_audit_column_count": f"#define AUDIT_COLUMN_COUNT {len(AUDIT_COLUMNS)}" in source,
+        # MQL5 caps a function at 64 parameters; no call may pass the schema.
+        "no_oversized_file_write": all(len(call) <= 60 for call in file_write_calls(source)),
+        "uses_string_serialization": "FileWriteString(g_file,CsvJoin(fields)" in code.replace(" ", ""),
+        "has_csv_escape": "string CsvEscape(" in source,
+        "has_csv_join": "string CsvJoin(" in source,
+        "has_write_audit_header": "bool WriteAuditHeader()" in source,
+        "has_write_audit_row": "bool WriteAuditRow(" in source,
+        "single_row_terminator": code.count("CsvJoin(fields)") == 1,
         "forbidden_calls": sorted(
             name for name in FORBIDDEN_CALLS
-            if re.search(rf"\b{re.escape(name)}\b", strip_comments_and_strings(source))),
+            if re.search(rf"\b{re.escape(name)}\b", code)),
         "has_execution_guard": "SendOrderGuard" in source,
         "default_mode_is_audit_only": bool(
             re.search(r"input\s+ExecutionMode\s+InpMode\s*=\s*AUDIT_ONLY", source)),
@@ -131,8 +187,6 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
         "core_fingerprint_present": "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd" in source,
         "evaluates_only_closed_bars": "ProcessClosedBar(1)" in source,
     }
-    report["row_columns_match_header"] = bool(
-        header and rows and all(count == len(header) for count in report["row_column_counts"]))
     return report
 
 

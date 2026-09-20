@@ -623,37 +623,157 @@ string IsoUtc(const datetime value,const bool present)
                        parts.hour,parts.min,parts.sec);
   }
 
+//+------------------------------------------------------------------+
+//| CSV serialization                                                 |
+//|                                                                   |
+//| MQL5 caps a function at 64 parameters, and the audit schema has   |
+//| 76 columns, so FileWrite(...) cannot emit a row. Each line is     |
+//| assembled as one escaped string and written with FileWriteString, |
+//| which also removes any dependence on FileWrite's own delimiter    |
+//| and line-break handling.                                          |
+//+------------------------------------------------------------------+
+#define AUDIT_COLUMN_COUNT 76
+
+//--- RFC 4180: quote only when required, and double any inner quote.
+//--- An empty field stays empty and is never quoted.
+string CsvEscape(const string value)
+  {
+   if(StringLen(value)==0)
+      return "";
+   bool needs_quotes = (StringFind(value,",")>=0 || StringFind(value,"\"")>=0
+                        || StringFind(value,"\n")>=0 || StringFind(value,"\r")>=0);
+   if(!needs_quotes)
+      return value;
+   string escaped = value;
+   StringReplace(escaped,"\"","\"\"");
+   return "\""+escaped+"\"";
+  }
+
+string CsvJoin(const string &fields[])
+  {
+   string line = "";
+   int total = ArraySize(fields);
+   for(int i=0;i<total;i++)
+     {
+      if(i>0)
+         line += ",";
+      line += CsvEscape(fields[i]);
+     }
+   return line;
+  }
+
+//--- One row per call, terminated exactly once. Refuses a row whose width
+//--- does not match the schema rather than writing a corrupt line.
+bool WriteAuditRow(const string &fields[])
+  {
+   if(ArraySize(fields)!=AUDIT_COLUMN_COUNT)
+     {
+      Print("Audit row has ",ArraySize(fields)," fields; expected ",AUDIT_COLUMN_COUNT,
+            ". Row not written.");
+      return false;
+     }
+   if(g_file==INVALID_HANDLE)
+      return false;
+   FileWriteString(g_file,CsvJoin(fields)+"\r\n");
+   return true;
+  }
+
+bool WriteAuditHeader()
+  {
+   string fields[AUDIT_COLUMN_COUNT];
+   int n = 0;
+   fields[n++] = "bar_time_utc";
+   fields[n++] = "symbol";
+   fields[n++] = "open";
+   fields[n++] = "high";
+   fields[n++] = "low";
+   fields[n++] = "close";
+   fields[n++] = "tick_volume";
+   fields[n++] = "spread_points";
+   fields[n++] = "spread_price";
+   fields[n++] = "h1_time_utc";
+   fields[n++] = "h1_open";
+   fields[n++] = "h1_high";
+   fields[n++] = "h1_low";
+   fields[n++] = "h1_close";
+   fields[n++] = "h1_ema50";
+   fields[n++] = "h1_ema200";
+   fields[n++] = "h1_ema200_past";
+   fields[n++] = "h1_atr";
+   fields[n++] = "h1_slope";
+   fields[n++] = "h1_slope_atr";
+   fields[n++] = "h1_separation_atr";
+   fields[n++] = "ema20";
+   fields[n++] = "ema50";
+   fields[n++] = "atr";
+   fields[n++] = "rsi";
+   fields[n++] = "adx";
+   fields[n++] = "plus_di";
+   fields[n++] = "minus_di";
+   fields[n++] = "body_percent";
+   fields[n++] = "a4_context_pass";
+   fields[n++] = "a4_signal_pass";
+   fields[n++] = "a4_reject_code";
+   fields[n++] = "a4_in_session";
+   fields[n++] = "a4_trades_today";
+   fields[n++] = "a4_material_below_ema50";
+   fields[n++] = "a4_pullback_active";
+   fields[n++] = "a4_pullback_low";
+   fields[n++] = "a4_pullback_depth_atr";
+   fields[n++] = "a4_pullback_bars";
+   fields[n++] = "a4_pullback_touch";
+   fields[n++] = "a4_structure_level";
+   fields[n++] = "a4_prior_high";
+   fields[n++] = "a4_trigger";
+   fields[n++] = "a4_stop";
+   fields[n++] = "a4_stop_atr";
+   fields[n++] = "t3_regime";
+   fields[n++] = "t3_context_pass";
+   fields[n++] = "t3_signal_pass";
+   fields[n++] = "t3_reject_code";
+   fields[n++] = "t3_prev_high";
+   fields[n++] = "t3_prev_low";
+   fields[n++] = "t3_stop_high";
+   fields[n++] = "t3_stop_low";
+   fields[n++] = "t3_range_atr";
+   fields[n++] = "t3_extension_atr";
+   fields[n++] = "t3_trigger";
+   fields[n++] = "t3_stop";
+   fields[n++] = "t3_stop_atr";
+   fields[n++] = "signal_side";
+   fields[n++] = "signal_setup_id";
+   fields[n++] = "signal_time_utc";
+   fields[n++] = "pending_status";
+   fields[n++] = "pending_trigger";
+   fields[n++] = "pending_stop";
+   fields[n++] = "pending_expiry_utc";
+   fields[n++] = "entry_time_utc";
+   fields[n++] = "entry_price";
+   fields[n++] = "entry_stop";
+   fields[n++] = "entry_target";
+   fields[n++] = "exit_time_utc";
+   fields[n++] = "exit_price";
+   fields[n++] = "exit_reason";
+   fields[n++] = "realized_r";
+   fields[n++] = "commission_status";
+   fields[n++] = "swap_status";
+   fields[n++] = "realized_cost_status";
+   return WriteAuditRow(fields);
+  }
+
 bool OpenLog()
   {
-   uint flags = FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI;
+   //--- FILE_TXT, not FILE_CSV: whole lines are written by WriteAuditRow, so
+   //--- no delimiter or line-break handling is delegated to FileWrite.
+   uint flags = FILE_READ|FILE_WRITE|FILE_TXT|FILE_ANSI;
    if(InpUseCommonFiles) flags |= FILE_COMMON;
-   g_file = FileOpen(InpLogFile,flags,',');
+   g_file = FileOpen(InpLogFile,flags);
    if(g_file==INVALID_HANDLE)
      { Print("Cannot open audit log ",InpLogFile,": ",GetLastError()); return false; }
-   if(FileSize(g_file)==0)
-     {
-      FileWrite(g_file,
-        "bar_time_utc","symbol","open","high","low","close","tick_volume",
-        "spread_points","spread_price",
-        "h1_time_utc","h1_open","h1_high","h1_low","h1_close",
-        "h1_ema50","h1_ema200","h1_ema200_past","h1_atr","h1_slope","h1_slope_atr",
-        "h1_separation_atr",
-        "ema20","ema50","atr","rsi","adx","plus_di","minus_di","body_percent",
-        "a4_context_pass","a4_signal_pass","a4_reject_code","a4_in_session",
-        "a4_trades_today","a4_material_below_ema50","a4_pullback_active",
-        "a4_pullback_low","a4_pullback_depth_atr","a4_pullback_bars",
-        "a4_pullback_touch","a4_structure_level","a4_prior_high","a4_trigger",
-        "a4_stop","a4_stop_atr",
-        "t3_regime","t3_context_pass","t3_signal_pass","t3_reject_code",
-        "t3_prev_high","t3_prev_low","t3_stop_high","t3_stop_low","t3_range_atr",
-        "t3_extension_atr","t3_trigger","t3_stop","t3_stop_atr",
-        "signal_side","signal_setup_id","signal_time_utc",
-        "pending_status","pending_trigger","pending_stop","pending_expiry_utc",
-        "entry_time_utc","entry_price","entry_stop","entry_target",
-        "exit_time_utc","exit_price","exit_reason","realized_r",
-        "commission_status","swap_status","realized_cost_status");
-     }
+   bool fresh = (FileSize(g_file)==0);
    FileSeek(g_file,0,SEEK_END);
+   if(fresh && !WriteAuditHeader())
+      return false;
    return true;
   }
 
@@ -1100,47 +1220,85 @@ void ProcessClosedBar(const int shift)
    //--- 5. log
    double slope=0.0; bool has_slope = H1Slope(g_h1,slope);
    double separation=0.0; bool has_separation = H1SeparationAtr(g_h1,separation);
-   FileWrite(g_file,
-     IsoUtc(bar.time,true),_Symbol,
-     Num(bar.open,true),Num(bar.high,true),Num(bar.low,true),Num(bar.close,true),
-     Num((double)bar.tick_volume,true),
-     Num((double)bar.spread_points,true),Num(bar.spread_points*g_point,true),
-     IsoUtc(g_h1.confirmed_hour,g_h1.confirmed),
-     Num(g_h1.confirmed_open,g_h1.confirmed),Num(g_h1.confirmed_high,g_h1.confirmed),
-     Num(g_h1.confirmed_low,g_h1.confirmed),Num(g_h1.confirmed_close,g_h1.confirmed),
-     Num(g_h1.confirmed_fast,g_h1.confirmed),Num(g_h1.confirmed_slow,g_h1.confirmed),
-     Num(g_h1.confirmed_past,g_h1.has_past),Num(g_h1.confirmed_atr,g_h1.has_atr),
-     Num(slope,has_slope),
-     Num(has_slope && g_h1.has_atr && g_h1.confirmed_atr>0.0 ? slope/g_h1.confirmed_atr : 0.0,
-         has_slope && g_h1.has_atr && g_h1.confirmed_atr>0.0),
-     Num(separation,has_separation),
-     Num(bar.ema20,true),Num(bar.ema50,true),Num(bar.atr,bar.has_atr),
-     Num(bar.rsi,bar.has_rsi),Num(bar.adx,bar.has_adx),
-     Num(bar.plus_di,bar.has_adx),Num(bar.minus_di,bar.has_adx),
-     Num(BodyPercent(bar.open,bar.high,bar.low,bar.close),true),
-     Flag(a4.context_pass,true),Flag(a4.signal_pass,true),a4.reject_code,
-     Flag(bar.in_session,true),IntegerToString(g_a4.trades_today),
-     Flag(bar.has_atr && bar.atr>0.0 && bar.close<bar.ema50-A4_MATERIAL_EMA50_ATR*bar.atr,true),
-     Flag(g_a4.pullback_active,true),
-     Num(g_a4.pullback_low,g_a4.has_pullback_low),
-     Num(g_a4.pullback_max_depth_atr,true),IntegerToString(g_a4.pullback_bars),
-     g_a4.pullback_touch,Num(g_a4.structure_level,g_a4.has_structure),
-     Num(prior_high,has_prior_high),
-     Num(a4.trigger,a4.has_levels),Num(a4.stop,a4.has_levels),Num(a4.stop_atr,a4.has_levels),
-     regime_label,Flag(t3.context_pass,true),Flag(t3.signal_pass,true),t3.reject_code,
-     Num(trend_high,has_trend_high),Num(trend_low,has_trend_low),
-     Num(stop_high,true),Num(stop_low,true),
-     Num(bar.has_atr ? (bar.high-bar.low)/bar.atr : 0.0,bar.has_atr),
-     Num(bar.has_atr ? MathAbs(bar.close-bar.ema20)/bar.atr : 0.0,bar.has_atr),
-     Num(t3.trigger,t3.has_levels),Num(t3.stop,t3.has_levels),Num(t3.stop_atr,t3.has_levels),
-     signal_side,signal_setup,IsoUtc(bar.time+STEP_SECONDS,signal_side!=""),
-     pending_status,
-     Num(g_order.trigger,g_order.active),Num(g_order.stop,g_order.active),
-     IsoUtc(g_order.expiry_time,g_order.active),
-     IsoUtc(g_position.entry_time,filled),Num(g_position.entry,filled),
-     Num(g_position.stop,filled),Num(g_position.target,filled),
-     IsoUtc(bar.time,closed),Num(exit_price,closed),exit_reason,Num(realized_r,closed),
-     "UNVERIFIED","UNVERIFIED","UNVERIFIED");
+   string fields[AUDIT_COLUMN_COUNT];
+   int n = 0;
+   fields[n++] = IsoUtc(bar.time,true);
+   fields[n++] = _Symbol;
+   fields[n++] = Num(bar.open,true);
+   fields[n++] = Num(bar.high,true);
+   fields[n++] = Num(bar.low,true);
+   fields[n++] = Num(bar.close,true);
+   fields[n++] = Num((double)bar.tick_volume,true);
+   fields[n++] = Num((double)bar.spread_points,true);
+   fields[n++] = Num(bar.spread_points*g_point,true);
+   fields[n++] = IsoUtc(g_h1.confirmed_hour,g_h1.confirmed);
+   fields[n++] = Num(g_h1.confirmed_open,g_h1.confirmed);
+   fields[n++] = Num(g_h1.confirmed_high,g_h1.confirmed);
+   fields[n++] = Num(g_h1.confirmed_low,g_h1.confirmed);
+   fields[n++] = Num(g_h1.confirmed_close,g_h1.confirmed);
+   fields[n++] = Num(g_h1.confirmed_fast,g_h1.confirmed);
+   fields[n++] = Num(g_h1.confirmed_slow,g_h1.confirmed);
+   fields[n++] = Num(g_h1.confirmed_past,g_h1.has_past);
+   fields[n++] = Num(g_h1.confirmed_atr,g_h1.has_atr);
+   fields[n++] = Num(slope,has_slope);
+   fields[n++] = Num(has_slope && g_h1.has_atr && g_h1.confirmed_atr>0.0 ? slope/g_h1.confirmed_atr : 0.0, has_slope && g_h1.has_atr && g_h1.confirmed_atr>0.0);
+   fields[n++] = Num(separation,has_separation);
+   fields[n++] = Num(bar.ema20,true);
+   fields[n++] = Num(bar.ema50,true);
+   fields[n++] = Num(bar.atr,bar.has_atr);
+   fields[n++] = Num(bar.rsi,bar.has_rsi);
+   fields[n++] = Num(bar.adx,bar.has_adx);
+   fields[n++] = Num(bar.plus_di,bar.has_adx);
+   fields[n++] = Num(bar.minus_di,bar.has_adx);
+   fields[n++] = Num(BodyPercent(bar.open,bar.high,bar.low,bar.close),true);
+   fields[n++] = Flag(a4.context_pass,true);
+   fields[n++] = Flag(a4.signal_pass,true);
+   fields[n++] = a4.reject_code;
+   fields[n++] = Flag(bar.in_session,true);
+   fields[n++] = IntegerToString(g_a4.trades_today);
+   fields[n++] = Flag(bar.has_atr && bar.atr>0.0 && bar.close<bar.ema50-A4_MATERIAL_EMA50_ATR*bar.atr,true);
+   fields[n++] = Flag(g_a4.pullback_active,true);
+   fields[n++] = Num(g_a4.pullback_low,g_a4.has_pullback_low);
+   fields[n++] = Num(g_a4.pullback_max_depth_atr,true);
+   fields[n++] = IntegerToString(g_a4.pullback_bars);
+   fields[n++] = g_a4.pullback_touch;
+   fields[n++] = Num(g_a4.structure_level,g_a4.has_structure);
+   fields[n++] = Num(prior_high,has_prior_high);
+   fields[n++] = Num(a4.trigger,a4.has_levels);
+   fields[n++] = Num(a4.stop,a4.has_levels);
+   fields[n++] = Num(a4.stop_atr,a4.has_levels);
+   fields[n++] = regime_label;
+   fields[n++] = Flag(t3.context_pass,true);
+   fields[n++] = Flag(t3.signal_pass,true);
+   fields[n++] = t3.reject_code;
+   fields[n++] = Num(trend_high,has_trend_high);
+   fields[n++] = Num(trend_low,has_trend_low);
+   fields[n++] = Num(stop_high,true);
+   fields[n++] = Num(stop_low,true);
+   fields[n++] = Num(bar.has_atr ? (bar.high-bar.low)/bar.atr : 0.0,bar.has_atr);
+   fields[n++] = Num(bar.has_atr ? MathAbs(bar.close-bar.ema20)/bar.atr : 0.0,bar.has_atr);
+   fields[n++] = Num(t3.trigger,t3.has_levels);
+   fields[n++] = Num(t3.stop,t3.has_levels);
+   fields[n++] = Num(t3.stop_atr,t3.has_levels);
+   fields[n++] = signal_side;
+   fields[n++] = signal_setup;
+   fields[n++] = IsoUtc(bar.time+STEP_SECONDS,signal_side!="");
+   fields[n++] = pending_status;
+   fields[n++] = Num(g_order.trigger,g_order.active);
+   fields[n++] = Num(g_order.stop,g_order.active);
+   fields[n++] = IsoUtc(g_order.expiry_time,g_order.active);
+   fields[n++] = IsoUtc(g_position.entry_time,filled);
+   fields[n++] = Num(g_position.entry,filled);
+   fields[n++] = Num(g_position.stop,filled);
+   fields[n++] = Num(g_position.target,filled);
+   fields[n++] = IsoUtc(bar.time,closed);
+   fields[n++] = Num(exit_price,closed);
+   fields[n++] = exit_reason;
+   fields[n++] = Num(realized_r,closed);
+   fields[n++] = "UNVERIFIED";
+   fields[n++] = "UNVERIFIED";
+   fields[n++] = "UNVERIFIED";
+   WriteAuditRow(fields);
    FileFlush(g_file);
   }
 

@@ -317,8 +317,74 @@ def test_the_ea_defaults_to_audit_only_and_says_so_on_the_chart():
 
 def test_the_ea_log_row_matches_its_header_exactly():
     report = static_check()
-    assert report["header_columns"] == len(AUDIT_COLUMNS)
+    assert report["header_columns"] == len(AUDIT_COLUMNS) == 76
+    assert report["row_columns"] == 76
     assert report["row_columns_match_header"] is True
+
+
+def test_the_ea_header_matches_the_python_schema_name_for_name_in_order():
+    """The strongest schema guarantee: not just 76 columns, the same 76 in the
+    same order as tools/core_audit_schema.py."""
+    from tools.check_mt5_core_source import SOURCE, header_column_names
+
+    assert header_column_names(SOURCE.read_text(encoding="utf-8")) == AUDIT_COLUMNS
+    assert static_check()["header_matches_python_schema"] is True
+
+
+def test_no_call_exceeds_the_mql5_parameter_limit():
+    """MQL5 caps a function at 64 parameters. Passing all 76 audit columns to
+    FileWrite is what failed to compile; rows are serialized as one string now."""
+    from tools.check_mt5_core_source import SOURCE, file_write_calls
+
+    for call in file_write_calls(SOURCE.read_text(encoding="utf-8")):
+        assert len(call) <= 60, f"FileWrite with {len(call)} arguments will not compile"
+    assert static_check()["no_oversized_file_write"] is True
+
+
+def test_the_ea_serializes_rows_as_a_single_escaped_string():
+    report = static_check()
+    assert report["uses_string_serialization"] is True
+    assert report["has_csv_escape"] is True
+    assert report["has_csv_join"] is True
+    assert report["has_write_audit_header"] is True
+    assert report["has_write_audit_row"] is True
+    assert report["declares_audit_column_count"] is True
+
+
+def test_exactly_one_row_terminator_so_a_row_cannot_split():
+    """One CsvJoin call site means one line per row: no accidental extra
+    FileWrite that would emit a second row or change the delimiter."""
+    assert static_check()["single_row_terminator"] is True
+
+
+def test_the_reader_side_round_trips_escaped_fields(tmp_path):
+    """Proves the schema survives what CsvEscape emits: a field containing a
+    comma and a quote is quoted and doubled, and reads back unchanged."""
+    import csv
+
+    awkward = 'Stop loss (ambiguous, "SL First")'
+    row = _blank_row("2026-01-01T00:00:00Z")
+    row["exit_reason"] = awkward
+    path = tmp_path / "escaped.csv"
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(AUDIT_COLUMNS)
+        writer.writerow([row[column] for column in AUDIT_COLUMNS])
+    reloaded = load_audit(path, label="MT5")
+    assert len(reloaded.columns) == 76
+    assert reloaded.loc[0, "exit_reason"] == awkward
+
+
+def test_empty_fields_stay_empty_and_are_not_quoted(tmp_path):
+    """Null behaviour is preserved: a blank column reads back as a blank
+    string, not as a quoted empty or a NaN."""
+    row = _blank_row("2026-01-01T00:00:00Z")
+    assert row["entry_price"] == ""
+    path = tmp_path / "blank.csv"
+    _audit([row]).to_csv(path, index=False)
+    reloaded = load_audit(path, label="MT5")
+    assert reloaded.loc[0, "entry_price"] == ""
+    assert reloaded.loc[0, "exit_reason"] == ""
 
 
 def test_the_ea_evaluates_only_closed_bars_and_stamps_the_core_fingerprint():
