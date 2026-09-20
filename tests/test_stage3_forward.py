@@ -439,3 +439,15 @@ def test_stage3_tooling_contains_no_order_transmission_call():
         source = (ROOT / "tools" / name).read_text()
         for token in forbidden:
             assert token not in source, f"{name} references {token}"
+
+
+def test_the_build_timestamp_is_converted_explicitly():
+    """__DATETIME__ is a datetime; assigning it to a string is an implicit cast.
+
+    MetaEditor warns on it. The explicit TimeToString call produces the same
+    "YYYY.MM.DD HH:MM:SS" text, so the recorded build identity is unchanged.
+    """
+    source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    assert "TimeToString(__DATETIME__,\n" in source
+    assert "TIME_DATE|TIME_MINUTES|TIME_SECONDS)" in source
+    assert static_check()["no_implicit_datetime_to_string"] is True

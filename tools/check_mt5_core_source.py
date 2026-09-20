@@ -297,6 +297,11 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
         "logs_operational_events": all(f'"{k}"' in source for k in (
             "SESSION_START", "RESTART", "RECONNECT", "DISCONNECT", "TICK_OUTAGE",
             "DATA_GAP", "BACKFILL", "DUPLICATE_BAR", "TIME_REVERSAL", "DEINIT")),
+        # A datetime assigned into a string is an implicit cast and a compiler
+        # warning. Print() is variadic and formats its own arguments, so only
+        # assignment contexts are checked here.
+        "no_implicit_datetime_to_string": not re.search(
+            r"=\s*__DATETIME__\s*;", code),
         "stage3_files_separate_from_audit_schema": all(t in source for t in (
             "InpSessionFile", "InpEventFile", "SESSION_SCHEMA_VERSION",
             "EVENT_SCHEMA_VERSION")),

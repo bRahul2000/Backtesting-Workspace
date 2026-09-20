@@ -968,7 +968,12 @@ void WriteSessionFile()
    rows[n][0]="schema_version";        rows[n++][1]=IntegerToString(SESSION_SCHEMA_VERSION);
    rows[n][0]="session_id";            rows[n++][1]=g_session_id;
    rows[n][0]="twin_build";            rows[n++][1]=TWIN_BUILD;
-   rows[n][0]="compiled_utc";          rows[n++][1]=__DATETIME__;
+   //--- __DATETIME__ is a datetime constant. Converting it explicitly avoids an
+   //--- implicit cast and pins the format; TIME_DATE|TIME_MINUTES|TIME_SECONDS
+   //--- yields the same "YYYY.MM.DD HH:MM:SS" text the implicit cast produced,
+   //--- so the recorded build identity is unchanged.
+   rows[n][0]="compiled_utc";          rows[n++][1]=TimeToString(__DATETIME__,
+                                            TIME_DATE|TIME_MINUTES|TIME_SECONDS);
    rows[n][0]="core_fingerprint";      rows[n++][1]=CORE_FINGERPRINT;
    rows[n][0]="a4_fingerprint";        rows[n++][1]=A4_FINGERPRINT;
    rows[n][0]="t3_fingerprint";        rows[n++][1]=T3_FINGERPRINT;
