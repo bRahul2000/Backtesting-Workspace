@@ -1,0 +1,805 @@
+{
+  "phase": "R2 \u2014 Exness BTCUSDm vs Bitstamp BTC/USD market-data comparison",
+  "purpose": "Quantify feed divergence on exact overlapping timestamps. No attempt is made to reconcile the feeds; they are different venues.",
+  "sources": {
+    "exness_m15": {
+      "path": "data/exness/btc/phase_r1/processed/btcusdm_M15.csv",
+      "sha256": "80735a2cf521363747f48368814267ad6ca146eb294bb7bd7252666d06c76af3"
+    },
+    "exness_h1": {
+      "path": "data/exness/btc/phase_r1/processed/btcusdm_H1.csv",
+      "sha256": "6d35fe9d7feb7635e0973084fb6520ccbc0f99f7b17fc49760692a97dec55658"
+    },
+    "bitstamp_m15": {
+      "path": "data/btcusd_15m.csv",
+      "sha256": "3ab2cc48c91106e7b1bdd755a525fcc2b595cdf158259cee0c2889d00aab46f2"
+    },
+    "bitstamp_h1": "derived: complete four-bar aggregation of Bitstamp M15 (no native H1 series exists)"
+  },
+  "timezone_basis": "Both series are UTC. Exness server offset is 0 at capture (btcusd_BTCUSDm_M15.csv.metadata.json), so no shift is applied.",
+  "M15": {
+    "timeframe": "M15",
+    "overlap": {
+      "start_utc": "2023-11-10T23:15:00+00:00",
+      "end_utc": "2026-09-17T01:30:00+00:00",
+      "exness_candles_in_window": 99928,
+      "bitstamp_candles_in_window": 99915
+    },
+    "alignment": {
+      "matched_candles": 99897,
+      "exness_only_timestamps": 31,
+      "bitstamp_only_timestamps": 18,
+      "matched_percent_of_exness": 99.96897766391803,
+      "matched_percent_of_bitstamp": 99.98198468698394
+    },
+    "correlation": {
+      "close_level": 0.99999871492782,
+      "close_return": 0.9928117699777234,
+      "high_low_range": 0.9871394767388633,
+      "atr14": 0.996483693746428
+    },
+    "price_difference": {
+      "open": {
+        "median_usd": 14.720000000001164,
+        "mean_usd": 24.28734816861366,
+        "p90_usd": 59.30000000000291,
+        "p95_usd": 76.84199999999834,
+        "maximum_usd": 1028.6199999999953,
+        "median_percent": 0.019093273997477553,
+        "median_atr": 0.06575160274727648
+      },
+      "high": {
+        "median_usd": 13.830000000001746,
+        "mean_usd": 23.07908535791867,
+        "p90_usd": 56.904000000002355,
+        "p95_usd": 72.91200000000242,
+        "maximum_usd": 1554.8999999999942,
+        "median_percent": 0.018146205493774614,
+        "median_atr": 0.06139321936659341
+      },
+      "low": {
+        "median_usd": 21.00999999999476,
+        "mean_usd": 31.11206853058651,
+        "p90_usd": 69.7899999999936,
+        "p95_usd": 89.7100000000064,
+        "maximum_usd": 6087.110000000001,
+        "median_percent": 0.026832942165551037,
+        "median_atr": 0.09616419919246813
+      },
+      "close": {
+        "median_usd": 15.5,
+        "mean_usd": 24.504870917044563,
+        "p90_usd": 58.85000000000582,
+        "p95_usd": 76.48200000000358,
+        "maximum_usd": 1445.300000000003,
+        "median_percent": 0.020274299344066788,
+        "median_atr": 0.06898043090870756
+      }
+    },
+    "signed_close_difference_usd": {
+      "mean": -9.250129333213197,
+      "median": -6.539999999993597,
+      "p05": -69.66999999999825,
+      "p95": 45.06199999999805,
+      "share_negative_percent": 63.78269617706237
+    },
+    "range_and_atr": {
+      "median_range_exness_usd": 206.27999999999884,
+      "median_range_bitstamp_usd": 180.0,
+      "median_range_ratio": 1.1302083333333333,
+      "median_atr14_exness_usd": 226.9521428571435,
+      "median_atr14_bitstamp_usd": 200.92857142857142,
+      "median_atr14_ratio": 1.1208702791461422
+    },
+    "discontinuity": {
+      "exness": {
+        "candles": 99928,
+        "continuous_segments": 7,
+        "largest_segment_candles": 32192
+      },
+      "bitstamp": {
+        "candles": 99915,
+        "continuous_segments": 9,
+        "largest_segment_candles": 28017
+      },
+      "matched": {
+        "candles": 99897,
+        "continuous_segments": 15,
+        "largest_segment_candles": 28017
+      }
+    },
+    "weekend": {
+      "matched_weekend_candles": 28581,
+      "weekend_share_percent": 28.610468782846333,
+      "median_absolute_close_difference_weekend_usd": 15.55000000000291,
+      "median_absolute_close_difference_weekday_usd": 15.480000000003201,
+      "note": "Both venues trade through the weekend; Exness pauses only briefly."
+    },
+    "pricing_basis": {
+      "hypothesis": "Exness candles are broker Bid quotes; Bitstamp reports last traded price. A Bid feed should sit below a last/mid feed by roughly half the quoted spread.",
+      "median_signed_close_difference_usd": -6.539999999993597,
+      "median_half_spread_usd": 10.8,
+      "median_difference_plus_half_spread_usd": 3.1299999999973807
+    },
+    "monthly": [
+      {
+        "month": "2023-11",
+        "candles": 1923.0,
+        "median_absolute_close_difference_usd": 30.489999999997963,
+        "p95_absolute_close_difference_usd": 61.96500000000086,
+        "median_close_difference_percent": 0.08200233735878781
+      },
+      {
+        "month": "2023-12",
+        "candles": 2975.0,
+        "median_absolute_close_difference_usd": 27.290000000000873,
+        "p95_absolute_close_difference_usd": 60.04999999999852,
+        "median_close_difference_percent": 0.06435171953890825
+      },
+      {
+        "month": "2024-01",
+        "candles": 2974.0,
+        "median_absolute_close_difference_usd": 13.950000000000728,
+        "p95_absolute_close_difference_usd": 53.25200000000003,
+        "median_close_difference_percent": 0.0329476935147001
+      },
+      {
+        "month": "2024-02",
+        "candles": 2781.0,
+        "median_absolute_close_difference_usd": 39.18000000000029,
+        "p95_absolute_close_difference_usd": 90.0199999999968,
+        "median_close_difference_percent": 0.07839428331231967
+      },
+      {
+        "month": "2024-03",
+        "candles": 2974.0,
+        "median_absolute_close_difference_usd": 40.3849999999984,
+        "p95_absolute_close_difference_usd": 114.38150000000459,
+        "median_close_difference_percent": 0.06048127712823134
+      },
+      {
+        "month": "2024-04",
+        "candles": 2877.0,
+        "median_absolute_close_difference_usd": 25.790000000000873,
+        "p95_absolute_close_difference_usd": 72.14400000000023,
+        "median_close_difference_percent": 0.03889127290643711
+      },
+      {
+        "month": "2024-05",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 16.529999999998836,
+        "p95_absolute_close_difference_usd": 49.842500000002474,
+        "median_close_difference_percent": 0.025531119303514857
+      },
+      {
+        "month": "2024-06",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 19.849999999998545,
+        "p95_absolute_close_difference_usd": 55.95749999999712,
+        "median_close_difference_percent": 0.030019078939912024
+      },
+      {
+        "month": "2024-07",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 23.00499999999738,
+        "p95_absolute_close_difference_usd": 57.974999999998545,
+        "median_close_difference_percent": 0.0367169472245311
+      },
+      {
+        "month": "2024-08",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 19.705000000001746,
+        "p95_absolute_close_difference_usd": 64.78749999999854,
+        "median_close_difference_percent": 0.033019102056497024
+      },
+      {
+        "month": "2024-09",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 23.0,
+        "p95_absolute_close_difference_usd": 58.28049999999894,
+        "median_close_difference_percent": 0.038329929539915625
+      },
+      {
+        "month": "2024-10",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 17.25,
+        "p95_absolute_close_difference_usd": 49.72250000000167,
+        "median_close_difference_percent": 0.02644822735510339
+      },
+      {
+        "month": "2024-11",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 43.075000000004366,
+        "p95_absolute_close_difference_usd": 104.04999999999413,
+        "median_close_difference_percent": 0.05014240328570716
+      },
+      {
+        "month": "2024-12",
+        "candles": 2958.0,
+        "median_absolute_close_difference_usd": 33.46499999999651,
+        "p95_absolute_close_difference_usd": 98.41450000000331,
+        "median_close_difference_percent": 0.03439830169797977
+      },
+      {
+        "month": "2025-01",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 26.364999999997963,
+        "p95_absolute_close_difference_usd": 79.13499999999476,
+        "median_close_difference_percent": 0.026289201801845477
+      },
+      {
+        "month": "2025-02",
+        "candles": 2688.0,
+        "median_absolute_close_difference_usd": 39.74500000000262,
+        "p95_absolute_close_difference_usd": 100.28500000000496,
+        "median_close_difference_percent": 0.041632036167769775
+      },
+      {
+        "month": "2025-03",
+        "candles": 2971.0,
+        "median_absolute_close_difference_usd": 26.479999999995925,
+        "p95_absolute_close_difference_usd": 84.25999999999476,
+        "median_close_difference_percent": 0.031194941230427223
+      },
+      {
+        "month": "2025-04",
+        "candles": 2879.0,
+        "median_absolute_close_difference_usd": 32.19000000000233,
+        "p95_absolute_close_difference_usd": 83.5630000000019,
+        "median_close_difference_percent": 0.037851960614956895
+      },
+      {
+        "month": "2025-05",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 47.775000000001455,
+        "p95_absolute_close_difference_usd": 124.36750000000393,
+        "median_close_difference_percent": 0.046155688002444704
+      },
+      {
+        "month": "2025-06",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 33.50999999999476,
+        "p95_absolute_close_difference_usd": 101.26149999999973,
+        "median_close_difference_percent": 0.0315321700161893
+      },
+      {
+        "month": "2025-07",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 35.19999999999709,
+        "p95_absolute_close_difference_usd": 110.94249999999738,
+        "median_close_difference_percent": 0.03058232089821429
+      },
+      {
+        "month": "2025-08",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 15.569999999999709,
+        "p95_absolute_close_difference_usd": 78.12249999999767,
+        "median_close_difference_percent": 0.01364603588741442
+      },
+      {
+        "month": "2025-09",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 8.429999999993015,
+        "p95_absolute_close_difference_usd": 25.34149999999644,
+        "median_close_difference_percent": 0.007451338220933137
+      },
+      {
+        "month": "2025-10",
+        "candles": 2964.0,
+        "median_absolute_close_difference_usd": 9.089999999996508,
+        "p95_absolute_close_difference_usd": 30.050000000002164,
+        "median_close_difference_percent": 0.00799333015729728
+      },
+      {
+        "month": "2025-11",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 6.7849999999962165,
+        "p95_absolute_close_difference_usd": 22.090499999996972,
+        "median_close_difference_percent": 0.007097208981674798
+      },
+      {
+        "month": "2025-12",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 6.860000000000582,
+        "p95_absolute_close_difference_usd": 22.172499999996944,
+        "median_close_difference_percent": 0.007697948561924746
+      },
+      {
+        "month": "2026-01",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 7.224999999998545,
+        "p95_absolute_close_difference_usd": 21.649999999997817,
+        "median_close_difference_percent": 0.007949536900619222
+      },
+      {
+        "month": "2026-02",
+        "candles": 2688.0,
+        "median_absolute_close_difference_usd": 8.720000000001164,
+        "p95_absolute_close_difference_usd": 25.956500000003143,
+        "median_close_difference_percent": 0.012589053131336021
+      },
+      {
+        "month": "2026-03",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 9.830000000001746,
+        "p95_absolute_close_difference_usd": 27.74250000000393,
+        "median_close_difference_percent": 0.014184345998170835
+      },
+      {
+        "month": "2026-04",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 8.99500000000262,
+        "p95_absolute_close_difference_usd": 26.22100000000136,
+        "median_close_difference_percent": 0.012146644582107966
+      },
+      {
+        "month": "2026-05",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 7.950000000004366,
+        "p95_absolute_close_difference_usd": 24.467499999998836,
+        "median_close_difference_percent": 0.010244460251745902
+      },
+      {
+        "month": "2026-06",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 5.7000000000080036,
+        "p95_absolute_close_difference_usd": 17.7005000000041,
+        "median_close_difference_percent": 0.0089964135658589
+      },
+      {
+        "month": "2026-07",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 5.25,
+        "p95_absolute_close_difference_usd": 16.07250000000022,
+        "median_close_difference_percent": 0.008212184885017869
+      },
+      {
+        "month": "2026-08",
+        "candles": 2974.0,
+        "median_absolute_close_difference_usd": 5.570000000003347,
+        "p95_absolute_close_difference_usd": 18.473499999996402,
+        "median_close_difference_percent": 0.008116636045165585
+      },
+      {
+        "month": "2026-09",
+        "candles": 1543.0,
+        "median_absolute_close_difference_usd": 6.0899999999965075,
+        "p95_absolute_close_difference_usd": 18.607000000000696,
+        "median_close_difference_percent": 0.007764277065073961
+      }
+    ],
+    "notable_divergence_months": [
+      {
+        "month": "2025-05",
+        "candles": 2976.0,
+        "median_absolute_close_difference_usd": 47.775000000001455,
+        "p95_absolute_close_difference_usd": 124.36750000000393,
+        "median_close_difference_percent": 0.046155688002444704
+      },
+      {
+        "month": "2024-11",
+        "candles": 2880.0,
+        "median_absolute_close_difference_usd": 43.075000000004366,
+        "p95_absolute_close_difference_usd": 104.04999999999413,
+        "median_close_difference_percent": 0.05014240328570716
+      },
+      {
+        "month": "2024-03",
+        "candles": 2974.0,
+        "median_absolute_close_difference_usd": 40.3849999999984,
+        "p95_absolute_close_difference_usd": 114.38150000000459,
+        "median_close_difference_percent": 0.06048127712823134
+      },
+      {
+        "month": "2025-02",
+        "candles": 2688.0,
+        "median_absolute_close_difference_usd": 39.74500000000262,
+        "p95_absolute_close_difference_usd": 100.28500000000496,
+        "median_close_difference_percent": 0.041632036167769775
+      },
+      {
+        "month": "2024-02",
+        "candles": 2781.0,
+        "median_absolute_close_difference_usd": 39.18000000000029,
+        "p95_absolute_close_difference_usd": 90.0199999999968,
+        "median_close_difference_percent": 0.07839428331231967
+      }
+    ]
+  },
+  "H1": {
+    "timeframe": "H1",
+    "overlap": {
+      "start_utc": "2023-11-07T00:00:00+00:00",
+      "end_utc": "2026-09-17T00:00:00+00:00",
+      "exness_candles_in_window": 25080,
+      "bitstamp_candles_in_window": 25068
+    },
+    "alignment": {
+      "matched_candles": 25067,
+      "exness_only_timestamps": 13,
+      "bitstamp_only_timestamps": 1,
+      "matched_percent_of_exness": 99.9481658692185,
+      "matched_percent_of_bitstamp": 99.99601085048667
+    },
+    "correlation": {
+      "close_level": 0.9999985542068005,
+      "close_return": 0.9974763404741066,
+      "high_low_range": 0.9911591050189492,
+      "atr14": 0.9978265021303447
+    },
+    "price_difference": {
+      "open": {
+        "median_usd": 14.720000000001164,
+        "mean_usd": 24.41558981928431,
+        "p90_usd": 59.5159999999975,
+        "p95_usd": 76.65700000000066,
+        "maximum_usd": 941.4600000000064,
+        "median_percent": 0.019277460340637237,
+        "median_atr": 0.031218652568803004
+      },
+      "high": {
+        "median_usd": 15.30000000000291,
+        "mean_usd": 24.54346591135751,
+        "p90_usd": 58.96400000000432,
+        "p95_usd": 75.6039999999993,
+        "maximum_usd": 904.6699999999983,
+        "median_percent": 0.02009778571765058,
+        "median_atr": 0.03238920316931199
+      },
+      "low": {
+        "median_usd": 23.270000000004075,
+        "mean_usd": 34.107829018231136,
+        "p90_usd": 74.35199999999608,
+        "p95_usd": 94.55399999999639,
+        "maximum_usd": 6085.110000000001,
+        "median_percent": 0.029770036924500934,
+        "median_atr": 0.04983891533077405
+      },
+      "close": {
+        "median_usd": 15.320000000006985,
+        "mean_usd": 24.55526469062914,
+        "p90_usd": 58.830000000001746,
+        "p95_usd": 76.05999999999767,
+        "maximum_usd": 2146.2899999999936,
+        "median_percent": 0.01998649561107753,
+        "median_atr": 0.03283022771947009
+      }
+    },
+    "signed_close_difference_usd": {
+      "mean": -9.195354051142939,
+      "median": -6.4799999999959255,
+      "p05": -69.82400000000052,
+      "p95": 44.94399999999799,
+      "share_negative_percent": 63.721227111341605
+    },
+    "range_and_atr": {
+      "median_range_exness_usd": 419.0599999999977,
+      "median_range_bitstamp_usd": 388.0,
+      "median_range_ratio": 1.0750106609808108,
+      "median_atr14_exness_usd": 485.94142857142805,
+      "median_atr14_bitstamp_usd": 455.07142857142856,
+      "median_atr14_ratio": 1.0666746085772658
+    },
+    "discontinuity": {
+      "exness": {
+        "candles": 25080,
+        "continuous_segments": 2,
+        "largest_segment_candles": 17032
+      },
+      "bitstamp": {
+        "candles": 25068,
+        "continuous_segments": 9,
+        "largest_segment_candles": 7004
+      },
+      "matched": {
+        "candles": 25067,
+        "continuous_segments": 10,
+        "largest_segment_candles": 7004
+      }
+    },
+    "weekend": {
+      "matched_weekend_candles": 7143,
+      "weekend_share_percent": 28.495631707025172,
+      "median_absolute_close_difference_weekend_usd": 15.130000000004657,
+      "median_absolute_close_difference_weekday_usd": 15.389999999999418,
+      "note": "Both venues trade through the weekend; Exness pauses only briefly."
+    },
+    "pricing_basis": {
+      "hypothesis": "Exness candles are broker Bid quotes; Bitstamp reports last traded price. A Bid feed should sit below a last/mid feed by roughly half the quoted spread.",
+      "median_signed_close_difference_usd": -6.4799999999959255,
+      "median_half_spread_usd": 10.8,
+      "median_difference_plus_half_spread_usd": 3.039999999993597
+    },
+    "monthly": [
+      {
+        "month": "2023-11",
+        "candles": 576.0,
+        "median_absolute_close_difference_usd": 31.17500000000291,
+        "p95_absolute_close_difference_usd": 62.025000000001455,
+        "median_close_difference_percent": 0.08459961250954251
+      },
+      {
+        "month": "2023-12",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 27.110000000000582,
+        "p95_absolute_close_difference_usd": 59.843500000001974,
+        "median_close_difference_percent": 0.06510961355198751
+      },
+      {
+        "month": "2024-01",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 14.125,
+        "p95_absolute_close_difference_usd": 53.59250000000285,
+        "median_close_difference_percent": 0.03336447024801677
+      },
+      {
+        "month": "2024-02",
+        "candles": 694.0,
+        "median_absolute_close_difference_usd": 39.70499999999811,
+        "p95_absolute_close_difference_usd": 87.69700000000049,
+        "median_close_difference_percent": 0.07895708692965805
+      },
+      {
+        "month": "2024-03",
+        "candles": 743.0,
+        "median_absolute_close_difference_usd": 41.30000000000291,
+        "p95_absolute_close_difference_usd": 115.58600000000006,
+        "median_close_difference_percent": 0.0608397730016869
+      },
+      {
+        "month": "2024-04",
+        "candles": 719.0,
+        "median_absolute_close_difference_usd": 25.410000000003492,
+        "p95_absolute_close_difference_usd": 71.7260000000024,
+        "median_close_difference_percent": 0.03872101862409269
+      },
+      {
+        "month": "2024-05",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 14.619999999998981,
+        "p95_absolute_close_difference_usd": 50.09049999999772,
+        "median_close_difference_percent": 0.022837445785441758
+      },
+      {
+        "month": "2024-06",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 20.625,
+        "p95_absolute_close_difference_usd": 54.24199999999801,
+        "median_close_difference_percent": 0.0314423985035841
+      },
+      {
+        "month": "2024-07",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 23.600000000002183,
+        "p95_absolute_close_difference_usd": 54.62900000000155,
+        "median_close_difference_percent": 0.03780623373751113
+      },
+      {
+        "month": "2024-08",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 19.56999999999971,
+        "p95_absolute_close_difference_usd": 62.029500000000915,
+        "median_close_difference_percent": 0.03265787469275837
+      },
+      {
+        "month": "2024-09",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 22.950000000000728,
+        "p95_absolute_close_difference_usd": 57.60300000000168,
+        "median_close_difference_percent": 0.03799197874855164
+      },
+      {
+        "month": "2024-10",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 17.215000000000146,
+        "p95_absolute_close_difference_usd": 48.74550000000018,
+        "median_close_difference_percent": 0.0262682761449161
+      },
+      {
+        "month": "2024-11",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 44.595000000001164,
+        "p95_absolute_close_difference_usd": 103.35500000000681,
+        "median_close_difference_percent": 0.051836955269263615
+      },
+      {
+        "month": "2024-12",
+        "candles": 739.0,
+        "median_absolute_close_difference_usd": 35.00999999999476,
+        "p95_absolute_close_difference_usd": 98.59100000000477,
+        "median_close_difference_percent": 0.03547951890231817
+      },
+      {
+        "month": "2025-01",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 26.125,
+        "p95_absolute_close_difference_usd": 76.36849999999613,
+        "median_close_difference_percent": 0.025874374161510033
+      },
+      {
+        "month": "2025-02",
+        "candles": 672.0,
+        "median_absolute_close_difference_usd": 39.87000000000262,
+        "p95_absolute_close_difference_usd": 98.46549999999547,
+        "median_close_difference_percent": 0.041632036167769775
+      },
+      {
+        "month": "2025-03",
+        "candles": 742.0,
+        "median_absolute_close_difference_usd": 26.93499999999767,
+        "p95_absolute_close_difference_usd": 86.36749999999593,
+        "median_close_difference_percent": 0.03132209638447077
+      },
+      {
+        "month": "2025-04",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 32.46499999999651,
+        "p95_absolute_close_difference_usd": 82.88749999999632,
+        "median_close_difference_percent": 0.037624834561614307
+      },
+      {
+        "month": "2025-05",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 48.919999999998254,
+        "p95_absolute_close_difference_usd": 121.50999999999404,
+        "median_close_difference_percent": 0.047353566471385826
+      },
+      {
+        "month": "2025-06",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 32.30500000000029,
+        "p95_absolute_close_difference_usd": 100.27700000000404,
+        "median_close_difference_percent": 0.03046459547183
+      },
+      {
+        "month": "2025-07",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 35.26000000000204,
+        "p95_absolute_close_difference_usd": 109.2909999999953,
+        "median_close_difference_percent": 0.03042191477230586
+      },
+      {
+        "month": "2025-08",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 15.180000000000291,
+        "p95_absolute_close_difference_usd": 77.4810000000034,
+        "median_close_difference_percent": 0.013297172559356227
+      },
+      {
+        "month": "2025-09",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 8.325000000004366,
+        "p95_absolute_close_difference_usd": 24.462500000002162,
+        "median_close_difference_percent": 0.007333316739207219
+      },
+      {
+        "month": "2025-10",
+        "candles": 742.0,
+        "median_absolute_close_difference_usd": 9.860000000000582,
+        "p95_absolute_close_difference_usd": 30.667499999998103,
+        "median_close_difference_percent": 0.008556185368668253
+      },
+      {
+        "month": "2025-11",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 6.834999999999127,
+        "p95_absolute_close_difference_usd": 21.888500000004562,
+        "median_close_difference_percent": 0.00695964874783318
+      },
+      {
+        "month": "2025-12",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 7.099999999998545,
+        "p95_absolute_close_difference_usd": 21.543499999996865,
+        "median_close_difference_percent": 0.007895735671267574
+      },
+      {
+        "month": "2026-01",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 7.364999999997963,
+        "p95_absolute_close_difference_usd": 22.913999999995585,
+        "median_close_difference_percent": 0.008009468419943455
+      },
+      {
+        "month": "2026-02",
+        "candles": 672.0,
+        "median_absolute_close_difference_usd": 8.669999999998254,
+        "p95_absolute_close_difference_usd": 26.111000000002228,
+        "median_close_difference_percent": 0.0125305317034364
+      },
+      {
+        "month": "2026-03",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 9.375,
+        "p95_absolute_close_difference_usd": 27.196500000004747,
+        "median_close_difference_percent": 0.013595456829365157
+      },
+      {
+        "month": "2026-04",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 8.810000000004948,
+        "p95_absolute_close_difference_usd": 27.01349999999511,
+        "median_close_difference_percent": 0.012021150687413128
+      },
+      {
+        "month": "2026-05",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 7.689999999995052,
+        "p95_absolute_close_difference_usd": 23.405500000003666,
+        "median_close_difference_percent": 0.009958951884936541
+      },
+      {
+        "month": "2026-06",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 5.445000000003347,
+        "p95_absolute_close_difference_usd": 16.915500000001323,
+        "median_close_difference_percent": 0.008804558411334523
+      },
+      {
+        "month": "2026-07",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 5.694999999999709,
+        "p95_absolute_close_difference_usd": 16.11349999999839,
+        "median_close_difference_percent": 0.008853595639722949
+      },
+      {
+        "month": "2026-08",
+        "candles": 743.0,
+        "median_absolute_close_difference_usd": 5.4100000000034925,
+        "p95_absolute_close_difference_usd": 16.60600000000122,
+        "median_close_difference_percent": 0.007803219191029659
+      },
+      {
+        "month": "2026-09",
+        "candles": 385.0,
+        "median_absolute_close_difference_usd": 6.350000000005821,
+        "p95_absolute_close_difference_usd": 18.194000000003133,
+        "median_close_difference_percent": 0.008109352110334339
+      }
+    ],
+    "notable_divergence_months": [
+      {
+        "month": "2025-05",
+        "candles": 744.0,
+        "median_absolute_close_difference_usd": 48.919999999998254,
+        "p95_absolute_close_difference_usd": 121.50999999999404,
+        "median_close_difference_percent": 0.047353566471385826
+      },
+      {
+        "month": "2024-11",
+        "candles": 720.0,
+        "median_absolute_close_difference_usd": 44.595000000001164,
+        "p95_absolute_close_difference_usd": 103.35500000000681,
+        "median_close_difference_percent": 0.051836955269263615
+      },
+      {
+        "month": "2024-03",
+        "candles": 743.0,
+        "median_absolute_close_difference_usd": 41.30000000000291,
+        "p95_absolute_close_difference_usd": 115.58600000000006,
+        "median_close_difference_percent": 0.0608397730016869
+      },
+      {
+        "month": "2025-02",
+        "candles": 672.0,
+        "median_absolute_close_difference_usd": 39.87000000000262,
+        "p95_absolute_close_difference_usd": 98.46549999999547,
+        "median_close_difference_percent": 0.041632036167769775
+      },
+      {
+        "month": "2024-02",
+        "candles": 694.0,
+        "median_absolute_close_difference_usd": 39.70499999999811,
+        "p95_absolute_close_difference_usd": 87.69700000000049,
+        "median_close_difference_percent": 0.07895708692965805
+      }
+    ]
+  },
+  "limitations": [
+    "Exness candles are broker Bid quotes; Bitstamp reports last traded price. A systematic offset is expected.",
+    "Bitstamp has no native H1 series; its H1 is aggregated from complete four-bar M15 groups.",
+    "Exness volume is tick count, Bitstamp volume is traded BTC; the two are not comparable and volume is not compared.",
+    "Exness real_volume is 0 throughout, so no true traded volume is available from the broker feed.",
+    "ATR here is a descriptive 14-bar true-range mean reset across gaps, not a strategy input."
+  ]
+}
