@@ -81,6 +81,12 @@ struct Stage4Order
    string   reject_detail;
   };
 
+//--- Forward declarations. These three are called above their definitions, and
+//--- MQL5 resolves a call only against something already declared.
+int    Stage4CertificateIssues(const string name);
+bool   Stage4BuildMatchesCertificate(const string name,const string build);
+string Stage4ClassifyRetcode(const int retcode);
+
 //+------------------------------------------------------------------+
 //| Gate evaluation                                                   |
 //|                                                                   |

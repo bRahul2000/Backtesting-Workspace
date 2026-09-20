@@ -13,6 +13,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "mt5" / "BTC_V3_Core_V1.mq5"
 STAGE4 = ROOT / "mt5" / "BTC_V3_Stage4_Demo.mqh"
+STAGE4_HARNESS = ROOT / "mt5" / "BTC_V3_Stage4_CompileCheck.mq5"
 
 #: MQL5 calls that transmit an order. None may appear in this EA.
 FORBIDDEN_CALLS = (
@@ -389,10 +390,47 @@ def stage4_checks() -> dict[str, object]:
         # The EA must not include the layer until Stage 4 is authorised.
         "stage4_not_wired_into_ea": "BTC_V3_Stage4_Demo.mqh" not in
             strip_comments_and_strings(SOURCE.read_text(encoding="utf-8")),
+        # MQL5 resolves a call only against something already declared, so the
+        # three functions called above their definitions need prototypes.
+        "stage4_forward_declarations_present": all(
+            re.search(rf"^{ret}\s+{name}\(.*\);\s*$",
+                      text.split("//| Gate evaluation")[0], re.M)
+            for ret, name in (("int", "Stage4CertificateIssues"),
+                              ("bool", "Stage4BuildMatchesCertificate"),
+                              ("string", "Stage4ClassifyRetcode"))),
+        **harness_checks(),
     }
 
 
-LIST_CHECKS = ("forbidden_calls", "stage4_forbidden_calls", "reject_codes_only_in_mt5", "reject_codes_only_in_python")
+def harness_checks() -> dict[str, object]:
+    """Compile-only harness for the Stage 4 layer.
+
+    It is a SCRIPT, not an Expert Advisor: a script runs once when dropped on a
+    chart and exits, so it cannot be left attached and cannot act on a later
+    bar. An EA harness could be forgotten on a chart; this cannot.
+    """
+    if not STAGE4_HARNESS.exists():
+        return {"stage4_harness_present": False}
+    text = STAGE4_HARNESS.read_text(encoding="utf-8")
+    body = strip_comments_and_strings(text)
+    return {
+        "stage4_harness_present": True,
+        "stage4_harness_forbidden_calls": sorted(
+            name for name in FORBIDDEN_CALLS
+            if re.search(rf"\b{re.escape(name)}\b", body)),
+        "stage4_harness_is_a_script": "void OnStart()" in body and "OnTick" not in body,
+        "stage4_harness_includes_the_layer":
+            '#include "BTC_V3_Stage4_Demo.mqh"' in text,
+        # The OrderCheck path is the only one touching MqlTradeRequest, and it
+        # is opt-in so the default run is pure computation.
+        "stage4_harness_ordercheck_is_opt_in": bool(re.search(
+            r"input bool InpRunOrderCheck = false;", body)),
+        "stage4_harness_exercises_refusal": "Stage4Transmit(cfg,order,outcome,ticket)" in body,
+    }
+
+
+LIST_CHECKS = ("forbidden_calls", "stage4_forbidden_calls",
+               "stage4_harness_forbidden_calls", "reject_codes_only_in_mt5", "reject_codes_only_in_python")
 
 
 def main() -> int:

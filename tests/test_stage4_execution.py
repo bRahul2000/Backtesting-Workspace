@@ -300,3 +300,91 @@ def test_stage4_and_stage5_tooling_contain_no_order_call():
         source = (ROOT / "tools" / name).read_text()
         for token in forbidden:
             assert token not in source, f"{name} references {token}"
+
+
+# --- compile harness ---------------------------------------------------------------------------
+#
+# The Stage 4 layer has never been seen by MetaEditor, because it is not wired
+# into the EA. The harness lets F7 compile every line of it without touching the
+# running Stage 3 EA and without any possibility of transmission.
+
+HARNESS = ROOT / "mt5" / "BTC_V3_Stage4_CompileCheck.mq5"
+
+
+def test_the_harness_exists_and_compiles_the_whole_layer():
+    report = static_check()
+    assert report["stage4_harness_present"] is True
+    assert report["stage4_harness_includes_the_layer"] is True
+
+
+def test_the_harness_is_a_script_not_an_expert_advisor():
+    """A script runs once and exits; an EA could be left attached to a chart."""
+    from tools.check_mt5_core_source import strip_comments_and_strings
+
+    report = static_check()
+    assert report["stage4_harness_is_a_script"] is True
+    # Check the code, not the prose: the header comment explains why there is
+    # no OnTick, and that sentence is not an entry point.
+    body = strip_comments_and_strings(HARNESS.read_text())
+    assert "void OnStart()" in body
+    assert "OnTick" not in body
+    assert "OnInit" not in body
+    assert "OnDeinit" not in body
+
+
+def test_the_harness_cannot_transmit():
+    report = static_check()
+    assert report["stage4_harness_forbidden_calls"] == []
+    assert report["stage4_harness_exercises_refusal"] is True
+
+
+def test_the_harness_ordercheck_path_is_opt_in():
+    """OrderCheck validates without sending, but the default run avoids it."""
+    assert static_check()["stage4_harness_ordercheck_is_opt_in"] is True
+    assert "input bool InpRunOrderCheck = false;" in HARNESS.read_text()
+
+
+def test_the_harness_does_not_wire_stage4_into_the_running_ea():
+    report = static_check()
+    assert report["stage4_not_wired_into_ea"] is True
+    ea = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    assert "Stage4" not in ea
+    assert "CompileCheck" not in ea
+
+
+def test_the_harness_configures_gates_that_must_refuse():
+    """It exercises the refusal path, so a pass would be the surprising result."""
+    text = HARNESS.read_text()
+    assert "cfg.enabled            = false;" in text
+    assert 'cfg.operator_ack       = "";' in text
+    assert "UNEXPECTED: gates passed" in text
+    assert "CRITICAL: Stage4Transmit returned true" in text
+
+
+def test_every_stage4_function_called_above_its_definition_is_declared_first():
+    """MQL5 resolves a call only against something already declared.
+
+    Three functions in the layer are called above their definitions. Without
+    prototypes this is a compile error, which is precisely what the harness
+    exists to surface — it was found and fixed before F7 ever ran.
+    """
+    assert static_check()["stage4_forward_declarations_present"] is True
+    import re
+    lines = (ROOT / "mt5" / "BTC_V3_Stage4_Demo.mqh").read_text().splitlines()
+    declared = {m.group(1) for line in lines
+                if (m := re.match(r"^(?:int|bool|string)\s+(Stage4\w+)\s*\([^;]*\);\s*$", line))}
+    defined = {}
+    for index, line in enumerate(lines, 1):
+        m = re.match(r"^(?:bool|void|string|datetime|int|double|Stage4Gate|Stage4Order)"
+                     r"\s+(\w+)\s*\([^;]*$", line)
+        if m:
+            defined.setdefault(m.group(1), index)
+    for name, definition in defined.items():
+        if name in declared:
+            continue
+        for index, line in enumerate(lines, 1):
+            if index == definition or re.match(r"^\s*(//|\*|#)", line):
+                continue
+            if re.search(rf"\b{name}\s*\(", line):
+                assert index > definition, f"{name} used at {index}, defined at {definition}"
+                break
