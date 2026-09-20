@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "profile_type": "MT5_SYMBOL_SPECIFICATION",
+  "profile_id": "EXNESS-BTCUSD-v1",
+  "capture": {
+    "timestamp_utc": "2026.09.20 07:45:05",
+    "timestamp_server": "2026.09.20 07:45:05",
+    "server_utc_offset_seconds": 0,
+    "terminal_common_data_path": "C:\\users\\user\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common"
+  },
+  "broker": {
+    "company": "Exness Technologies Ltd",
+    "server": "Exness-MT5Trial5"
+  },
+  "symbol": {
+    "name": "BTCUSDm",
+    "description": "Bitcoin vs US Dollar",
+    "currency_base": "BTC",
+    "currency_profit": "USD",
+    "currency_margin": "BTC",
+    "digits": 2,
+    "point": 0.0100000000
+  },
+  "contract": {
+    "tick_size": 0.0100000000,
+    "tick_value": 0.0100000000,
+    "tick_value_profit": 0.0100000000,
+    "tick_value_loss": 0.0100000000,
+    "contract_size": 1.0000000000
+  },
+  "volume": {
+    "minimum": 0.0100000000,
+    "maximum": 200.0000000000,
+    "step": 0.0100000000
+  },
+  "trading": {
+    "trade_mode": 4,
+    "trade_mode_name": "FULL",
+    "trade_exemode": 2,
+    "trade_calc_mode": 5,
+    "filling_modes": ["FOK","IOC"],
+    "filling_mode_mask": 3,
+    "order_mode_mask": 127,
+    "expiration_mode_mask": 15,
+    "stops_level_points": 0,
+    "freeze_level_points": 0,
+    "spread_points_reported": 1000,
+    "spread_float": true
+  },
+  "quote": {
+    "bid": 80300.41,
+    "ask": 80310.41,
+    "last": 0.00,
+    "spread_price": 10.00,
+    "spread_points": 1000.0000
+  },
+  "raw_margin_swap_capture": {
+    "margin_initial": 1.0000000000,
+    "margin_maintenance": 0.0000000000,
+    "swap_mode": 1,
+    "swap_long": -1736.6000000000,
+    "swap_short": 0.0000000000,
+    "account_leverage_reported": 200
+  },
+  "unverified": {
+    "leverage_status": "UNVERIFIED",
+    "commission_status": "UNVERIFIED",
+    "margin_status": "UNVERIFIED",
+    "note": "MT5 does not expose a trustworthy per-symbol commission, and a zero margin or swap capture does not imply a true zero. These must not be modelled as costs without an independent account-statement verification."
+  },
+  "trading_sessions": [{"day_number":0,"day":"Sunday","session_index":0,"from":"00:00","to":"00:00"},{"day_number":1,"day":"Monday","session_index":0,"from":"00:00","to":"00:00"},{"day_number":2,"day":"Tuesday","session_index":0,"from":"00:00","to":"00:00"},{"day_number":3,"day":"Wednesday","session_index":0,"from":"00:00","to":"00:00"},{"day_number":4,"day":"Thursday","session_index":0,"from":"00:00","to":"00:00"},{"day_number":5,"day":"Friday","session_index":0,"from":"00:00","to":"00:00"},{"day_number":6,"day":"Saturday","session_index":0,"from":"00:00","to":"00:00"}],
+  "source": "MT5 SymbolInfo capture; no credentials collected"
+}

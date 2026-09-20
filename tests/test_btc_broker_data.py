@@ -9,8 +9,9 @@ import json
 import pandas as pd
 import pytest
 
+from core.fingerprints import sha256_file
 from services.btc_broker_data import (
-    BrokerDataError, M15_FILE, H1_FILE, SPEC_FILE, build_phase_r1, load_btc_spec,
+    MANIFEST_PATH, BrokerDataError, M15_FILE, H1_FILE, SPEC_FILE, build_phase_r1, load_btc_spec,
     phase_r1_inputs, phase_r1_status, read_broker_ohlcv, reconcile_m15_h1,
     segment_report, spread_statistics, tick_sample_assets, validate_candles,
 )
@@ -349,8 +350,38 @@ def test_the_real_exness_m15_export_passes_validation():
     assert report["invalid_ohlc_rows"] == 0
 
 
-def test_phase_r1_is_currently_blocked_on_the_real_repository_paths():
-    """The live gate: until the user exports spec and H1, R1 cannot complete."""
+def test_phase_r1_real_exports_are_present_and_the_gate_is_open():
+    """The live gate: all three real MT5 exports now exist."""
     status = phase_r1_status()
-    assert status["ready"] is False
-    assert "spec" in status["missing"] and "H1" in status["missing"]
+    assert status["ready"] is True
+    assert status["missing"] == []
+
+
+@pytest.mark.skipif(not MANIFEST_PATH.exists(), reason="Phase R1 manifest not built")
+def test_the_real_phase_r1_manifest_is_clean_and_reconciled():
+    """Locks in the ingested broker dataset: both timeframes valid, M15 and H1
+    agreeing on every complete four-bar group, and costs still UNVERIFIED."""
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    assert manifest["symbol"] == "BTCUSDm"
+    assert manifest["broker"] == "Exness Technologies Ltd"
+    assert manifest["specification"]["point"] == 0.01
+    assert manifest["specification"]["contract_size"] == 1.0
+    assert manifest["specification"]["leverage_status"] == "UNVERIFIED"
+    assert manifest["specification"]["commission_status"] == "UNVERIFIED"
+    assert manifest["datasets"]["M15"]["passed"] is True
+    assert manifest["datasets"]["H1"]["passed"] is True
+    assert manifest["datasets"]["M15"]["rows"] == 100_239
+    assert manifest["datasets"]["H1"]["rows"] == 25_158
+    assert manifest["alignment"]["mismatches"] == 0
+    assert manifest["alignment"]["groups_compared"] == 25_054
+    assert len(manifest["external_replay_assets"]["samples"]) == 5
+    assert len(manifest["fingerprints"]) == 8
+
+
+def test_the_raw_exports_are_preserved_byte_for_byte():
+    """Ingestion is read-only: the recorded raw fingerprints still match."""
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    raw = MANIFEST_PATH.parent / "raw"
+    assert sha256_file(raw / SPEC_FILE) == manifest["fingerprints"]["raw_spec_sha256"]
+    assert sha256_file(raw / M15_FILE) == manifest["fingerprints"]["raw_m15_sha256"]
+    assert sha256_file(raw / H1_FILE) == manifest["fingerprints"]["raw_h1_sha256"]

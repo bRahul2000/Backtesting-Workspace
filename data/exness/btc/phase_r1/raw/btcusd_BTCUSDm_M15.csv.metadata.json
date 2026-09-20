@@ -1,0 +1,19 @@
+{
+  "source": "MT5 CopyRates broker history",
+  "symbol": "BTCUSDm",
+  "timeframe": "M15",
+  "timestamp_field_timezone": "broker trade-server time; see server_utc_offset_seconds_at_capture",
+  "server_utc_offset_seconds_at_capture": 0,
+  "broker_company": "Exness Technologies Ltd",
+  "account_server": "Exness-MT5Trial5",
+  "digits": 2,
+  "point": 0.0100000000,
+  "bars_available_in_terminal": 100240,
+  "bars_exported": 100239,
+  "first_bar_server_time": "2023.11.10 23:15:00",
+  "last_bar_server_time": "2026.09.20 07:15:00",
+  "current_incomplete_bar_excluded": true,
+  "spread_field_semantics": "MT5 bar spread is a bar-level spread descriptor in points, not the spread guaranteed at an execution tick",
+  "capture_server_time": "2026.09.20 07:44:51",
+  "output_file": "C:\\users\\user\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files\\btcusd_BTCUSDm_M15.csv"
+}

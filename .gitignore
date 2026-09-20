@@ -22,3 +22,6 @@ secrets.*
 # User-supplied Exness tick archives stay local; keep the directory scaffold.
 /data/exness/raw/*
 !/data/exness/raw/.gitkeep
+
+# MT5 compiles scripts next to their source; the binaries are terminal output.
+*.ex5

@@ -72,7 +72,7 @@ string TradingSessions(const string symbol)
    string names[7] = {"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
    string output = "[";
    bool first = true;
-   for(int day = DAY_SUNDAY; day <= DAY_SATURDAY; day++)
+   for(int day = SUNDAY; day <= SATURDAY; day++)
      {
       for(uint index = 0; index < 16; index++)
         {

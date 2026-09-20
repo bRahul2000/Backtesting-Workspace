@@ -1,0 +1,235 @@
+{
+  "alignment": {
+    "aggregation": "open=first M15 open, high=max M15 high, low=min M15 low, close=last M15 close",
+    "complete_m15_groups": 25054,
+    "groups_compared": 25054,
+    "h1_bars": 25158,
+    "h1_bars_without_a_complete_m15_group": 104,
+    "incomplete_m15_groups_not_checkable": 10,
+    "m15_hour_groups": 25064,
+    "matches": 25054,
+    "mismatch_details": [],
+    "mismatch_details_truncated": false,
+    "mismatch_magnitude": {
+      "max": 0.0,
+      "median": 0.0
+    },
+    "mismatch_timestamps": [],
+    "mismatches": 0,
+    "tolerance": 1e-09
+  },
+  "broker": "Exness Technologies Ltd",
+  "built_at_utc": "2026-09-20T07:55:17.721463+00:00",
+  "datasets": {
+    "H1": {
+      "duplicate_full_rows": 0,
+      "duplicate_timestamps": 0,
+      "first_timestamp_utc": "2023-11-07T00:00:00+00:00",
+      "invalid_ohlc_rows": 0,
+      "last_timestamp_utc": "2026-09-20T06:00:00+00:00",
+      "negative_real_volume_rows": 0,
+      "negative_spread_rows": 0,
+      "negative_tick_volume_rows": 0,
+      "non_numeric_rows": 0,
+      "off_grid_timestamps": 0,
+      "passed": true,
+      "rows": 25158,
+      "segments": {
+        "continuous_segments": 2,
+        "gap_count": 1,
+        "gap_size_distribution": {
+          "1": 1,
+          "17-96": 0,
+          "2-4": 0,
+          "5-16": 0,
+          "97+": 0
+        },
+        "largest_gap_candles": 1,
+        "largest_segment_candles": 17032,
+        "median_segment_candles": 12579.0,
+        "missing_candles": 1,
+        "smallest_segment_candles": 8126
+      },
+      "spread": {
+        "formula": "spread_price = spread_points * point",
+        "semantics": "MT5 bar spread is a bar-level spread descriptor, not the spread guaranteed at an execution tick.",
+        "spread_points": {
+          "max": 7763.0,
+          "mean": 2341.0254392241036,
+          "median": 2160.0,
+          "min": 243.0,
+          "p25": 1800.0,
+          "p75": 2880.0,
+          "p90": 3306.0,
+          "p95": 4286.299999999996,
+          "p99": 5756.740000000005
+        },
+        "spread_price": {
+          "max": 77.63,
+          "mean": 23.41025439224104,
+          "median": 21.6,
+          "min": 2.43,
+          "p25": 18.0,
+          "p75": 28.8,
+          "p90": 33.06,
+          "p95": 42.86299999999996,
+          "p99": 57.567400000000056
+        },
+        "unique_spread_points": 3720
+      },
+      "timeframe": "H1",
+      "timestamps_monotonic_increasing": true,
+      "timezone_basis": "Exness trade-server wall time treated as UTC+0",
+      "unparsable_timestamps": 0,
+      "zero_spread_rows": 0,
+      "zero_tick_volume_rows": 0
+    },
+    "M15": {
+      "duplicate_full_rows": 0,
+      "duplicate_timestamps": 0,
+      "first_timestamp_utc": "2023-11-10T23:15:00+00:00",
+      "invalid_ohlc_rows": 0,
+      "last_timestamp_utc": "2026-09-20T07:15:00+00:00",
+      "negative_real_volume_rows": 0,
+      "negative_spread_rows": 0,
+      "negative_tick_volume_rows": 0,
+      "non_numeric_rows": 0,
+      "off_grid_timestamps": 0,
+      "passed": true,
+      "rows": 100239,
+      "segments": {
+        "continuous_segments": 7,
+        "gap_count": 6,
+        "gap_size_distribution": {
+          "1": 3,
+          "17-96": 0,
+          "2-4": 2,
+          "5-16": 1,
+          "97+": 0
+        },
+        "largest_gap_candles": 10,
+        "largest_segment_candles": 32503,
+        "median_segment_candles": 10961.0,
+        "missing_candles": 18,
+        "smallest_segment_candles": 10
+      },
+      "spread": {
+        "formula": "spread_price = spread_points * point",
+        "semantics": "MT5 bar spread is a bar-level spread descriptor, not the spread guaranteed at an execution tick.",
+        "spread_points": {
+          "max": 8809.0,
+          "mean": 2399.5967238300464,
+          "median": 2160.0,
+          "min": 269.0,
+          "p25": 1800.0,
+          "p75": 2896.0,
+          "p90": 3394.0,
+          "p95": 4530.099999999991,
+          "p99": 6441.239999999991
+        },
+        "spread_price": {
+          "max": 88.09,
+          "mean": 23.99596723830047,
+          "median": 21.6,
+          "min": 2.69,
+          "p25": 18.0,
+          "p75": 28.96,
+          "p90": 33.94,
+          "p95": 45.30099999999992,
+          "p99": 64.4123999999999
+        },
+        "unique_spread_points": 5904
+      },
+      "timeframe": "M15",
+      "timestamps_monotonic_increasing": true,
+      "timezone_basis": "Exness trade-server wall time treated as UTC+0",
+      "unparsable_timestamps": 0,
+      "zero_spread_rows": 0,
+      "zero_tick_volume_rows": 0
+    }
+  },
+  "external_replay_assets": {
+    "description": "Five real BTCUSDm tick samples, referenced for execution replay. They are never merged into the candle datasets.",
+    "samples": [
+      {
+        "file": "btcusdm_s01_ticks_server_time.csv",
+        "first_timestamp_utc": "2026-08-01T12:00:00.449000+00:00",
+        "last_timestamp_utc": "2026-08-02T11:59:58.760000+00:00",
+        "sample_id": "s01",
+        "sha256": "182589b8c1d4deedb4fdcc6900a59b13204320a17eb9a68a932cb13b4769ec68",
+        "ticks": 89396
+      },
+      {
+        "file": "btcusdm_s02_ticks_server_time.csv",
+        "first_timestamp_utc": "2026-08-05T12:00:00.100000+00:00",
+        "last_timestamp_utc": "2026-08-06T11:59:59.350000+00:00",
+        "sample_id": "s02",
+        "sha256": "eaf36e10f04f4dbe87f5ac64f70127501bb05c781ddc57c8cb025015e02e9815",
+        "ticks": 101344
+      },
+      {
+        "file": "btcusdm_s03_ticks_server_time.csv",
+        "first_timestamp_utc": "2026-08-15T12:00:00.655000+00:00",
+        "last_timestamp_utc": "2026-08-16T11:59:59.700000+00:00",
+        "sample_id": "s03",
+        "sha256": "4fb3606005138b6867382fb855d6624a7a8a5511348186aa7a41dcdb8bd17e3b",
+        "ticks": 75345
+      },
+      {
+        "file": "btcusdm_s04_ticks_server_time.csv",
+        "first_timestamp_utc": "2026-09-01T12:00:00.983000+00:00",
+        "last_timestamp_utc": "2026-09-02T11:59:59.014000+00:00",
+        "sample_id": "s04",
+        "sha256": "c68d8f3597daed797e881ba870efb3f8f5ea48645a7c40d5e0de82eaf7d0a7c2",
+        "ticks": 128645
+      },
+      {
+        "file": "btcusdm_s05_ticks_server_time.csv",
+        "first_timestamp_utc": "2026-09-15T12:00:00.912000+00:00",
+        "last_timestamp_utc": "2026-09-16T11:59:59.364000+00:00",
+        "sample_id": "s05",
+        "sha256": "2c7a353f7829cfd36ef72884bcc985079e88867a7354f83dfef85acd40ddf9c8",
+        "ticks": 146917
+      }
+    ]
+  },
+  "fingerprints": {
+    "broker_profile_sha256": "bba445b1d009d4da2c8f0eb9869de8d799a06f1e008dfa9d7acc50ebad2809be",
+    "instrument_profile_sha256": "6eeaa450ed012784ede37758e0c548dc4ffd81da347ed019c119a794e3311114",
+    "manifest_sha256": "113c41df2fe262d70d9b2322b7d47fa9a6a27ef8cdbdacdd8612b3072f8a815d",
+    "processed_h1_sha256": "6d35fe9d7feb7635e0973084fb6520ccbc0f99f7b17fc49760692a97dec55658",
+    "processed_m15_sha256": "80735a2cf521363747f48368814267ad6ca146eb294bb7bd7252666d06c76af3",
+    "raw_h1_sha256": "24c0c04ae05900c9b62e9046e497924be4dd15efd1497c006b05a9dfb133250a",
+    "raw_m15_sha256": "b5ce7d60ab3b30490e42d26614e1ff4b9200b198bee71ea033e21b79d680f43a",
+    "raw_spec_sha256": "a37f11399f92d15370ce93bc7acb878bedc3b77bb9500152d2507f37503ce489"
+  },
+  "instrument": "BTCUSD",
+  "phase": "R1 \u2014 Exness BTCUSDm broker-native dataset",
+  "profile_id": "EXNESS-BTCUSD-v1",
+  "raw_files_preserved": true,
+  "schema_version": "1.0",
+  "server": "Exness-MT5Trial5",
+  "source_timezone": "Exness trade-server wall time treated as UTC+0",
+  "specification": {
+    "commission_status": "UNVERIFIED",
+    "contract_size": 1.0,
+    "currency_margin": "BTC",
+    "currency_profit": "USD",
+    "current_spread_points": 1000.0,
+    "digits": 2,
+    "filling_modes": [
+      "FOK",
+      "IOC"
+    ],
+    "leverage_status": "UNVERIFIED",
+    "margin_status": "UNVERIFIED; a zero capture does not imply zero true margin",
+    "maximum_volume": 200.0,
+    "minimum_volume": 0.01,
+    "point": 0.01,
+    "tick_size": 0.01,
+    "tick_value": 0.01,
+    "trade_mode": "FULL",
+    "volume_step": 0.01
+  },
+  "symbol": "BTCUSDm"
+}
