@@ -1,0 +1,3 @@
+bar_time_utc,classification,column,python,mt5,delta
+2025-11-30T23:45:00Z,WINDOW_BOUNDARY,bar_time_utc,present,after the last logged bar,
+2025-12-01T00:00:00Z,WINDOW_BOUNDARY,bar_time_utc,present,after the last logged bar,

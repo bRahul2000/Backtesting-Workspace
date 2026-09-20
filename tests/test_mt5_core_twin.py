@@ -706,3 +706,88 @@ def test_every_created_pending_reaches_a_terminal_state(tmp_path):
     terminal = sum(int(counts.get(state, 0)) for state in ("FILLED", "EXPIRED", "CANCELLED"))
     open_at_end = frame.pending_status.iloc[-1] in ("CREATED", "ACTIVE")
     assert int(counts.get("CREATED", 0)) == terminal + int(open_at_end)
+
+
+# --- whole-trade pairing ------------------------------------------------------------------
+#
+# The second certification window crosses a real data gap. A segment reset
+# abandons the open position, leaving an entry with no exit, and from that point
+# on entries and exits can no longer be zipped by position.
+
+
+def _entry(stamp, price="100.0"):
+    row = _blank_row(stamp)
+    row.update({"entry_time_utc": stamp, "entry_price": price,
+                "entry_stop": "99.0", "entry_target": "103.0"})
+    return row
+
+
+def _exit(stamp, price="103.0", r="3.0"):
+    row = _blank_row(stamp)
+    row.update({"exit_time_utc": stamp, "exit_price": price,
+                "exit_reason": "Take profit", "realized_r": r})
+    return row
+
+
+def _trades_of(frame):
+    from tools.compare_mt5_core import _trade_table
+    return _trade_table(frame)
+
+
+def test_an_abandoned_position_is_recorded_not_silently_dropped():
+    """A new entry while one is open means the previous position was lost."""
+    frame = _audit([_entry("2026-01-01T00:00:00Z"),
+                    _entry("2026-01-01T00:15:00Z", price="200.0"),
+                    _exit("2026-01-01T00:30:00Z")])
+    trades, orphans = _trades_of(frame)
+    assert len(trades) == 2
+    assert trades[0][1] == "100.0" and trades[0][-1] is None   # abandoned
+    assert trades[1][1] == "200.0" and trades[1][-1] == "3.0"  # closed
+    assert orphans == 0
+
+
+def test_a_trade_still_open_at_the_end_of_the_run_is_recorded():
+    frame = _audit([_entry("2026-01-01T00:00:00Z")])
+    trades, _ = _trades_of(frame)
+    assert len(trades) == 1 and trades[0][-1] is None
+
+
+def test_an_entry_and_exit_on_the_same_bar_is_one_trade():
+    row = _entry("2026-01-01T00:00:00Z")
+    row.update({"exit_time_utc": "2026-01-01T00:00:00Z", "exit_price": "99.0",
+                "exit_reason": "Stop loss", "realized_r": "-1.0"})
+    trades, orphans = _trades_of(_audit([row]))
+    assert len(trades) == 1 and trades[0][-1] == "-1.0" and orphans == 0
+
+
+def test_an_exit_with_no_open_entry_is_surfaced():
+    trades, orphans = _trades_of(_audit([_exit("2026-01-01T00:00:00Z")]))
+    assert trades == [] and orphans == 1
+
+
+def test_matching_sides_reach_full_trade_parity_despite_an_abandoned_position():
+    """Regression: positional zipping under-counted a perfectly matching run.
+
+    Both sides abandon the same position at a segment reset. Entries and exits
+    then differ in length, and zipping them by index reported a false mismatch.
+    """
+    rows = [_entry("2026-01-01T00:00:00Z"),
+            _entry("2026-01-01T00:15:00Z", price="200.0"),
+            _exit("2026-01-01T00:30:00Z")]
+    result = compare(_audit([dict(r) for r in rows]), _audit([dict(r) for r in rows]))
+    assert result["python_trades"] == result["mt5_trades"] == 2
+    assert result["python_unclosed_trades"] == result["mt5_unclosed_trades"] == 1
+    assert result["full_trade_matches"] == 2
+    assert result["full_trade_parity"] is True
+
+
+def test_a_differing_abandoned_position_still_fails():
+    """The allowance must not make unclosed trades unverified."""
+    theirs = [_entry("2026-01-01T00:00:00Z"),
+              _entry("2026-01-01T00:15:00Z", price="200.0"),
+              _exit("2026-01-01T00:30:00Z")]
+    mine = [dict(r) for r in theirs]
+    mine[0] = _entry("2026-01-01T00:00:00Z", price="123.0")
+    result = compare(_audit(mine), _audit(theirs))
+    assert result["full_trade_matches"] == 1
+    assert result["full_trade_parity"] is False

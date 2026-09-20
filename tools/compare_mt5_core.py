@@ -118,12 +118,36 @@ ENTRY_FIELDS = ["entry_time_utc", "entry_price", "entry_stop", "entry_target"]
 EXIT_FIELDS = ["exit_time_utc", "exit_price", "exit_reason", "realized_r"]
 
 
-def _trade_legs(frame: pd.DataFrame) -> tuple[list[tuple], list[tuple]]:
-    """Entries and exits in bar order, as the audit recorded them."""
-    entries = frame.loc[frame.entry_time_utc != "", ENTRY_FIELDS]
-    exits = frame.loc[frame.exit_time_utc != "", EXIT_FIELDS]
-    return (list(entries.itertuples(index=False, name=None)),
-            list(exits.itertuples(index=False, name=None)))
+def _trade_table(frame: pd.DataFrame) -> tuple[list[tuple], int]:
+    """Whole trades in bar order: each entry paired with the exit that closes it.
+
+    Entries and exits must NOT be zipped positionally. A segment reset abandons
+    the open position, leaving an entry with no exit, and from then on index i
+    of one list is a different trade from index i of the other. Only one
+    position exists at a time, so walking the bars and closing the currently
+    open trade is both correct and unambiguous.
+    """
+    trades: list[tuple] = []
+    unmatched_exits = 0
+    open_entry: tuple | None = None
+    blank = (None,) * len(EXIT_FIELDS)
+    for row in frame.itertuples(index=False):
+        if row.entry_time_utc != "":
+            if open_entry is not None:
+                # A new entry while one is still open means the previous
+                # position was abandoned — a segment reset drops it. Record it
+                # as unclosed rather than letting it vanish.
+                trades.append(open_entry + blank)
+            open_entry = tuple(getattr(row, field) for field in ENTRY_FIELDS)
+        if row.exit_time_utc != "":
+            if open_entry is None:
+                unmatched_exits += 1
+                continue
+            trades.append(open_entry + tuple(getattr(row, field) for field in EXIT_FIELDS))
+            open_entry = None
+    if open_entry is not None:
+        trades.append(open_entry + blank)
+    return trades, unmatched_exits
 
 
 #: Timestamp columns whose disagreement is an alignment problem, not a value one.
@@ -294,12 +318,12 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
                                      if compared else None)}
                   for name, columns in DIMENSIONS}
 
-    # Full-trade parity: an entry leg and its exit leg must both agree, in order.
-    py_entries, py_exits = _trade_legs(python_audit)
-    mt_entries, mt_exits = _trade_legs(mt5_audit)
-    paired = min(len(py_entries), len(mt_entries), len(py_exits), len(mt_exits))
-    full_trades = sum(1 for i in range(paired)
-                      if py_entries[i] == mt_entries[i] and py_exits[i] == mt_exits[i])
+    # Full-trade parity over whole trades, including any left unclosed.
+    py_trades, py_orphan_exits = _trade_table(python_audit)
+    mt_trades, mt_orphan_exits = _trade_table(mt5_audit)
+    full_trades = sum(1 for a, b in zip(py_trades, mt_trades) if a == b)
+    py_unclosed = sum(1 for t in py_trades if t[-1] is None)
+    mt_unclosed = sum(1 for t in mt_trades if t[-1] is None)
 
     signal_rows = left.loc[left.signal_side != ""]
     trade_rows = left.loc[left.entry_time_utc != ""]
@@ -333,11 +357,15 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
         "signals_with_a_divergence": int(sum(1 for stamp in signal_rows.index if stamp in mismatched)),
         "trades_with_a_divergence": int(sum(1 for stamp in trade_rows.index if stamp in mismatched)),
         "dimensions": dimensions,
-        "python_trades": len(py_entries),
-        "mt5_trades": len(mt_entries),
+        "python_trades": len(py_trades),
+        "mt5_trades": len(mt_trades),
+        "python_unclosed_trades": py_unclosed,
+        "mt5_unclosed_trades": mt_unclosed,
+        "python_unmatched_exits": py_orphan_exits,
+        "mt5_unmatched_exits": mt_orphan_exits,
         "full_trade_matches": full_trades,
-        "full_trade_parity": (bool(full_trades == len(py_entries) == len(mt_entries))
-                              if py_entries or mt_entries else None),
+        "full_trade_parity": (bool(full_trades == len(py_trades) == len(mt_trades))
+                              if py_trades or mt_trades else None),
         "mismatch_counts": counts,
         "first_mismatch": (detail.iloc[0].to_dict() if not detail.empty else None),
         "first_20_mismatches": (detail.head(20).to_dict("records") if not detail.empty else []),
@@ -379,7 +407,8 @@ def main() -> int:
         print(f"UNRESOLVED one-sided  : {report['unresolved_one_sided_bars'][:5]}")
     print(f"decision parity      : {report['decision_parity_percent']}%")
     print(f"trades py / mt5      : {report['python_trades']} / {report['mt5_trades']}"
-          f"   fully matching: {report['full_trade_matches']}")
+          f"   fully matching: {report['full_trade_matches']}"
+          f"   unclosed: {report['python_unclosed_trades']}/{report['mt5_unclosed_trades']}")
     for name, stat in report["dimensions"].items():
         print(f"  {name:20} {stat['matching']:>6}/{stat['of']:<6} {stat['percent']}%")
     print(f"mismatch counts      : {report['mismatch_counts']}")

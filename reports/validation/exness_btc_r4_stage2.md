@@ -499,4 +499,9 @@ warmup completing and trades occurring on both sides.
 
 The Python audit for this window is already exported to
 `data/exness/btc/r4/python_core_audit_20250901_20251201.csv` (8,727 rows, 35
-trades) and is ready for comparison. No MT5 run has been made.
+trades) and is ready for comparison.
+
+**Run and CERTIFIED on 2025-09-20 17:09** — 8,725 aligned bars, 0 mismatches,
+100.000% parity, 35/35 trades, FULL PARITY True, with the segment reset and the
+abandoned pre-gap position verified identical on both sides. See
+[`exness_btc_r4_stage2_window2.md`](exness_btc_r4_stage2_window2.md).

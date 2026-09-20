@@ -1,116 +1,116 @@
 {
   "python_duplicate_bars_collapsed": 0,
   "mt5_duplicate_bars_collapsed": 0,
-  "bars_compared": 5663,
+  "bars_compared": 8725,
   "bars_only_in_python": 2,
   "bars_only_in_mt5": 0,
-  "last_mt5_bar": "2026-02-28T23:30:00Z",
+  "last_mt5_bar": "2025-11-30T23:30:00Z",
   "window_boundary_bars": [
-    "2026-02-28T23:45:00Z",
-    "2026-03-01T00:00:00Z"
+    "2025-11-30T23:45:00Z",
+    "2025-12-01T00:00:00Z"
   ],
   "unresolved_one_sided_bars": [],
-  "bars_matching": 5663,
+  "bars_matching": 8725,
   "bars_mismatching": 0,
   "decision_parity_percent": 100.0,
-  "exact_ohlc_matches": 5663,
-  "indicator_matches": 5663,
-  "a4_decision_matches": 5663,
-  "t3_decision_matches": 5663,
-  "signal_matches": 5663,
-  "pending_matches": 5663,
-  "entry_matches": 5663,
-  "exit_matches": 5663,
-  "python_signals": 26,
-  "python_entries": 22,
-  "python_exits": 22,
+  "exact_ohlc_matches": 8725,
+  "indicator_matches": 8725,
+  "a4_decision_matches": 8725,
+  "t3_decision_matches": 8725,
+  "signal_matches": 8725,
+  "pending_matches": 8725,
+  "entry_matches": 8725,
+  "exit_matches": 8725,
+  "python_signals": 39,
+  "python_entries": 35,
+  "python_exits": 34,
   "signals_with_a_divergence": 0,
   "trades_with_a_divergence": 0,
   "dimensions": {
     "ohlc": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "volume_and_spread": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "h1_context": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "indicators": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "carried_state": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "a4_context": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "a4_signal": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "t3_context": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "t3_signal": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "signal": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "pending": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "entry": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "stop_and_target": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     },
     "exit": {
-      "matching": 5663,
-      "of": 5663,
+      "matching": 8725,
+      "of": 8725,
       "percent": 100.0
     }
   },
-  "python_trades": 22,
-  "mt5_trades": 22,
-  "python_unclosed_trades": 0,
-  "mt5_unclosed_trades": 0,
+  "python_trades": 35,
+  "mt5_trades": 35,
+  "python_unclosed_trades": 1,
+  "mt5_unclosed_trades": 1,
   "python_unmatched_exits": 0,
   "mt5_unmatched_exits": 0,
-  "full_trade_matches": 22,
+  "full_trade_matches": 35,
   "full_trade_parity": true,
   "mismatch_counts": {
     "WINDOW_BOUNDARY": 2
   },
   "first_mismatch": {
-    "bar_time_utc": "2026-02-28T23:45:00Z",
+    "bar_time_utc": "2025-11-30T23:45:00Z",
     "classification": "WINDOW_BOUNDARY",
     "column": "bar_time_utc",
     "python": "present",
@@ -119,7 +119,7 @@
   },
   "first_20_mismatches": [
     {
-      "bar_time_utc": "2026-02-28T23:45:00Z",
+      "bar_time_utc": "2025-11-30T23:45:00Z",
       "classification": "WINDOW_BOUNDARY",
       "column": "bar_time_utc",
       "python": "present",
@@ -127,7 +127,7 @@
       "delta": null
     },
     {
-      "bar_time_utc": "2026-03-01T00:00:00Z",
+      "bar_time_utc": "2025-12-01T00:00:00Z",
       "classification": "WINDOW_BOUNDARY",
       "column": "bar_time_utc",
       "python": "present",
