@@ -125,10 +125,26 @@ def load_audit(path: str | Path, *, label: str) -> pd.DataFrame:
     if missing:
         raise ValueError(f"{label} audit is missing columns: {missing}")
     frame = frame[AUDIT_COLUMNS].copy()
+    collapsed = 0
     if frame[KEY].duplicated().any():
-        duplicate = frame.loc[frame[KEY].duplicated(), KEY].iloc[0]
-        raise ValueError(f"{label} audit has duplicate {KEY} rows, first at {duplicate}.")
-    return frame.sort_values(KEY).reset_index(drop=True)
+        # An EA rerun that appends into an existing log writes every bar again.
+        # Identical repeats are recoverable and collapsing them is lossless, so
+        # do it here — inside the tool, with the count reported — rather than
+        # leaving an untracked manual edit in the evidence chain. Repeats that
+        # actually disagree are two different runs and are still refused.
+        deduped = frame.drop_duplicates(subset=AUDIT_COLUMNS)
+        if deduped[KEY].duplicated().any():
+            conflict = deduped.loc[deduped[KEY].duplicated(), KEY].iloc[0]
+            raise ValueError(
+                f"{label} audit has conflicting rows for the same {KEY}, first at "
+                f"{conflict}. Two different runs are mixed in one file.")
+        collapsed = len(frame) - len(deduped)
+        print(f"{label} audit: collapsed {collapsed:,} identical repeated bars "
+              f"(an appended rerun); {len(deduped):,} distinct bars remain.")
+        frame = deduped
+    frame = frame.sort_values(KEY).reset_index(drop=True)
+    frame.attrs["duplicates_collapsed"] = collapsed
+    return frame
 
 
 def _numeric(value: str) -> float | None:
@@ -257,6 +273,8 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
     mismatched = set(detail[KEY]) if not detail.empty else set()
 
     return {
+        "python_duplicate_bars_collapsed": int(python_audit.attrs.get("duplicates_collapsed", 0)),
+        "mt5_duplicate_bars_collapsed": int(mt5_audit.attrs.get("duplicates_collapsed", 0)),
         "bars_compared": compared,
         "bars_only_in_python": len(only_python),
         "bars_only_in_mt5": len(only_mt5),

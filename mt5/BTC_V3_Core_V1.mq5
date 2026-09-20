@@ -47,6 +47,7 @@ input ExecutionMode InpMode            = AUDIT_ONLY;
 input string        InpSymbolExpected  = "BTCUSDm";
 input string        InpLogFile         = "btc_core_v1_audit.csv";
 input bool          InpUseCommonFiles  = true;
+input bool          InpAppendLog       = false;
 input double        InpStartBalance    = 10000.0;
 input double        InpRiskPercent     = 0.25;
 input double        InpRewardMultiple  = 3.0;
@@ -55,6 +56,11 @@ input bool          InpRequireUtcServer = true;
 
 //--- Frozen fingerprints, stamped into every log row so a log can never be
 //--- silently matched against a different Python build.
+//--- Twin build marker. MetaTrader runs the compiled .ex5, not the .mq5 on
+//--- disk, so an un-recompiled source change is invisible from the audit alone.
+//--- This banner is printed on every init: if the Experts tab does not show the
+//--- build you expect, the .ex5 is stale and the audit is from the old logic.
+#define TWIN_BUILD "R4-S2-2 warmup+session-reset+DI+risk-budget"
 #define CORE_FINGERPRINT "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd"
 #define A4_SETUP_ID "BTC_V3_A4_PULLBACK_LONG_FROZEN"
 #define T3_SETUP_ID "BTC_V3_T3_BREAKOUT_SHORT_FROZEN"
@@ -821,13 +827,26 @@ bool OpenLog()
   {
    //--- FILE_TXT, not FILE_CSV: whole lines are written by WriteAuditRow, so
    //--- no delimiter or line-break handling is delegated to FileWrite.
-   uint flags = FILE_READ|FILE_WRITE|FILE_TXT|FILE_ANSI;
+   //---
+   //--- One run is one audit. FileOpen truncates when FILE_READ is absent, and
+   //--- that is the default here on purpose: a rerun that appends into the same
+   //--- file writes every bar a second time, and the comparator then sees a
+   //--- doubled log rather than a run. Opt into appending only for a genuinely
+   //--- continuous live session.
+   uint flags = FILE_WRITE|FILE_TXT|FILE_ANSI;
    if(InpUseCommonFiles) flags |= FILE_COMMON;
+   if(InpAppendLog)      flags |= FILE_READ;
    g_file = FileOpen(InpLogFile,flags);
    if(g_file==INVALID_HANDLE)
      { Print("Cannot open audit log ",InpLogFile,": ",GetLastError()); return false; }
    bool fresh = (FileSize(g_file)==0);
-   FileSeek(g_file,0,SEEK_END);
+   if(InpAppendLog)
+     {
+      FileSeek(g_file,0,SEEK_END);
+      if(!fresh)
+         Print("Appending to an existing audit log. Bars already present will "
+               "repeat if this run covers the same range.");
+     }
    if(fresh && !WriteAuditHeader())
       return false;
    return true;
@@ -1413,6 +1432,8 @@ int OnInit()
    g_last_processed=0;
    Comment("BTC CORE V1 — AUDIT ONLY — NO ORDERS");
    Print("BTC CORE V1 — AUDIT ONLY — NO ORDERS. Fingerprint ",CORE_FINGERPRINT);
+   Print("Twin build ",TWIN_BUILD,", compiled ",__DATETIME__,
+         ". Warmup ",CoreWarmupM15Bars()," M15 / ",CoreWarmupH1Bars()," H1 bars.");
    if(InpMode!=AUDIT_ONLY)
       Print("WARNING: DEMO_EXECUTION selected, but transmission is not implemented; "
             "the EA still sends nothing.");

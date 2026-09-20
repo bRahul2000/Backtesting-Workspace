@@ -1,5 +1,12 @@
 # R4 Stage 2 — Backtester ↔ MT5 parity run (BTC Core V1, AUDIT_ONLY)
 
+> **Run 2 (2026-09-20 16:10) did not exercise the corrected EA.** The submitted
+> `..._corrected.csv` is byte-for-byte identical to run 1 after collapsing an
+> appended duplicate of every bar. Cause: MetaTrader runs the compiled `.ex5`,
+> and the deployed binary is dated 15:02 while the deployed source — which does
+> match repo HEAD — is dated 15:39. The source was copied across but never
+> recompiled, so the stale pre-correction binary ran. See "Run 2" at the end.
+
 **Verdict: NOT CERTIFIED.** The first real parity run diverged, seven defects
 were found and corrected, and every residual divergence is now attributed. Four
 of the corrections are in the MQL5 twin, so they are not present in the audit
@@ -153,3 +160,45 @@ on both sides fully matching. Anything else is a new finding and stays open.
 
 Audit CSVs live in `data/exness/btc/r4/` and are deliberately not committed
 (7.8 MB of generated/terminal output).
+
+
+---
+
+## Run 2 — 2026-09-20 16:10 (`..._corrected.csv`)
+
+The file holds 11,326 rows: every one of the 5,663 bars twice, and the two
+copies are identical. After collapsing the repeat, the frame is **byte-for-byte
+equal to run 1**. Every parity figure above reproduces to the decimal.
+
+Four falsifiable checks, each of which the corrected EA must change:
+
+| Check | Corrected EA | Run 2 |
+|---|---|---|
+| `A4_BEFORE_WINDOW` / `T3_BEFORE_WINDOW` rows | > 0 | **0** |
+| bars with `plus_di` while `adx` is empty | 13 | **0** |
+| entries before 2026-01-09 12:00 | 0 | **5** |
+| `a4_pullback_active` at 2026-01-13T22:00Z | 0 | **1** |
+
+All four report the pre-correction behaviour, so the running EA was the
+pre-`d618129` build.
+
+**Root cause.** In the wine prefix:
+
+```
+MQL5/Experts/BTC_V3_Core_V1.ex5   48,442 b   15:02   <- executed
+MQL5/Experts/BTC_V3_Core_V1.mq5   56,255 b   15:39   <- identical to repo HEAD
+```
+
+The `.mq5` was copied over but F7 was not pressed, so MetaTrader kept running
+the binary compiled from the previous source.
+
+### Two real defects this run exposed
+
+| | Where | Correction |
+|---|---|---|
+| F1 | EA | `OpenLog` appended into the existing common-files log, writing every bar a second time. It now truncates by default (`FileOpen` without `FILE_READ`); `InpAppendLog` opts back in for a continuous live session |
+| F2 | EA | `OnInit` prints `TWIN_BUILD` and `__DATETIME__`, so a stale `.ex5` is visible in the Experts tab instead of being inferred from parity output days later |
+| F3 | Comparator | `load_audit` collapses identical repeated bars, reports the count, and still refuses repeats that disagree — recovery happens inside the tool rather than as an untracked manual edit |
+
+Neither F1 nor F2 affects a decision, an indicator, a timestamp or an execution
+semantic. 752 tests pass; all seven protected fingerprints unchanged.

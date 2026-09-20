@@ -1,4 +1,6 @@
 {
+  "python_duplicate_bars_collapsed": 0,
+  "mt5_duplicate_bars_collapsed": 5663,
   "bars_compared": 5663,
   "bars_only_in_python": 2,
   "bars_only_in_mt5": 0,

@@ -89,11 +89,17 @@ def test_loading_rejects_a_missing_column(tmp_path):
         load_audit(path, label="MT5")
 
 
-def test_loading_rejects_duplicate_bars(tmp_path):
+def test_loading_rejects_duplicate_bars_that_disagree(tmp_path):
+    """One bar may not hold two different sets of values.
+
+    Identical repeats are an appended rerun and are collapsed instead; see
+    test_a_rerun_that_repeats_every_bar_is_recovered_not_refused.
+    """
     path = tmp_path / "dupe.csv"
     stamp = "2026-01-01T00:00:00Z"
-    _audit([_blank_row(stamp), _blank_row(stamp)]).to_csv(path, index=False)
-    with pytest.raises(ValueError, match="duplicate"):
+    first = _blank_row(stamp)
+    _audit([first, dict(first, ema20="1.0")]).to_csv(path, index=False)
+    with pytest.raises(ValueError, match="conflicting"):
         load_audit(path, label="Python")
 
 
@@ -530,3 +536,51 @@ def test_the_pending_lifecycle_vocabulary_is_shared():
         assert status in PENDING_STATUSES
         assert re.search(rf'"{status}"', exporter), f"{status} missing from the exporter"
         assert re.search(rf'"{status}"', source), f"{status} missing from the EA"
+
+
+# --- rerun hygiene ------------------------------------------------------------------------
+#
+# A rerun that appended into the existing common-files log doubled a 5,663-bar
+# audit to 11,326 rows, and the stale .ex5 that produced it was invisible from
+# the audit alone.
+
+
+def test_a_rerun_that_repeats_every_bar_is_recovered_not_refused(tmp_path, capsys):
+    rows = [_blank_row("2026-01-01T00:00:00Z"), _blank_row("2026-01-01T00:15:00Z")]
+    doubled = pd.DataFrame(rows + rows, columns=AUDIT_COLUMNS)
+    path = tmp_path / "doubled.csv"
+    doubled.to_csv(path, index=False)
+
+    frame = load_audit(path, label="MT5")
+    assert len(frame) == 2
+    assert frame.attrs["duplicates_collapsed"] == 2
+    assert "collapsed 2 identical repeated bars" in capsys.readouterr().out
+
+
+def test_two_different_runs_in_one_file_are_still_refused(tmp_path):
+    first = _blank_row("2026-01-01T00:00:00Z")
+    second = dict(first, close="100.6000000000")
+    path = tmp_path / "conflicting.csv"
+    pd.DataFrame([first, second], columns=AUDIT_COLUMNS).to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="conflicting rows"):
+        load_audit(path, label="MT5")
+
+
+def test_the_ea_starts_a_fresh_audit_per_run_by_default():
+    """FileOpen truncates without FILE_READ, so one run is one audit."""
+    source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    assert "input bool          InpAppendLog       = false;" in source
+    open_log = source.split("bool OpenLog()")[1].split("\n  }")[0]
+    assert "FILE_WRITE|FILE_TXT|FILE_ANSI" in open_log.replace(" ", "")
+    # FILE_READ is only added when appending was explicitly requested.
+    assert "if(InpAppendLog)      flags |= FILE_READ;" in open_log
+    assert open_log.count("FileSeek(g_file,0,SEEK_END)") == 1
+
+
+def test_the_ea_prints_a_build_banner_so_a_stale_binary_is_visible():
+    """MetaTrader runs the .ex5; an un-recompiled source change is silent."""
+    source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    assert "#define TWIN_BUILD" in source
+    assert "__DATETIME__" in source
+    assert 'Print("Twin build ",TWIN_BUILD' in source
