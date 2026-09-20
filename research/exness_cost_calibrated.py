@@ -61,17 +61,38 @@ def _event(order, status: str, reason: str | None = None,
                       order.setup_id)
 
 
+def _spread_at(spread, index: int) -> float:
+    """Resolve the spread for one bar.
+
+    A scalar keeps the original constant-spread behaviour exactly. A sequence
+    supplies the broker's real per-bar spread, one value per candle.
+    """
+    if isinstance(spread, (int, float)):
+        return float(spread)
+    return float(spread[index])
+
+
 def run_synthetic_segment(frame: pd.DataFrame, strategy: BtcV2SetupB,
-                          spread: float, trade_start: pd.Timestamp,
+                          spread, trade_start: pd.Timestamp,
                           settings: BacktestSettings = SETTINGS) -> BacktestResult:
     """Replay one continuous segment with Bid signals and quote-side execution.
 
     Conservative same-bar resolution and position sizing reuse audited engine
     primitives. The only new rule is selecting the Bid or synthetic Ask stream.
+
+    ``spread`` is either a constant (the historical calibrated assumption) or a
+    per-bar sequence carrying the broker's real historical spread.
     """
-    if spread < 0:
-        raise ValueError("Spread must be nonnegative.")
     candles = _validated_candles(frame)
+    if isinstance(spread, (int, float)):
+        if spread < 0:
+            raise ValueError("Spread must be nonnegative.")
+    else:
+        spread = [float(value) for value in spread]
+        if len(spread) != len(candles):
+            raise ValueError("Per-bar spread must supply exactly one value per candle.")
+        if any(value < 0 for value in spread):
+            raise ValueError("Spread must be nonnegative.")
     if any(b.timestamp - a.timestamp != pd.Timedelta(minutes=15)
            for a, b in zip(candles, candles[1:])):
         raise ValueError("Synthetic replay requires one continuous M15 segment.")
@@ -89,7 +110,7 @@ def run_synthetic_segment(frame: pd.DataFrame, strategy: BtcV2SetupB,
                 result.order_events.append(_event(order, "expired", "Expiry bar passed without a trigger."))
                 pending = None
             else:
-                side = entry_candle(bid, spread, order.direction)
+                side = entry_candle(bid, _spread_at(spread, index), order.direction)
                 try:
                     position = fill_pending_order(order, side, index, len(result.trades) + 1,
                                                   settings)
@@ -111,7 +132,7 @@ def run_synthetic_segment(frame: pd.DataFrame, strategy: BtcV2SetupB,
                                                            "Not triggered by the end of the expiry bar."))
                         pending = None
         if position is not None:
-            side = exit_candle(bid, spread, position.direction)
+            side = exit_candle(bid, _spread_at(spread, index), position.direction)
             decision = exit_decision(position, side, settings.same_bar_resolution,
                                      entered_intrabar=entered_intrabar)
             if decision is not None:

@@ -71,6 +71,32 @@ def _group_stats(trades, key):
     return out
 
 
+
+def _broker_native_spread(path: Path, data: pd.DataFrame) -> pd.Series:
+    """Real per-bar spread from a broker-native export, keyed by timestamp.
+
+    Requires an explicit spread_price column: a broker-native run must never
+    silently fall back to the calibrated constant.
+    """
+    raw = pd.read_csv(path)
+    columns = {name.lower().strip(): name for name in raw.columns}
+    stamp = columns.get("timestamp") or columns.get("timestamp_utc")
+    price = columns.get("spread_price")
+    if stamp is None or price is None:
+        raise ValueError(
+            "spread_source=BROKER_NATIVE_PER_BAR requires timestamp and spread_price "
+            f"columns in {path.name}; found {sorted(raw.columns)}.")
+    series = pd.Series(pd.to_numeric(raw[price], errors="coerce").to_numpy(),
+                       index=pd.to_datetime(raw[stamp], utc=True))
+    series = series[~series.index.duplicated(keep="last")]
+    missing = [stamp for stamp in data.timestamp if stamp not in series.index]
+    if missing:
+        raise ValueError(f"{len(missing)} candles have no broker spread; first {missing[0]}.")
+    if series.isna().any() or (series.dropna() < 0).any():
+        raise ValueError("Broker spread column contains missing or negative values.")
+    return series
+
+
 def _trade_row(trade):
     row = asdict(trade)
     for key, value in list(row.items()):
@@ -128,6 +154,11 @@ def run_universal_backtest(
     data = data.loc[data.timestamp.between(start, end)].reset_index(drop=True)
     if data.empty:
         raise ValueError("No data in requested date range.")
+    # Opt-in broker-native spread. load_ohlcv_csv keeps only the OHLCV columns,
+    # so the real per-bar spread is read from the same file separately. The
+    # default CONSTANT path is untouched.
+    broker_spread = _broker_native_spread(path, data) if \
+        config.spread_source == "BROKER_NATIVE_PER_BAR" else None
 
     # Fingerprint the *effective* configuration (defaults merged with overrides),
     # not the raw override mapping — a default-only run must not fingerprint as
@@ -182,13 +213,19 @@ def run_universal_backtest(
             continue
         inner_strategy = adapter.create_legacy_strategy(config.strategy_parameters)
         strategy = DiagnosticStrategyObserver(inner_strategy, descriptor.metadata.strategy_id)
-        result = run_synthetic_segment(frame, strategy, config.spread, trade_start, settings)
+        segment_spread = (config.spread if broker_spread is None
+                          else [broker_spread[stamp] for stamp in frame.timestamp])
+        result = run_synthetic_segment(frame, strategy, segment_spread, trade_start, settings)
         # Strategies may optionally emit their own rule-level diagnostics/X-Ray evaluations
         # (see strategies/btc_pb1_shallow_pullback.py). This never changes fill/risk/target
         # behavior — frozen strategies without these attributes are unaffected.
         result.diagnostic_events = list(strategy.events) + list(getattr(inner_strategy, "diagnostic_events", ()))
         xray_evaluations.extend(getattr(inner_strategy, "xray_evaluations", ()))
-        enrich_result(result, frame, spread=config.spread)
+        # Excursion enrichment mirrors the execution spread so short-side
+        # excursions are measured against the same Ask stream that filled them.
+        enrich_result(result, frame,
+                      spread=config.spread if broker_spread is None
+                      else float(pd.Series(segment_spread).median()))
         add_closed_trade_equity(result)
         results.append(result)
         pooled.extend(result.trades)

@@ -42,6 +42,10 @@ class BacktestConfig:
     # silently redefining its own target.
     risk_reward_ratio: float = 3.0
     spread: float = 10.0
+    # CONSTANT keeps the historical calibrated single-spread assumption.
+    # BROKER_NATIVE_PER_BAR uses the real per-bar spread carried by the
+    # dataset, which is only meaningful for a broker-native export.
+    spread_source: str = "CONSTANT"
     commission_percent: float = 0.0
     slippage_percent: float = 0.0
     leverage: float = 1.0
@@ -63,6 +67,8 @@ class BacktestConfig:
             raise ValueError("start_date must not exceed end_date.")
         if self.risk_per_trade_percent <= 0 or self.initial_capital <= 0:
             raise ValueError("Capital and risk must be positive.")
+        if self.spread_source not in ("CONSTANT", "BROKER_NATIVE_PER_BAR"):
+            raise ValueError("spread_source must be CONSTANT or BROKER_NATIVE_PER_BAR.")
         if self.risk_reward_ratio <= 0:
             raise ValueError("risk_reward_ratio must be positive.")
         if self.spread < 0 or self.commission_percent < 0 or self.slippage_percent < 0:

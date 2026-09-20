@@ -1,0 +1,172 @@
+{
+  "phase": "R3 \u2014 frozen BTC Core portability, Exness broker-native vs Bitstamp",
+  "strategy_id": "BTC_V3_CORE_V1_FROZEN",
+  "frozen_core_fingerprint": "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd",
+  "not_tuned": "No parameter was changed. The frozen Core is untouched.",
+  "overlap": {
+    "matched_candles": 99897,
+    "start_utc": "2023-11-10T23:15:00+00:00",
+    "end_utc": "2026-09-17T01:30:00+00:00",
+    "exness_sha256": "ac15167c91f1fe99af1a8653a282afb03cb21564abaed8d58e60d6822efc7c49",
+    "bitstamp_sha256": "e58e1780e5517a9af082ed93156bc4df172cbb0b5c9ef762d882172e6da9c103",
+    "note": "Derived overlap datasets are written outside the repository; they are fully reproducible from the committed inputs by rerunning this module."
+  },
+  "variants": {
+    "EXNESS_NATIVE": {
+      "label": "EXNESS_NATIVE",
+      "strategy_fingerprint": "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd",
+      "parameter_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "dataset_fingerprint": "ac15167c91f1fe99af1a8653a282afb03cb21564abaed8d58e60d6822efc7c49",
+      "spread_source": "BROKER_NATIVE_PER_BAR",
+      "constant_spread": null,
+      "metrics": {
+        "total_trades": 304,
+        "long_trades": 145,
+        "short_trades": 159,
+        "total_entries": 305,
+        "open_at_end": 1,
+        "win_rate": 26.31578947368421,
+        "profit_factor": 1.0717338762754998,
+        "average_r": 0.055958000036994714,
+        "total_r": 17.011232011246385,
+        "pnl": 401.86445183387735,
+        "max_drawdown_percent": 3.6520839303374726,
+        "max_losing_streak": 10
+      }
+    },
+    "EXNESS_FLAT10": {
+      "label": "EXNESS_FLAT10",
+      "strategy_fingerprint": "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd",
+      "parameter_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "dataset_fingerprint": "ac15167c91f1fe99af1a8653a282afb03cb21564abaed8d58e60d6822efc7c49",
+      "spread_source": "CONSTANT",
+      "constant_spread": 10.0,
+      "metrics": {
+        "total_trades": 295,
+        "long_trades": 137,
+        "short_trades": 158,
+        "total_entries": 296,
+        "open_at_end": 1,
+        "win_rate": 27.11864406779661,
+        "profit_factor": 1.1174926589436327,
+        "average_r": 0.08836097108248667,
+        "total_r": 26.06648646933357,
+        "pnl": 630.9288416152295,
+        "max_drawdown_percent": 3.6515592319333843,
+        "max_losing_streak": 9
+      }
+    },
+    "BITSTAMP_FLAT10": {
+      "label": "BITSTAMP_FLAT10",
+      "strategy_fingerprint": "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd",
+      "parameter_fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "dataset_fingerprint": "e58e1780e5517a9af082ed93156bc4df172cbb0b5c9ef762d882172e6da9c103",
+      "spread_source": "CONSTANT",
+      "constant_spread": 10.0,
+      "metrics": {
+        "total_trades": 354,
+        "long_trades": 149,
+        "short_trades": 205,
+        "total_entries": 354,
+        "open_at_end": 0,
+        "win_rate": 29.096045197740114,
+        "profit_factor": 1.228648895013868,
+        "average_r": 0.1625736467142846,
+        "total_r": 57.551070936856746,
+        "pnl": 1437.4528455865322,
+        "max_drawdown_percent": 3.7455941320390216,
+        "max_losing_streak": 13
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "comparison": "BITSTAMP_FLAT10 vs EXNESS_FLAT10",
+      "isolates": "FEED (identical spread model)",
+      "trades_a": 354,
+      "trades_b": 295,
+      "matched_signals": 149,
+      "unmatched_signals": 351,
+      "matched_percent_of_a": 42.090395480225986,
+      "classifications": {
+        "SIGNAL_DIFFERENCE": 351,
+        "FEED_PRICE_DIFFERENCE": 111,
+        "EXIT_DIFFERENCE": 30,
+        "ENTRY_DIFFERENCE": 8
+      },
+      "identical_percent_of_matched": 0.0,
+      "difference_summary": {
+        "median_entry_price_difference": -17.41578615360777,
+        "median_absolute_entry_price_difference": 20.57013398136769,
+        "median_absolute_stop_difference": 16.881662116167718,
+        "exit_reason_changes": 7,
+        "median_r_difference": 0.0,
+        "mean_r_difference": -0.18946277559294472,
+        "total_r_difference": -28.22995356334876
+      }
+    },
+    {
+      "comparison": "EXNESS_FLAT10 vs EXNESS_NATIVE",
+      "isolates": "SPREAD (identical feed)",
+      "trades_a": 295,
+      "trades_b": 304,
+      "matched_signals": 295,
+      "unmatched_signals": 9,
+      "matched_percent_of_a": 100.0,
+      "classifications": {
+        "IDENTICAL": 251,
+        "SPREAD_DIFFERENCE": 29,
+        "EXIT_DIFFERENCE": 13,
+        "SIGNAL_DIFFERENCE": 9,
+        "ENTRY_DIFFERENCE": 2
+      },
+      "identical_percent_of_matched": 85.08474576271186,
+      "difference_summary": {
+        "median_entry_price_difference": 0.0,
+        "median_absolute_entry_price_difference": 0.0,
+        "median_absolute_stop_difference": 0.0,
+        "exit_reason_changes": 2,
+        "median_r_difference": 0.0,
+        "mean_r_difference": -0.027241669794360875,
+        "total_r_difference": -8.036292589336458
+      }
+    },
+    {
+      "comparison": "BITSTAMP_FLAT10 vs EXNESS_NATIVE",
+      "isolates": "FEED + SPREAD combined",
+      "trades_a": 354,
+      "trades_b": 304,
+      "matched_signals": 150,
+      "unmatched_signals": 358,
+      "matched_percent_of_a": 42.3728813559322,
+      "classifications": {
+        "SIGNAL_DIFFERENCE": 358,
+        "FEED_PRICE_DIFFERENCE": 109,
+        "EXIT_DIFFERENCE": 33,
+        "ENTRY_DIFFERENCE": 8
+      },
+      "identical_percent_of_matched": 0.0,
+      "difference_summary": {
+        "median_entry_price_difference": -17.544229465187527,
+        "median_absolute_entry_price_difference": 20.463611520950508,
+        "median_absolute_stop_difference": 16.893582783035527,
+        "exit_reason_changes": 7,
+        "median_r_difference": 0.0,
+        "mean_r_difference": -0.18895519390041204,
+        "total_r_difference": -28.343279085061805
+      }
+    }
+  ],
+  "cost_status": {
+    "spread": "modelled \u2014 real per-bar broker spread in EXNESS_NATIVE",
+    "commission": "NOT MODELLED \u2014 UNVERIFIED for BTCUSDm",
+    "swap": "NOT MODELLED \u2014 UNVERIFIED; positions are intraday but overnight holds are possible",
+    "leverage_margin": "NOT MODELLED \u2014 UNVERIFIED; engine caps leverage at 1.0",
+    "slippage": "NOT MODELLED \u2014 0.0 in this configuration"
+  },
+  "limitations": [
+    "Exness candles are broker Bid quotes; the Ask stream is synthesized by adding the spread.",
+    "MT5 bar spread is a bar-level descriptor, not the spread guaranteed at an execution tick, so EXNESS_NATIVE costs are indicative rather than tick-exact.",
+    "This is a portability measurement over a broker-native window. It is not a live-profitability claim."
+  ]
+}
