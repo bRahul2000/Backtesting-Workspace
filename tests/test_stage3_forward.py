@@ -451,3 +451,73 @@ def test_the_build_timestamp_is_converted_explicitly():
     assert "TimeToString(__DATETIME__,\n" in source
     assert "TIME_DATE|TIME_MINUTES|TIME_SECONDS)" in source
     assert static_check()["no_implicit_datetime_to_string"] is True
+
+
+# --- session bring-up -------------------------------------------------------------------------
+#
+# The first live Stage 3 start halted with ANCHOR_UNREACHABLE. The anchor was
+# placed at bar InpMaxReplayBars-1, and the reachability loop could only confirm
+# bars strictly older than the anchor, which it could never reach. Every first
+# start halted, at any input value.
+
+
+def test_the_anchor_bar_itself_is_reachable_and_replayed():
+    report = static_check()
+    assert report["anchor_bar_is_reachable"] is True
+    assert report["halts_if_anchor_unreachable"] is True
+
+
+def test_the_reachability_walk_can_reach_an_anchor_at_the_cap():
+    """The arithmetic that failed live, reproduced directly.
+
+    shift ends one past the oldest bar to replay. With the anchor at index
+    cap-1, a loop bounded by `shift < cap` that only breaks on a bar strictly
+    older than the anchor runs out of room before it can confirm anything.
+    """
+    def walk(cap, anchor_index, inclusive):
+        shift, reached = 1, False
+        while (shift <= cap) if inclusive else (shift < cap):
+            older = shift > anchor_index
+            equal = shift == anchor_index
+            if older:
+                reached = True
+                break
+            shift += 1
+            if inclusive and equal:
+                reached = True
+                break
+        return reached, shift
+
+    assert walk(20_000, 19_999, inclusive=False)[0] is False   # the live failure
+    reached, shift = walk(20_000, 19_999, inclusive=True)
+    assert reached is True
+    assert shift == 20_000                                      # anchor included
+    # A normal, shallow anchor works either way; the bug only bit at the cap.
+    assert walk(20_000, 1_500, inclusive=True)[0] is True
+
+
+def test_a_new_session_anchors_at_warmup_depth_not_the_replay_cap():
+    """Anchoring at the cap would replay months on every restart."""
+    assert static_check()["anchor_depth_is_warmup_based"] is True
+    source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    assert "input int           InpAnchorWarmupBars = 1500;" in source
+    # Whatever the input says, the depth must still cover the frozen warmup.
+    from tools.check_mt5_core_source import warmup_h1_bars, warmup_m15_bars
+    needed = warmup_h1_bars(source) * 4 + warmup_m15_bars(source) + 64
+    assert 1500 >= needed, f"default anchor depth {1500} is below warmup {needed}"
+
+
+def test_a_failed_bring_up_does_not_persist_its_anchor():
+    """Otherwise a plain restart resurrects the same unusable origin."""
+    assert static_check()["halted_bringup_is_not_persisted"] is True
+
+
+def test_starting_a_fresh_session_preserves_the_previous_evidence():
+    """Evidence is renamed aside, never deleted."""
+    report = static_check()
+    assert report["fresh_session_rotates_not_deletes"] is True
+    source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    assert "input bool          InpNewSession      = false;" in source
+    assert "FileDelete" not in source
+    for name in ("InpLogFile", "SessionFileName()", "InpEventFile"):
+        assert f"RotateStageFile({name});" in source

@@ -300,6 +300,25 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
         # A datetime assigned into a string is an implicit cast and a compiler
         # warning. Print() is variadic and formats its own arguments, so only
         # assignment contexts are checked here.
+        # The anchor bar must be reachable AND replayed. Anchoring at the cap
+        # with a strictly-older test made every first start halt.
+        "anchor_bar_is_reachable": bool(re.search(
+            r"while\(shift <= InpMaxReplayBars\)", code))
+            and bool(re.search(r"stamp==g_anchor\)\s*\{ reached=true; break; \}", code)),
+        # A new session anchors at warmup depth, never at the safety cap.
+        "anchor_depth_is_warmup_based": "InpAnchorWarmupBars" in code
+            and "CoreWarmupH1Bars()*4" in code,
+        # A failed bring-up must not persist its anchor.
+        # ProcessPendingBars() must be followed by a halt check that returns
+        # before WriteSessionFile(), so a failed bring-up cannot persist its
+        # anchor and be resurrected by a plain restart.
+        "halted_bringup_is_not_persisted": bool(re.search(
+            r"ProcessPendingBars\(\);\s*if\(g_halted\)\s*\{[^}]*?return INIT_SUCCEEDED;\s*\}",
+            code, re.S)),
+        # A fresh session preserves the previous one's evidence by renaming it.
+        "fresh_session_rotates_not_deletes": all(t in code for t in (
+            "RotateStageFile", "RotateSessionEvidence", "FileMove", "InpNewSession"))
+            and "FileDelete" not in code,
         "no_implicit_datetime_to_string": not re.search(
             r"=\s*__DATETIME__\s*;", code),
         "stage3_files_separate_from_audit_schema": all(t in source for t in (

@@ -8,6 +8,25 @@ strategy *would* have done. Nothing reaches the broker.
 
 ---
 
+## Starting a fresh forward session
+
+Use this when there is no session yet, or when a previous session must be
+abandoned (for example it anchored somewhere unusable).
+
+1. In MetaTrader, right-click the chart → **Expert Advisors** → **Remove**.
+2. Drag `BTC_V3_Core_V1` back onto the BTCUSDm M15 chart.
+3. On the **Inputs** tab set **`InpNewSession` = `true`**. Leave everything else
+   alone. Click OK.
+4. Read the Journal. You should see three `Rotated …` lines and then a normal
+   `SESSION_START`.
+5. **Remove the EA and re-attach it with `InpNewSession` back to `false`.**
+   Leaving it `true` would rotate the evidence again on every restart.
+
+Nothing is deleted. Each previous file is renamed in place with a UTC stamp and
+a `.bak` suffix, in the same `Common\Files` folder.
+
+---
+
 ## One-time setup
 
 **1. Copy the EA across.**

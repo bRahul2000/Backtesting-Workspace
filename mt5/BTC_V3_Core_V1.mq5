@@ -59,6 +59,8 @@ input bool          InpRequireUtcServer = true;
 input string        InpSessionFile     = "btc_core_v1_session.csv";
 input string        InpEventFile       = "btc_core_v1_events.csv";
 input int           InpMaxReplayBars   = 20000;
+input int           InpAnchorWarmupBars = 1500;
+input bool          InpNewSession      = false;
 input int           InpTickOutageSecs  = 900;
 
 //--- Frozen fingerprints, stamped into every log row so a log can never be
@@ -1004,6 +1006,32 @@ void WriteSessionFile()
    FileClose(handle);
   }
 
+//--- Rename, never delete. Starting a fresh session must preserve whatever the
+//--- previous one recorded, so each file is moved aside with a UTC stamp and a
+//--- .bak suffix. Nothing is removed and nothing is overwritten.
+void RotateStageFile(const string name)
+  {
+   int common = InpUseCommonFiles ? FILE_COMMON : 0;
+   if(!FileIsExist(name,common))
+      return;
+   string stamp = TimeToString(TimeGMT(),TIME_DATE|TIME_MINUTES|TIME_SECONDS);
+   StringReplace(stamp,".","");
+   StringReplace(stamp,":","");
+   StringReplace(stamp," ","T");
+   string dest = name+"."+stamp+".bak";
+   if(FileMove(name,common,dest,common))
+      Print("Rotated ",name," -> ",dest);
+   else
+      Print("Could not rotate ",name,": error ",GetLastError());
+  }
+
+void RotateSessionEvidence()
+  {
+   RotateStageFile(InpLogFile);
+   RotateStageFile(SessionFileName());
+   RotateStageFile(InpEventFile);
+  }
+
 //--- Reads back only what must survive a restart: the anchor and the counters.
 void ReadSessionFile()
   {
@@ -1687,15 +1715,20 @@ string StartKind(const int restarts) { return (restarts>0) ? "RESTART" : "SESSIO
 
 void ProcessPendingBars()
   {
+   //--- shift ends one past the oldest bar to replay, so the anchor bar itself
+   //--- is included. Testing only "older than the anchor" could never see the
+   //--- anchor bar, so an anchor sitting exactly at the cap was unreachable by
+   //--- construction and every first start halted.
    int shift = 1;
    bool reached = false;
-   while(shift < InpMaxReplayBars)
+   while(shift <= InpMaxReplayBars)
      {
       datetime stamp = iTime(_Symbol,PERIOD_M15,shift);
       if(stamp==0)                                      { reached=true; break; }
       if(g_last_processed!=0 && stamp<=g_last_processed) { reached=true; break; }
       if(g_anchor!=0 && stamp<g_anchor)                 { reached=true; break; }
       shift++;
+      if(g_anchor!=0 && stamp==g_anchor)                { reached=true; break; }
      }
    //--- Silently starting the replay somewhere other than the anchor would give
    //--- a different warmup boundary and therefore different decisions, which is
@@ -1789,6 +1822,10 @@ int OnInit()
 
    if(g_live)
      {
+      //--- A deliberate fresh start moves the previous session's three files
+      //--- aside before anything reads or opens them.
+      if(InpNewSession)
+         RotateSessionEvidence();
       //--- Recover the anchor and counters, then re-derive everything else.
       ReadSessionFile();
       bool resumed = (g_session_id!="");
@@ -1801,7 +1838,15 @@ int OnInit()
          //--- First start fixes the replay origin. Everything downstream —
          //--- warmup boundary, first search time, every decision — is derived
          //--- from it, so it must never move again.
-         int deepest = MathMin(InpMaxReplayBars-1,Bars(_Symbol,PERIOD_M15)-1);
+         //---
+         //--- Depth is the warmup the frozen Core needs plus headroom, NOT the
+         //--- replay cap. InpMaxReplayBars is a safety limit; anchoring at it
+         //--- would make every restart replay months of bars for no benefit and
+         //--- would leave no margin before the limit.
+         int wanted = MathMax(InpAnchorWarmupBars,
+                              CoreWarmupH1Bars()*4+CoreWarmupM15Bars()+64);
+         int deepest = MathMin(wanted,
+                       MathMin(InpMaxReplayBars-1,Bars(_Symbol,PERIOD_M15)-1));
          if(deepest<1)
            {
             g_halted=true; g_halt_reason="No M15 history available to anchor the session.";
@@ -1825,6 +1870,13 @@ int OnInit()
                "anchor "+IsoUtc(g_anchor,true)+", last logged bar "
                +IsoUtc(g_last_logged,g_last_logged!=0)+", build "+TWIN_BUILD);
       ProcessPendingBars();
+      if(g_halted)
+        {
+         //--- Never persist the anchor of a session that could not start, or a
+         //--- plain restart would keep resurrecting the same bad origin.
+         Print("Stage 3 bring-up failed; session file left unchanged.");
+         return INIT_SUCCEEDED;
+        }
       g_last_bar_time = iTime(_Symbol,PERIOD_M15,0);
       WriteSessionFile();
       Print("Stage 3 live forward ready. Session ",g_session_id,
