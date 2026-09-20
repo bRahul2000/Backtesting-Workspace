@@ -791,3 +791,17 @@ def test_a_differing_abandoned_position_still_fails():
     result = compare(_audit(mine), _audit(theirs))
     assert result["full_trade_matches"] == 1
     assert result["full_trade_parity"] is False
+
+
+def test_tick_volume_is_held_to_the_raw_data_standard():
+    """A field no strategy reads is still raw broker data, not a free pass.
+
+    The daily-cap window differed on tick_volume for exactly one bar, with OHLC
+    and spread bit-identical. Volume feeds no gate, indicator or execution rule,
+    so it cannot change a decision — but it is the canary for the two sides
+    reading different history snapshots, and the same mechanism could revise a
+    price. It stays a hard DATA_MISMATCH.
+    """
+    assert _classification(tick_volume="270.0000000000") == "DATA_MISMATCH"
+    python_audit, mt5_audit = _pair(tick_volume="270.0000000000")
+    assert compare(python_audit, mt5_audit)["full_parity"] is False
