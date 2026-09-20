@@ -1,5 +1,7 @@
 # R4 Stage 2 — Backtester ↔ MT5 parity run (BTC Core V1, AUDIT_ONLY)
 
+> **Run 4 (final, 16:54) is the certified run — FULL PARITY: True.**
+>
 > **Run 3 (certification, 16:37) reached 99.965% and 22/22 matching trades, but
 > one defect remains: the twin never cancels a pending order.** See "Run 3".
 >
@@ -10,10 +12,10 @@
 > match repo HEAD — is dated 15:39. The source was copied across but never
 > recompiled, so the stale pre-correction binary ran. See "Run 2" at the end.
 
-**Verdict: NOT CERTIFIED.** The first real parity run diverged, seven defects
-were found and corrected, and every residual divergence is now attributed. Four
-of the corrections are in the MQL5 twin, so they are not present in the audit
-CSV this report measures. Certification requires one more MT5 run.
+**Verdict: CERTIFIED on run 4** (`..._final.csv`, 2026-09-20 16:54). All 76
+audit columns agree on all 5,663 commonly logged bars and all 22 trades match
+end to end. The history below is kept: it took four runs and eight corrections,
+and each one is recorded with the evidence that found it. See "Run 4".
 
 ## What was compared
 
@@ -276,3 +278,88 @@ enforces that invariant on any audit, so a silently dropped order cannot pass.
 C10 is an EA change and is not present in the certification file. Nothing was
 reconstructed: the numbers above are measured from the observed MT5 output as
 submitted. One more run of the recompiled EA is required.
+
+
+---
+
+## Run 4 — CERTIFIED (`..._final.csv`, 2026-09-20 16:54)
+
+Confirmed fresh from the MT5 Journal (`compiled 2026.09.20 16:48:27`,
+`first signal search at 2026.01.09 12:00`, and
+`Pending cancelled at 2026-01-14T13:30:00Z: V3-L2 bullish trend context
+invalidated.`) and from the file: 5,663 distinct bars, no duplicates, distinct
+from every earlier run, and the MT5 pending ledger now balances exactly as
+Python's does — **26 CREATED = 22 FILLED + 3 EXPIRED + 1 CANCELLED**.
+
+| Dimension | Matching | Parity |
+|---|---|---|
+| `ohlc` | 5,663 / 5,663 | **100%** |
+| `volume_and_spread` | 5,663 / 5,663 | **100%** |
+| `h1_context` | 5,663 / 5,663 | **100%** |
+| `indicators` | 5,663 / 5,663 | **100%** |
+| `carried_state` | 5,663 / 5,663 | **100%** |
+| `a4_context` / `a4_signal` | 5,663 / 5,663 | **100%** |
+| `t3_context` / `t3_signal` | 5,663 / 5,663 | **100%** |
+| `signal` | 5,663 / 5,663 | **100%** |
+| `pending` | 5,663 / 5,663 | **100%** |
+| `entry` | 5,663 / 5,663 | **100%** |
+| `stop_and_target` | 5,663 / 5,663 | **100%** |
+| `exit` | 5,663 / 5,663 | **100%** |
+
+Whole-bar decision parity **100.000%**, 0 mismatching bars.
+Trades **22 / 22, all 22 matching** on entry time, entry price, stop, target,
+exit time, exit price, exit reason and realized R. Summed realized R is
+identical to ten decimal places on both sides (−5.8348258414). Exits: 18 stop
+loss, 4 take profit.
+
+Verified independently of the comparator by a separate pass over all 76 columns
+and a separately rebuilt trade table: no column shows any residual difference.
+
+### The window boundary, and why it is not an exemption
+
+The EA evaluates `ProcessClosedBar(1)` — the just-closed bar. That is the
+safeguard that stops it reading a forming bar, and it means a run can never log
+the final bar of its own range. A Python audit run to the same end date
+therefore always carries a short tail past the last MT5 bar; here
+`2026-02-28T23:45Z` and `2026-03-01T00:00Z`, both out of session or
+not-bullish, with no signal, pending order, entry or exit.
+
+Rather than waive this by hand, the rule is now in the comparator as
+`WINDOW_BOUNDARY`, and it is deliberately narrow. These remain hard failures:
+
+* a Python-only bar **inside** the MT5 range, wherever it falls;
+* **any** MT5-only bar;
+* a trailing bar carrying **any** decision — signal side, setup id, either
+  signal flag, a pending status, an entry or an exit.
+
+Nine tests pin those guardrails, including a parametrised case for each of the
+seven decision columns.
+
+### Acceptance criterion, as enforced
+
+> 100% strategy decision parity over every compared bar; no MT5-only bar; no
+> Python-only bar inside the MT5 range; and any Python bars past the last
+> logged MT5 bar must carry no signal, pending order, entry or exit.
+
+**FULL PARITY: True.**
+
+### Final state
+
+* **764 tests pass.** 42/42 static checks pass.
+* All seven protected fingerprints unchanged; PB1/PB2/PB3 remain REJECTED.
+* `AUDIT_ONLY` is the default, `SendOrderGuard` refuses unconditionally, no
+  order-submission call exists in the source, DEMO_EXECUTION not enabled.
+* Commission, swap and realized cost remain `UNVERIFIED`. No rate was invented.
+* Tolerances unchanged throughout: `EXACT_TOLERANCE = 1e-09`,
+  `INDICATOR_TOLERANCE = 1e-06`, `ROUNDING_TOLERANCE = 0.01` as a label only.
+
+### What this certifies, and what it does not
+
+It certifies that the MQL5 twin reproduces the frozen BTC Core exactly on
+broker-native Exness BTCUSDm data over 2026-01-01 → 2026-03-01: same bars, same
+indicators, same carried state, same gates, same orders, same fills, same
+exits, same R.
+
+It does not say anything about whether the strategy is worth trading. Over this
+window the frozen Core returned −5.83R across 22 trades. That is a property of
+the strategy, not of the twin, and it is not a validation result.

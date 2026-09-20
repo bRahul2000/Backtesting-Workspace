@@ -124,11 +124,16 @@ def test_fixture_h1_timestamp_mismatch():
 
 
 def test_fixture_missing_bar():
-    python_audit, mt5_audit = _pair()
-    mt5_audit = mt5_audit.iloc[:1]
+    """A gap INSIDE the MT5 range is a hard failure, wherever it falls."""
+    python_audit = _audit([_blank_row("2026-01-01T00:00:00Z"),
+                           _blank_row("2026-01-01T00:15:00Z"),
+                           _blank_row("2026-01-01T00:30:00Z")])
+    mt5_audit = _audit([_blank_row("2026-01-01T00:00:00Z"),
+                        _blank_row("2026-01-01T00:30:00Z")])
     result = compare(python_audit, mt5_audit)
     assert result["bars_only_in_python"] == 1
     assert result["mismatch_counts"]["TIMESTAMP_ALIGNMENT"] == 1
+    assert result["window_boundary_bars"] == []
     assert result["full_parity"] is False
 
 
@@ -183,7 +188,7 @@ def test_every_declared_class_is_reachable_or_documented():
         "DATA_MISMATCH", "TIMESTAMP_ALIGNMENT", "H1_ALIGNMENT", "INDICATOR_MISMATCH",
         "CONTEXT_MISMATCH", "SIGNAL_MISMATCH", "PENDING_STATE_MISMATCH",
         "ENTRY_PRICE_MISMATCH", "SL_MISMATCH", "TP_MISMATCH", "EXIT_MISMATCH",
-        "SPREAD_MISMATCH", "ROUNDING_MISMATCH", "UNKNOWN"}
+        "SPREAD_MISMATCH", "ROUNDING_MISMATCH", "WINDOW_BOUNDARY", "UNKNOWN"}
 
 
 # --- tolerances ----------------------------------------------------------------------------
@@ -234,10 +239,51 @@ def test_worst_numeric_differences_are_ranked():
     assert worst[0]["delta"] > worst[1]["delta"]
 
 
-def test_a_missing_mt5_record_is_never_a_match():
+def test_an_mt5_only_bar_is_always_a_hard_failure():
+    """The twin logging a bar Python never produced is never excusable."""
+    python_audit = _audit([_blank_row("2026-01-01T00:00:00Z")])
+    mt5_audit = _audit([_blank_row("2026-01-01T00:00:00Z"),
+                        _blank_row("2026-01-01T00:15:00Z")])
+    result = compare(python_audit, mt5_audit)
+    assert result["bars_only_in_mt5"] == 1
+    assert result["mismatch_counts"]["TIMESTAMP_ALIGNMENT"] == 1
+    assert result["full_parity"] is False
+
+
+def test_a_decision_free_tail_past_the_last_logged_bar_is_a_boundary():
+    """ProcessClosedBar(1) means a run can never log its own final bar.
+
+    The allowance exists only for that: bars strictly after the last MT5 bar
+    that carry no signal, pending order, entry or exit.
+    """
     python_audit, mt5_audit = _pair()
     result = compare(python_audit, mt5_audit.iloc[:1])
     assert result["bars_matching"] == 1
+    assert result["window_boundary_bars"] == ["2026-01-01T00:15:00Z"]
+    assert result["unresolved_one_sided_bars"] == []
+    assert result["mismatch_counts"]["WINDOW_BOUNDARY"] == 1
+    assert result["full_parity"] is True
+
+
+@pytest.mark.parametrize("column, value", [
+    ("signal_side", "LONG"),
+    ("signal_setup_id", "BTC_V3_A4_PULLBACK_LONG_FROZEN"),
+    ("a4_signal_pass", "1"),
+    ("t3_signal_pass", "1"),
+    ("pending_status", "CREATED"),
+    ("entry_time_utc", "2026-01-01T00:15:00Z"),
+    ("exit_time_utc", "2026-01-01T00:15:00Z"),
+])
+def test_a_trailing_bar_holding_a_decision_is_never_written_off(column, value):
+    """The boundary allowance must not swallow an unobserved decision."""
+    tail = _blank_row("2026-01-01T00:15:00Z")
+    tail[column] = value
+    python_audit = _audit([_blank_row("2026-01-01T00:00:00Z"), tail])
+    mt5_audit = _audit([_blank_row("2026-01-01T00:00:00Z")])
+    result = compare(python_audit, mt5_audit)
+    assert result["window_boundary_bars"] == []
+    assert result["unresolved_one_sided_bars"] == ["2026-01-01T00:15:00Z"]
+    assert result["mismatch_counts"]["TIMESTAMP_ALIGNMENT"] == 1
     assert result["full_parity"] is False
 
 

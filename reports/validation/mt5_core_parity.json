@@ -4,15 +4,21 @@
   "bars_compared": 5663,
   "bars_only_in_python": 2,
   "bars_only_in_mt5": 0,
-  "bars_matching": 5661,
-  "bars_mismatching": 2,
-  "decision_parity_percent": 99.96468303019601,
+  "last_mt5_bar": "2026-02-28T23:30:00Z",
+  "window_boundary_bars": [
+    "2026-02-28T23:45:00Z",
+    "2026-03-01T00:00:00Z"
+  ],
+  "unresolved_one_sided_bars": [],
+  "bars_matching": 5663,
+  "bars_mismatching": 0,
+  "decision_parity_percent": 100.0,
   "exact_ohlc_matches": 5663,
   "indicator_matches": 5663,
   "a4_decision_matches": 5663,
   "t3_decision_matches": 5663,
   "signal_matches": 5663,
-  "pending_matches": 5661,
+  "pending_matches": 5663,
   "entry_matches": 5663,
   "exit_matches": 5663,
   "python_signals": 26,
@@ -72,9 +78,9 @@
       "percent": 100.0
     },
     "pending": {
-      "matching": 5661,
+      "matching": 5663,
       "of": 5663,
-      "percent": 99.964683
+      "percent": 100.0
     },
     "entry": {
       "matching": 5663,
@@ -97,52 +103,35 @@
   "full_trade_matches": 22,
   "full_trade_parity": true,
   "mismatch_counts": {
-    "PENDING_STATE_MISMATCH": 2,
-    "TIMESTAMP_ALIGNMENT": 2
+    "WINDOW_BOUNDARY": 2
   },
   "first_mismatch": {
-    "bar_time_utc": "2026-01-14T13:30:00Z",
-    "classification": "PENDING_STATE_MISMATCH",
-    "column": "pending_status",
-    "python": "CANCELLED",
-    "mt5": "ACTIVE",
+    "bar_time_utc": "2026-02-28T23:45:00Z",
+    "classification": "WINDOW_BOUNDARY",
+    "column": "bar_time_utc",
+    "python": "present",
+    "mt5": "after the last logged bar",
     "delta": null
   },
   "first_20_mismatches": [
     {
-      "bar_time_utc": "2026-01-14T13:30:00Z",
-      "classification": "PENDING_STATE_MISMATCH",
-      "column": "pending_status",
-      "python": "CANCELLED",
-      "mt5": "ACTIVE",
-      "delta": null
-    },
-    {
-      "bar_time_utc": "2026-01-14T13:45:00Z",
-      "classification": "PENDING_STATE_MISMATCH",
-      "column": "pending_status",
-      "python": "",
-      "mt5": "EXPIRED",
-      "delta": null
-    },
-    {
       "bar_time_utc": "2026-02-28T23:45:00Z",
-      "classification": "TIMESTAMP_ALIGNMENT",
+      "classification": "WINDOW_BOUNDARY",
       "column": "bar_time_utc",
       "python": "present",
-      "mt5": "MISSING",
+      "mt5": "after the last logged bar",
       "delta": null
     },
     {
       "bar_time_utc": "2026-03-01T00:00:00Z",
-      "classification": "TIMESTAMP_ALIGNMENT",
+      "classification": "WINDOW_BOUNDARY",
       "column": "bar_time_utc",
       "python": "present",
-      "mt5": "MISSING",
+      "mt5": "after the last logged bar",
       "delta": null
     }
   ],
   "worst_numeric_differences": [],
-  "full_parity": false,
-  "acceptance_criterion": "100% strategy decision parity over every compared bar, with no bar present on only one side."
+  "full_parity": true,
+  "acceptance_criterion": "100% strategy decision parity over every compared bar; no MT5-only bar; no Python-only bar inside the MT5 range; and any Python bars past the last logged MT5 bar must carry no signal, pending order, entry or exit."
 }

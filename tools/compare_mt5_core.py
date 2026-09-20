@@ -44,8 +44,19 @@ CLASSES = [
     "TP_MISMATCH",
     "EXIT_MISMATCH",
     "ROUNDING_MISMATCH",
+    "WINDOW_BOUNDARY",
     "UNKNOWN",
 ]
+
+#: Columns that make a bar a decision. A bar carrying any of them can never be
+#: written off as a boundary artefact.
+DECISION_COLUMNS = ["signal_side", "signal_setup_id", "a4_signal_pass",
+                    "t3_signal_pass", "pending_status", "entry_time_utc",
+                    "exit_time_utc"]
+
+
+def _is_decision_free(row: pd.Series) -> bool:
+    return all(row[column] in ("", "0") for column in DECISION_COLUMNS)
 
 #: (class, columns, tolerance) in the order they are evaluated.
 CHECKS: list[tuple[str, list[str], float]] = [
@@ -219,9 +230,32 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
 
     # A bar present on one side only is never a match.
     mismatched_common = len({row[KEY] for row in rows})
+
+    # The EA evaluates ProcessClosedBar(1), the just-closed bar — the safeguard
+    # that stops it reading a forming bar. A run therefore can never log the
+    # final bar of its own range, so a Python audit run to the same end date
+    # always carries a short decision-free tail past the last MT5 bar.
+    #
+    # That tail is a window boundary, not a parity failure. The allowance is
+    # deliberately narrow: it applies only to bars strictly after the last MT5
+    # bar, and only while they carry no signal, pending order, entry or exit. A
+    # Python-only bar INSIDE the MT5 range, any MT5-only bar, and any trailing
+    # bar holding a decision all stay hard failures.
+    last_mt5 = max(right.index) if len(right.index) else None
+    trailing = [s for s in only_python if last_mt5 is not None and s > last_mt5]
+    trailing_inert = [s for s in trailing if _is_decision_free(left.loc[s])]
+    boundary = set(trailing_inert)
+    unresolved_python = [s for s in only_python if s not in boundary]
+
     for stamp in only_python:
-        rows.append({KEY: stamp, "classification": "TIMESTAMP_ALIGNMENT",
-                     "column": KEY, "python": "present", "mt5": "MISSING", "delta": None})
+        if stamp in boundary:
+            rows.append({KEY: stamp, "classification": "WINDOW_BOUNDARY", "column": KEY,
+                         "python": "present", "mt5": "after the last logged bar",
+                         "delta": None})
+        else:
+            rows.append({KEY: stamp, "classification": "TIMESTAMP_ALIGNMENT",
+                         "column": KEY, "python": "present", "mt5": "MISSING",
+                         "delta": None})
     for stamp in only_mt5:
         rows.append({KEY: stamp, "classification": "TIMESTAMP_ALIGNMENT",
                      "column": KEY, "python": "MISSING", "mt5": "present", "delta": None})
@@ -278,6 +312,9 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
         "bars_compared": compared,
         "bars_only_in_python": len(only_python),
         "bars_only_in_mt5": len(only_mt5),
+        "last_mt5_bar": last_mt5,
+        "window_boundary_bars": sorted(boundary),
+        "unresolved_one_sided_bars": sorted(unresolved_python) + sorted(only_mt5),
         "bars_matching": compared - mismatched_common,
         "bars_mismatching": mismatched_common,
         "decision_parity_percent": (float(100 * (compared - mismatched_common) / compared)
@@ -306,9 +343,12 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
         "first_20_mismatches": (detail.head(20).to_dict("records") if not detail.empty else []),
         "worst_numeric_differences": worst,
         "full_parity": bool(compared > 0 and mismatched_common == 0
-                            and not only_python and not only_mt5),
-        "acceptance_criterion": ("100% strategy decision parity over every compared bar, "
-                                 "with no bar present on only one side."),
+                            and not unresolved_python and not only_mt5),
+        "acceptance_criterion": (
+            "100% strategy decision parity over every compared bar; no MT5-only "
+            "bar; no Python-only bar inside the MT5 range; and any Python bars "
+            "past the last logged MT5 bar must carry no signal, pending order, "
+            "entry or exit."),
         "_detail": detail,
     }
 
@@ -332,7 +372,11 @@ def main() -> int:
     detail.to_csv(args.detail, index=False)
 
     print(f"bars compared        : {report['bars_compared']:,}")
-    print(f"python-only / mt5-only: {report['bars_only_in_python']} / {report['bars_only_in_mt5']}")
+    print(f"python-only / mt5-only: {report['bars_only_in_python']} / {report['bars_only_in_mt5']}"
+          f"   (decision-free tail past {report['last_mt5_bar']}: "
+          f"{len(report['window_boundary_bars'])})")
+    if report["unresolved_one_sided_bars"]:
+        print(f"UNRESOLVED one-sided  : {report['unresolved_one_sided_bars'][:5]}")
     print(f"decision parity      : {report['decision_parity_percent']}%")
     print(f"trades py / mt5      : {report['python_trades']} / {report['mt5_trades']}"
           f"   fully matching: {report['full_trade_matches']}")
