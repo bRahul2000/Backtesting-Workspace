@@ -35,3 +35,4 @@ data/exness/btc/provenance/processed/
 
 # Stage 3 live-forward evidence collected from the terminal
 data/exness/btc/stage3/
+data/exness/btc/stage4/

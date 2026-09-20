@@ -12,6 +12,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "mt5" / "BTC_V3_Core_V1.mq5"
+STAGE4 = ROOT / "mt5" / "BTC_V3_Stage4_Demo.mqh"
 
 #: MQL5 calls that transmit an order. None may appear in this EA.
 FORBIDDEN_CALLS = (
@@ -246,6 +247,7 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
         # Position.initial_risk is the risk budget and survives the leverage cap.
         "planned_risk_is_budget": bool(re.search(r"planned_risk\s*=\s*budget\s*;", code)),
         "reject_codes_match_python": reject_codes(source) == python_reject_codes(),
+        **stage4_checks(),
         # The frozen children cancel their own pending order before any other
         # decision; a twin that only lets orders expire can fill one the frozen
         # strategy had already withdrawn.
@@ -342,7 +344,55 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
     return report
 
 
-LIST_CHECKS = ("forbidden_calls", "reject_codes_only_in_mt5", "reject_codes_only_in_python")
+def stage4_checks() -> dict[str, object]:
+    """R4 Stage 4 demo-execution layer.
+
+    The decisive property is that the transmission call does not exist. A gated
+    OrderSend is one edited condition away from firing; an absent one is not.
+    """
+    if not STAGE4.exists():
+        return {"stage4_layer_present": False}
+    text = STAGE4.read_text(encoding="utf-8")
+    body = strip_comments_and_strings(text)
+    gates = ("MODE_NOT_DEMO_EXECUTION", "ACCOUNT_NOT_DEMO", "SYMBOL_NOT_BTCUSDM",
+             "BROKER_FINGERPRINT_MISMATCH", "STAGE3_CERTIFICATE_ABSENT",
+             "OPERATOR_ACKNOWLEDGEMENT_ABSENT", "STALE_BUILD",
+             "STAGE3_ISSUES_UNRESOLVED")
+    return {
+        "stage4_layer_present": True,
+        # No transmission call anywhere in the Stage 4 layer, code or not.
+        "stage4_forbidden_calls": sorted(
+            name for name in FORBIDDEN_CALLS
+            if re.search(rf"\b{re.escape(name)}\b", body)),
+        "stage4_transmit_refuses_unconditionally": bool(re.search(
+            r"outcome = G_TRANSMIT;[\s\S]{0,400}?return false;", body)),
+        "stage4_declares_all_eight_gates": all(f'"{g}"' in text for g in gates),
+        "stage4_requires_demo_account": "ACCOUNT_TRADE_MODE_DEMO" in body
+            and "trade_mode!=ACCOUNT_TRADE_MODE_DEMO" in body.replace(" ", ""),
+        "stage4_requires_operator_phrase": "STAGE4_ACK_PHRASE" in body
+            and "I AUTHORISE EXNESS DEMO EXECUTION" in text,
+        "stage4_requires_stage3_certificate": "FileIsExist(cfg.stage3_certificate" in body,
+        # OrderCheck validates margin without transmitting; it is allowed.
+        "stage4_preflights_with_ordercheck": "OrderCheck(request,check)" in body,
+        "stage4_has_magic_ownership": "STAGE4_MAGIC" in body
+            and "Stage4AlreadySubmitted" in body,
+        "stage4_detects_orphans": "Stage4OrphanCount" in body,
+        "stage4_normalises_volume_and_price": all(t in body for t in (
+            "SYMBOL_VOLUME_STEP", "SYMBOL_VOLUME_MIN", "SYMBOL_VOLUME_MAX",
+            "SYMBOL_TRADE_TICK_SIZE", "MathFloor")),
+        "stage4_validates_stops_level": "SYMBOL_TRADE_STOPS_LEVEL" in body,
+        "stage4_has_spread_guardrail": "Stage4SpreadAcceptable" in body,
+        "stage4_classifies_retcodes": all(t in body for t in (
+            "TRADE_RETCODE_REQUOTE", "TRADE_RETCODE_NO_MONEY",
+            "TRADE_RETCODE_INVALID_VOLUME", "TRADE_RETCODE_INVALID_STOPS",
+            "Stage4IsRetryable")),
+        # The EA must not include the layer until Stage 4 is authorised.
+        "stage4_not_wired_into_ea": "BTC_V3_Stage4_Demo.mqh" not in
+            strip_comments_and_strings(SOURCE.read_text(encoding="utf-8")),
+    }
+
+
+LIST_CHECKS = ("forbidden_calls", "stage4_forbidden_calls", "reject_codes_only_in_mt5", "reject_codes_only_in_python")
 
 
 def main() -> int:

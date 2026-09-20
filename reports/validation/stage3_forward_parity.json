@@ -1,0 +1,112 @@
+{
+  "python_duplicate_bars_collapsed": 0,
+  "mt5_duplicate_bars_collapsed": 0,
+  "bars_compared": 1502,
+  "bars_only_in_python": 0,
+  "bars_only_in_mt5": 0,
+  "last_mt5_bar": "2026-09-20T21:15:00Z",
+  "window_boundary_bars": [],
+  "unresolved_one_sided_bars": [],
+  "bars_matching": 1502,
+  "bars_mismatching": 0,
+  "decision_parity_percent": 100.0,
+  "exact_ohlc_matches": 1502,
+  "indicator_matches": 1502,
+  "a4_decision_matches": 1502,
+  "t3_decision_matches": 1502,
+  "signal_matches": 1502,
+  "pending_matches": 1502,
+  "entry_matches": 1502,
+  "exit_matches": 1502,
+  "python_signals": 2,
+  "python_entries": 2,
+  "python_exits": 2,
+  "signals_with_a_divergence": 0,
+  "trades_with_a_divergence": 0,
+  "dimensions": {
+    "ohlc": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "volume_and_spread": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "h1_context": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "indicators": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "carried_state": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "a4_context": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "a4_signal": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "t3_context": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "t3_signal": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "signal": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "pending": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "entry": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "stop_and_target": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    },
+    "exit": {
+      "matching": 1502,
+      "of": 1502,
+      "percent": 100.0
+    }
+  },
+  "python_trades": 2,
+  "mt5_trades": 2,
+  "python_unclosed_trades": 0,
+  "mt5_unclosed_trades": 0,
+  "python_unmatched_exits": 0,
+  "mt5_unmatched_exits": 0,
+  "full_trade_matches": 2,
+  "full_trade_parity": true,
+  "mismatch_counts": {},
+  "first_mismatch": null,
+  "first_20_mismatches": [],
+  "worst_numeric_differences": [],
+  "full_parity": true,
+  "acceptance_criterion": "100% strategy decision parity over every compared bar; no MT5-only bar; no Python-only bar inside the MT5 range; and any Python bars past the last logged MT5 bar must carry no signal, pending order, entry or exit."
+}
