@@ -111,6 +111,47 @@ input bool          InpRequireUtcServer = true;
 #define MAX_TRADES_PER_DAY 3
 
 //+------------------------------------------------------------------+
+//| Warmup contract                                                   |
+//|                                                                   |
+//| BTC_V3_CORE_V1_FROZEN's descriptor resolves its first search time |
+//| with max(a4_warmup, t3_warmup), i.e. research.v3_l2_trend_pullback|
+//| _baseline.warmup_plan and research.v3_regime_adaptive_baseline.   |
+//| v3_warmup_plan. Both frozen strategies then refuse to emit a      |
+//| signal before window_start (btc_v3_l2_trend_pullback_long.py      |
+//| on_candle returns None after updating indicators and the prior    |
+//| buffer, but before any pullback state changes).                   |
+//|                                                                   |
+//| The twin has to apply the same boundary. Without it the EA trades |
+//| on indicator values the Python side still calls unwarmed, and     |
+//| every downstream decision is compared against a different state.  |
+//+------------------------------------------------------------------+
+int CoreWarmupM15Bars()
+  {
+   int shared = MathMax(A4_EMA_SLOW,
+                MathMax(A4_ATR_LENGTH,
+                MathMax(A4_RSI_LENGTH+1, A4_DI_LENGTH+A4_ADX_SMOOTHING)));
+   int a4 = MathMax(shared, A4_STRUCTURE_LOOKBACK+1);
+   int t3 = MathMax(shared,
+            MathMax(T3_STRUCTURE_LOOKBACK+1,
+            MathMax(T3_RANGE_SWEEP_LOOKBACK+1, T3_STOP_LOOKBACK)));
+   return MathMax(a4,t3);
+  }
+
+int CoreWarmupH1Bars()
+  { return MathMax(A4_H1_SLOW+A4_H1_SLOPE_LOOKBACK, A4_H1_ATR); }
+
+//--- segment_start.ceil("h") + h1_bars hours, against
+//--- segment_start + (m15_bars-1) steps; the later of the two wins.
+datetime CoreFirstSearchTime(const datetime segment_start)
+  {
+   long seconds = (long)segment_start;
+   long first_full_hour = ((seconds+3599)/3600)*3600;
+   datetime h1_ready  = (datetime)(first_full_hour+(long)CoreWarmupH1Bars()*3600);
+   datetime m15_ready = (datetime)(seconds+(long)(CoreWarmupM15Bars()-1)*STEP_SECONDS);
+   return (h1_ready>m15_ready) ? h1_ready : m15_ready;
+  }
+
+//+------------------------------------------------------------------+
 //| Pine-equivalent streaming indicators                             |
 //|                                                                  |
 //| These deliberately do NOT use iMA/iATR/iRSI/iADX. MT5's built-in |
@@ -237,8 +278,9 @@ void DmiInit(PineDmi &dmi,const int di_length,const int adx_smoothing)
   }
 
 bool DmiUpdate(PineDmi &dmi,const double high,const double low,const double close,
-               double &plus_di,double &minus_di,double &adx_out)
+               double &plus_di,double &minus_di,double &adx_out,bool &has_di)
   {
+   has_di=false;
    if(!dmi.has_previous)
      {
       //--- Pine's ta.tr includes the first bar's high-low.
@@ -265,6 +307,10 @@ bool DmiUpdate(PineDmi &dmi,const double high,const double low,const double clos
    double divisor = (tr_avg!=0.0) ? tr_avg : 1.0;
    plus_di  = 100.0*plus_avg/divisor;
    minus_di = 100.0*minus_avg/divisor;
+   //--- Pine's ta.dmi returns +DI/-DI as soon as the DI RMAs are seeded; ADX
+   //--- needs adx_smoothing further observations. strategies/pine_indicators.DMI
+   //--- emits them on that earlier bar, so the twin must publish them too.
+   has_di=true;
    double total = plus_di+minus_di;
    double dx = 100.0*MathAbs(plus_di-minus_di)/((total!=0.0)?total:1.0);
    return RmaUpdate(dmi.adx,dx,adx_out);
@@ -521,6 +567,8 @@ double        g_balance;
 int           g_bar_index;
 datetime      g_last_bar_time;
 datetime      g_last_processed;
+datetime      g_segment_start;
+datetime      g_first_search;
 int           g_day_key;
 int           g_file;
 bool          g_halted;
@@ -563,6 +611,10 @@ void ResetAll()
    g_balance=InpStartBalance;
    g_bar_index=0;
    g_day_key=-1;
+   //--- A gap restarts the segment, so warmup restarts with it. This mirrors
+   //--- the Python exporter, which resolves warmup per continuous segment.
+   g_segment_start=0;
+   g_first_search=0;
   }
 
 //+------------------------------------------------------------------+
@@ -599,7 +651,11 @@ double AuditQuantity(const double entry,const double stop,double &planned_risk)
    double max_quantity = (g_balance*InpMaxLeverage)/entry;
    if(quantity>max_quantity)
       quantity = max_quantity;
-   planned_risk = quantity*distance;
+   //--- engine.execution.open_position stores the risk BUDGET as
+   //--- Position.initial_risk and keeps it when the leverage cap shrinks the
+   //--- quantity; quantity*distance is the separate estimated_stop_loss field.
+   //--- Dividing by the shrunken loss instead of the budget overstates |R|.
+   planned_risk = budget;
    return quantity;
   }
 
@@ -793,7 +849,7 @@ struct BarView
    long     tick_volume;
    int      spread_points;
    double   ema20, ema50, atr, rsi, adx, plus_di, minus_di;
-   bool     has_atr, has_rsi, has_adx;
+   bool     has_atr, has_rsi, has_adx, has_di;
    bool     in_session;
   };
 
@@ -827,8 +883,13 @@ void EvaluateA4(const BarView &bar,const double prior_high,const bool has_prior_
   {
    DecisionInit(decision);
    if(blocked) { decision.reject_code=blocked_code; return; }
-   if(!bar.in_session) { decision.reject_code="A4_OUT_OF_SESSION"; return; }
-   if(g_a4.trades_today>=MAX_TRADES_PER_DAY) { decision.reject_code="A4_MAX_TRADES_PER_DAY"; return; }
+   //--- btc_v3_l2_trend_pullback_long.on_candle clears the pullback on both of
+   //--- these branches (_reset_pullback_state(clear_structure=False)); returning
+   //--- without the reset carries a stale pullback across the session boundary.
+   if(!bar.in_session)
+     { ResetPullback(false); decision.reject_code="A4_OUT_OF_SESSION"; return; }
+   if(g_a4.trades_today>=MAX_TRADES_PER_DAY)
+     { ResetPullback(false); decision.reject_code="A4_MAX_TRADES_PER_DAY"; return; }
    if(!bar.has_atr || bar.atr<=0.0 || !bar.has_rsi || !bar.has_adx)
      { decision.reject_code="A4_WARMUP"; return; }
 
@@ -1157,6 +1218,14 @@ void ProcessClosedBar(const int shift)
       Print("Data gap before ",TimeToString(bar.time),": indicators and state reset.");
      }
    g_last_processed=bar.time;
+   if(g_segment_start==0)
+     {
+      g_segment_start=bar.time;
+      g_first_search=CoreFirstSearchTime(g_segment_start);
+      Print("Segment start ",TimeToString(g_segment_start),
+            " — first signal search at ",TimeToString(g_first_search));
+     }
+   bool in_window = (bar.time>=g_first_search);
 
    //--- 1. order lifecycle on this bar, before the strategy sees it
    string pending_status="";
@@ -1172,7 +1241,8 @@ void ProcessClosedBar(const int shift)
    bar.ema50 = EmaUpdate(g_ema50,bar.close);
    bar.has_atr = AtrUpdate(g_atr,bar.high,bar.low,bar.close,bar.atr);
    bar.has_rsi = RsiUpdate(g_rsi,bar.close,bar.rsi);
-   bar.has_adx = DmiUpdate(g_dmi,bar.high,bar.low,bar.close,bar.plus_di,bar.minus_di,bar.adx);
+   bar.has_adx = DmiUpdate(g_dmi,bar.high,bar.low,bar.close,bar.plus_di,bar.minus_di,
+                           bar.adx,bar.has_di);
 
    MqlDateTime parts;
    TimeToStruct(bar.time,parts);
@@ -1193,9 +1263,15 @@ void ProcessClosedBar(const int shift)
    double stop_high = has_previous ? MathMax(previous_high,bar.high) : bar.high;
    double stop_low  = has_previous ? MathMin(previous_low,bar.low)   : bar.low;
 
-   bool blocked = (g_order.active || g_position.active);
-   string a4_blocked_code = g_order.active ? "A4_BLOCKED_PENDING" : "A4_BLOCKED_POSITION";
-   string t3_blocked_code = g_order.active ? "T3_BLOCKED_PENDING" : "T3_BLOCKED_POSITION";
+   //--- Precedence matches the Python exporter: a live order or position is
+   //--- reported before the warmup window, never the other way round.
+   bool blocked = (g_order.active || g_position.active || !in_window);
+   string a4_blocked_code = g_order.active   ? "A4_BLOCKED_PENDING"
+                          : g_position.active ? "A4_BLOCKED_POSITION"
+                                              : "A4_BEFORE_WINDOW";
+   string t3_blocked_code = g_order.active   ? "T3_BLOCKED_PENDING"
+                          : g_position.active ? "T3_BLOCKED_POSITION"
+                                              : "T3_BEFORE_WINDOW";
 
    Decision a4, t3;
    string regime_label="";
@@ -1248,8 +1324,8 @@ void ProcessClosedBar(const int shift)
    fields[n++] = Num(bar.atr,bar.has_atr);
    fields[n++] = Num(bar.rsi,bar.has_rsi);
    fields[n++] = Num(bar.adx,bar.has_adx);
-   fields[n++] = Num(bar.plus_di,bar.has_adx);
-   fields[n++] = Num(bar.minus_di,bar.has_adx);
+   fields[n++] = Num(bar.plus_di,bar.has_di);
+   fields[n++] = Num(bar.minus_di,bar.has_di);
    fields[n++] = Num(BodyPercent(bar.open,bar.high,bar.low,bar.close),true);
    fields[n++] = Flag(a4.context_pass,true);
    fields[n++] = Flag(a4.signal_pass,true);

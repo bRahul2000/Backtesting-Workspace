@@ -153,6 +153,46 @@ def header_column_names(source: str) -> list[str]:
     return names
 
 
+def defines(source: str) -> dict[str, int]:
+    """Integer #define values declared by the EA."""
+    return {name: int(value) for name, value in
+            re.findall(r"^#define\s+([A-Z0-9_]+)\s+(\d+)\s*$", source, re.M)}
+
+
+def warmup_m15_bars(source: str) -> int:
+    """CoreWarmupM15Bars() evaluated from the EA's own constants."""
+    d = defines(source)
+    shared = max(d["A4_EMA_SLOW"], d["A4_ATR_LENGTH"], d["A4_RSI_LENGTH"] + 1,
+                 d["A4_DI_LENGTH"] + d["A4_ADX_SMOOTHING"])
+    a4 = max(shared, d["A4_STRUCTURE_LOOKBACK"] + 1)
+    t3 = max(shared, d["T3_STRUCTURE_LOOKBACK"] + 1,
+             d["T3_RANGE_SWEEP_LOOKBACK"] + 1, d["T3_STOP_LOOKBACK"])
+    return max(a4, t3)
+
+
+def warmup_h1_bars(source: str) -> int:
+    d = defines(source)
+    return max(d["A4_H1_SLOW"] + d["A4_H1_SLOPE_LOOKBACK"], d["A4_H1_ATR"])
+
+
+#: Reject codes are audit metadata, but a code only one side can emit makes the
+#: comparator report a mismatch on every bar that reaches it. Both vocabularies
+#: must be identical, so a new branch on either side is a visible failure.
+CODE_PATTERN = re.compile(r'"([AT][43]_[A-Z0-9_]+)"')
+
+
+def reject_codes(text: str) -> set[str]:
+    return {code for code in CODE_PATTERN.findall(text) if not code.endswith("_")}
+
+
+def python_reject_codes() -> set[str]:
+    exporter = (ROOT / "tools/export_python_core_audit.py").read_text(encoding="utf-8")
+    codes = reject_codes(exporter)
+    # A4_CONTEXT_OK is an internal sentinel: it is always replaced by a
+    # pullback-stage code before it can reach a row.
+    return codes - {"A4_CONTEXT_OK"}
+
+
 def check(source_path: Path = SOURCE) -> dict[str, object]:
     source = source_path.read_text(encoding="utf-8")
     code = strip_comments_and_strings(source)
@@ -186,15 +226,40 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
         "declares_audit_only_status": "AUDIT ONLY — NO ORDERS" in source,
         "core_fingerprint_present": "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd" in source,
         "evaluates_only_closed_bars": "ProcessClosedBar(1)" in source,
+        # The twin must not search before the frozen descriptor's warmup
+        # resolver says the Python side would.
+        "honours_warmup_window": all(
+            token in code for token in ("CoreFirstSearchTime", "CoreWarmupH1Bars",
+                                        "CoreWarmupM15Bars")),
+        "warmup_m15_bars": warmup_m15_bars(source),
+        "warmup_h1_bars": warmup_h1_bars(source),
+        "emits_before_window_codes": all(
+            f'"{code}"' in source for code in ("A4_BEFORE_WINDOW", "T3_BEFORE_WINDOW")),
+        # btc_v3_l2_trend_pullback_long.on_candle clears the pullback on both of
+        # these branches; forgetting either carries stale state across a day.
+        "resets_pullback_out_of_session": bool(re.search(
+            r"if\(!bar\.in_session\)\s*\{?\s*ResetPullback\(false\);", code)),
+        "resets_pullback_at_daily_cap": bool(re.search(
+            r"trades_today>=MAX_TRADES_PER_DAY\)\s*\{?\s*ResetPullback\(false\);", code)),
+        # +DI/-DI are published as soon as the DI RMAs seed, before ADX does.
+        "publishes_di_before_adx": "bar.has_di" in code and code.count("bar.has_di") >= 3,
+        # Position.initial_risk is the risk budget and survives the leverage cap.
+        "planned_risk_is_budget": bool(re.search(r"planned_risk\s*=\s*budget\s*;", code)),
+        "reject_codes_match_python": reject_codes(source) == python_reject_codes(),
     }
+    report["reject_codes_only_in_mt5"] = sorted(reject_codes(source) - python_reject_codes())
+    report["reject_codes_only_in_python"] = sorted(python_reject_codes() - reject_codes(source))
     return report
+
+
+LIST_CHECKS = ("forbidden_calls", "reject_codes_only_in_mt5", "reject_codes_only_in_python")
 
 
 def main() -> int:
     report = check()
     ok = True
     for key, value in report.items():
-        flag = value if isinstance(value, bool) else (value == [] if key == "forbidden_calls" else True)
+        flag = value if isinstance(value, bool) else (value == [] if key in LIST_CHECKS else True)
         ok &= bool(flag)
         print(f"{'OK  ' if flag else 'FAIL'} {key}: {value}")
     print("\nStatic checks:", "PASS" if ok else "FAIL")

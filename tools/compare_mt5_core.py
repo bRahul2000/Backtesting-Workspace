@@ -22,8 +22,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.core_audit_schema import (                                     # noqa: E402
-    AUDIT_COLUMNS, EXACT_TOLERANCE, INDICATOR_TOLERANCE, KEY,
-    ROUNDING_TOLERANCE,
+    AUDIT_COLUMNS, EXACT_TOLERANCE, INDICATOR_TOLERANCE, KEY, LEVEL_COLUMNS,
+    ROUNDING_TOLERANCE, STATE_COLUMNS,
 )
 
 #: Divergence classes, checked in causal order: the first one that fires is the
@@ -34,7 +34,9 @@ CLASSES = [
     "TIMESTAMP_ALIGNMENT",
     "H1_ALIGNMENT",
     "INDICATOR_MISMATCH",
+    "STATE_MISMATCH",
     "CONTEXT_MISMATCH",
+    "LEVEL_MISMATCH",
     "SIGNAL_MISMATCH",
     "PENDING_STATE_MISMATCH",
     "ENTRY_PRICE_MISMATCH",
@@ -54,9 +56,14 @@ CHECKS: list[tuple[str, list[str], float]] = [
      ["ema20", "ema50", "atr", "rsi", "adx", "plus_di", "minus_di", "body_percent",
       "h1_ema50", "h1_ema200", "h1_ema200_past", "h1_atr", "h1_slope", "h1_slope_atr",
       "h1_separation_atr"], INDICATOR_TOLERANCE),
+    # Carried state before the codes it explains: a pullback that only one side
+    # thinks is active shows up here, on the bar it actually diverged, instead
+    # of surfacing bars later as an unexplained reject-code difference.
+    ("STATE_MISMATCH", STATE_COLUMNS, INDICATOR_TOLERANCE),
     ("CONTEXT_MISMATCH",
      ["a4_context_pass", "a4_reject_code", "t3_context_pass", "t3_reject_code",
       "t3_regime", "a4_in_session"], 0.0),
+    ("LEVEL_MISMATCH", LEVEL_COLUMNS, INDICATOR_TOLERANCE),
     ("SIGNAL_MISMATCH",
      ["a4_signal_pass", "t3_signal_pass", "signal_side", "signal_setup_id",
       "signal_time_utc"], 0.0),
@@ -72,6 +79,41 @@ CHECKS: list[tuple[str, list[str], float]] = [
     ("EXIT_MISMATCH",
      ["exit_time_utc", "exit_price", "exit_reason", "realized_r"], EXACT_TOLERANCE),
 ]
+
+#: Parity is also reported per dimension, so a single stubborn column cannot be
+#: hidden inside an overall percentage.
+DIMENSIONS: list[tuple[str, list[str]]] = [
+    ("ohlc", ["open", "high", "low", "close"]),
+    ("volume_and_spread", ["tick_volume", "spread_points", "spread_price"]),
+    ("h1_context", ["h1_time_utc", "h1_open", "h1_high", "h1_low", "h1_close",
+                    "h1_ema50", "h1_ema200", "h1_ema200_past", "h1_atr",
+                    "h1_slope", "h1_slope_atr", "h1_separation_atr"]),
+    ("indicators", ["ema20", "ema50", "atr", "rsi", "adx", "plus_di",
+                    "minus_di", "body_percent"]),
+    ("carried_state", STATE_COLUMNS),
+    ("a4_context", ["a4_context_pass", "a4_reject_code", "a4_in_session"]),
+    ("a4_signal", ["a4_signal_pass", "a4_trigger", "a4_stop", "a4_stop_atr"]),
+    ("t3_context", ["t3_context_pass", "t3_reject_code", "t3_regime"]),
+    ("t3_signal", ["t3_signal_pass", "t3_trigger", "t3_stop", "t3_stop_atr"]),
+    ("signal", ["signal_side", "signal_setup_id", "signal_time_utc"]),
+    ("pending", ["pending_status", "pending_trigger", "pending_stop",
+                 "pending_expiry_utc"]),
+    ("entry", ["entry_time_utc", "entry_price"]),
+    ("stop_and_target", ["entry_stop", "entry_target"]),
+    ("exit", ["exit_time_utc", "exit_price", "exit_reason", "realized_r"]),
+]
+
+ENTRY_FIELDS = ["entry_time_utc", "entry_price", "entry_stop", "entry_target"]
+EXIT_FIELDS = ["exit_time_utc", "exit_price", "exit_reason", "realized_r"]
+
+
+def _trade_legs(frame: pd.DataFrame) -> tuple[list[tuple], list[tuple]]:
+    """Entries and exits in bar order, as the audit recorded them."""
+    entries = frame.loc[frame.entry_time_utc != "", ENTRY_FIELDS]
+    exits = frame.loc[frame.exit_time_utc != "", EXIT_FIELDS]
+    return (list(entries.itertuples(index=False, name=None)),
+            list(exits.itertuples(index=False, name=None)))
+
 
 #: Timestamp columns whose disagreement is an alignment problem, not a value one.
 H1_TIME_COLUMN = "h1_time_utc"
@@ -196,6 +238,19 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
                      .head(10)[[KEY, "classification", "column", "python", "mt5", "delta"]]
                      .to_dict("records"))
 
+    dimensions = {name: {"matching": _agree(columns),
+                         "of": compared,
+                         "percent": (round(100 * _agree(columns) / compared, 6)
+                                     if compared else None)}
+                  for name, columns in DIMENSIONS}
+
+    # Full-trade parity: an entry leg and its exit leg must both agree, in order.
+    py_entries, py_exits = _trade_legs(python_audit)
+    mt_entries, mt_exits = _trade_legs(mt5_audit)
+    paired = min(len(py_entries), len(mt_entries), len(py_exits), len(mt_exits))
+    full_trades = sum(1 for i in range(paired)
+                      if py_entries[i] == mt_entries[i] and py_exits[i] == mt_exits[i])
+
     signal_rows = left.loc[left.signal_side != ""]
     trade_rows = left.loc[left.entry_time_utc != ""]
     exit_rows = left.loc[left.exit_time_utc != ""]
@@ -222,6 +277,12 @@ def compare(python_audit: pd.DataFrame, mt5_audit: pd.DataFrame) -> dict:
         "python_exits": int(len(exit_rows)),
         "signals_with_a_divergence": int(sum(1 for stamp in signal_rows.index if stamp in mismatched)),
         "trades_with_a_divergence": int(sum(1 for stamp in trade_rows.index if stamp in mismatched)),
+        "dimensions": dimensions,
+        "python_trades": len(py_entries),
+        "mt5_trades": len(mt_entries),
+        "full_trade_matches": full_trades,
+        "full_trade_parity": (bool(full_trades == len(py_entries) == len(mt_entries))
+                              if py_entries or mt_entries else None),
         "mismatch_counts": counts,
         "first_mismatch": (detail.iloc[0].to_dict() if not detail.empty else None),
         "first_20_mismatches": (detail.head(20).to_dict("records") if not detail.empty else []),
@@ -255,6 +316,10 @@ def main() -> int:
     print(f"bars compared        : {report['bars_compared']:,}")
     print(f"python-only / mt5-only: {report['bars_only_in_python']} / {report['bars_only_in_mt5']}")
     print(f"decision parity      : {report['decision_parity_percent']}%")
+    print(f"trades py / mt5      : {report['python_trades']} / {report['mt5_trades']}"
+          f"   fully matching: {report['full_trade_matches']}")
+    for name, stat in report["dimensions"].items():
+        print(f"  {name:20} {stat['matching']:>6}/{stat['of']:<6} {stat['percent']}%")
     print(f"mismatch counts      : {report['mismatch_counts']}")
     if report["first_mismatch"]:
         print(f"first divergence     : {report['first_mismatch']}")

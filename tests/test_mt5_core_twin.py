@@ -397,3 +397,136 @@ def test_the_ea_source_is_structurally_balanced():
     report = static_check()
     assert report["braces_balanced"] is True
     assert report["parens_balanced"] is True
+
+
+# --- R4 Stage 2 parity corrections --------------------------------------------------------
+#
+# Each test below pins one divergence the first real MT5 audit run exposed, so
+# the same class of defect fails here instead of in a two-month parity run.
+
+
+def test_the_twin_uses_the_frozen_descriptor_s_own_warmup_contract():
+    """The EA's warmup constants must evaluate to the Python warmup plan.
+
+    The first MT5 run searched for signals from bar 15 while the Python side
+    would not search until 2026-01-09 12:00, so 800+ bars disagreed on context
+    and five trades existed on one side only.
+    """
+    from strategies.universal_catalog import _core_warmup
+    from research.v3_l2_trend_pullback_baseline import warmup_plan
+    from strategies.btc_v3_a4_pullback_long import frozen_parameters
+
+    report = static_check()
+    plan = warmup_plan(frozen_parameters(), pd.Timestamp("2026-01-01", tz="UTC"))
+    assert report["warmup_m15_bars"] == plan.m15_bars
+    assert report["warmup_h1_bars"] == plan.confirmed_h1_bars
+    assert report["honours_warmup_window"] is True
+    assert report["emits_before_window_codes"] is True
+    # The formula the EA implements, evaluated here against the real resolver.
+    start = pd.Timestamp("2026-01-01", tz="UTC")
+    h1_ready = start.ceil("h") + pd.Timedelta(hours=report["warmup_h1_bars"])
+    m15_ready = start + (report["warmup_m15_bars"] - 1) * pd.Timedelta(minutes=15)
+    assert max(h1_ready, m15_ready) == _core_warmup(start)
+
+
+def test_the_twin_clears_the_pullback_when_the_session_or_daily_cap_closes():
+    """btc_v3_l2_trend_pullback_long resets on both branches; so must the EA.
+
+    Without it a pullback opened at 21:45 survived the 22:00 session close and
+    produced confirmation decisions the frozen strategy never made.
+    """
+    report = static_check()
+    assert report["resets_pullback_out_of_session"] is True
+    assert report["resets_pullback_at_daily_cap"] is True
+
+
+def test_directional_indices_are_published_before_adx_is_seeded():
+    """pine_indicators.DMI returns +DI/-DI while adx is still None."""
+    from engine.models import Candle
+    from strategies.pine_indicators import DMI
+
+    dmi = DMI(14, 14)
+    seen_di_without_adx = False
+    price = 100.0
+    for index in range(40):
+        price += 1.0 if index % 3 else -0.5
+        value = dmi.update(Candle(pd.Timestamp("2026-01-01", tz="UTC"), price,
+                                  price + 1, price - 1, price, 10.0))
+        if value.plus_di is not None and value.adx is None:
+            seen_di_without_adx = True
+    assert seen_di_without_adx, "DI and ADX would become available on the same bar"
+    assert static_check()["publishes_di_before_adx"] is True
+
+
+def test_realized_r_divides_by_the_risk_budget_not_the_capped_loss():
+    """Position.initial_risk is the budget and survives the leverage cap.
+
+    Dividing by quantity*distance instead reported -1.019R for a stop that the
+    audited engine scores -0.937R.
+    """
+    from engine.execution import open_position
+    from engine.models import (BacktestSettings, Direction, RiskCalculation,
+                               RiskMode, SameBarResolution, Signal)
+
+    settings = BacktestSettings(
+        starting_balance=10_000.0, risk_mode=RiskMode.PERCENT_EQUITY,
+        risk_percent=0.25, fixed_risk_dollars=0.0, risk_reward_ratio=3.0,
+        commission_percent=0.0, slippage_percent=0.0,
+        same_bar_resolution=SameBarResolution.SL_FIRST,
+        risk_calculation=RiskCalculation.ESTIMATED_TOTAL_STOP_LOSS,
+        max_leverage=1.0, min_quantity=0.0)
+    stamp = pd.Timestamp("2026-01-01", tz="UTC")
+    # A stop 0.2% away needs far more notional than 1x leverage allows.
+    position = open_position(Signal(Direction.LONG, stop_loss=99_800.0),
+                             stamp, stamp, 100_000.0, 0, 1, 10_000.0, settings)
+    assert position.leverage_capped is True
+    budget = 10_000.0 * 0.25 / 100
+    assert position.initial_risk == pytest.approx(budget)
+    assert position.estimated_stop_loss < position.initial_risk
+    assert static_check()["planned_risk_is_budget"] is True
+
+
+def test_both_halves_of_the_twin_share_one_reject_vocabulary():
+    """A code only one side can emit mismatches on every bar that reaches it.
+
+    Five A4 codes existed only in MQL5, which is why 44 post-warmup bars
+    disagreed on a4_reject_code while agreeing on every trade.
+    """
+    report = static_check()
+    assert report["reject_codes_only_in_mt5"] == []
+    assert report["reject_codes_only_in_python"] == []
+    assert report["reject_codes_match_python"] is True
+
+
+def test_carried_state_is_compared_before_the_codes_it_explains():
+    """A stale pullback must be reported as the cause, not its symptom."""
+    from tools.compare_mt5_core import CHECKS
+
+    order = [label for label, _, _ in CHECKS]
+    assert order.index("STATE_MISMATCH") < order.index("CONTEXT_MISMATCH")
+    assert order.index("CONTEXT_MISMATCH") < order.index("SIGNAL_MISMATCH")
+    row = _classification(a4_pullback_active="1", a4_reject_code="A4_BODY_TOO_SMALL")
+    assert row == "STATE_MISMATCH"
+
+
+def test_state_and_level_columns_are_actually_compared():
+    """Every schema column belongs to exactly one check, or parity is partial."""
+    from tools.compare_mt5_core import CHECKS, H1_TIME_COLUMN
+    from tools.core_audit_schema import COST_COLUMNS
+
+    covered = {column for _, columns, _ in CHECKS for column in columns}
+    covered |= {H1_TIME_COLUMN, KEY, "symbol"} | set(COST_COLUMNS)
+    assert set(AUDIT_COLUMNS) - covered == set()
+
+
+def test_the_pending_lifecycle_vocabulary_is_shared():
+    """Python emitted only CREATED/ACTIVE while MT5 also emitted FILLED/EXPIRED."""
+    import re
+    from tools.core_audit_schema import PENDING_STATUSES
+
+    exporter = (ROOT / "tools/export_python_core_audit.py").read_text()
+    source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    for status in ("CREATED", "FILLED", "EXPIRED", "ACTIVE"):
+        assert status in PENDING_STATUSES
+        assert re.search(rf'"{status}"', exporter), f"{status} missing from the exporter"
+        assert re.search(rf'"{status}"', source), f"{status} missing from the EA"

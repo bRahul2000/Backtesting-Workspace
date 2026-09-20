@@ -25,3 +25,6 @@ secrets.*
 
 # MT5 compiles scripts next to their source; the binaries are terminal output.
 *.ex5
+
+# R4 digital-twin audit exports (generated / MT5 terminal output)
+data/exness/btc/r4/

@@ -54,6 +54,15 @@ from strategies.registry import discover_builtin_strategies               # noqa
 from tools.core_audit_schema import AUDIT_COLUMNS, UNVERIFIED             # noqa: E402
 from utils.data_validation import continuous_segments, load_ohlcv_csv     # noqa: E402
 
+#: The A4 blocked code and the T3 code derived from it. Spelled out so the whole
+#: reject vocabulary is greppable from both halves of the twin, and so an
+#: unrecognised pair fails loudly instead of reaching a row.
+BLOCKED_CODE_PAIRS = (
+    ("A4_BLOCKED_PENDING", "T3_BLOCKED_PENDING"),
+    ("A4_BLOCKED_POSITION", "T3_BLOCKED_POSITION"),
+    ("A4_BEFORE_WINDOW", "T3_BEFORE_WINDOW"),
+)
+
 EXNESS_M15 = ROOT / "data/exness/btc/phase_r1/processed/btcusdm_M15.csv"
 STRATEGY_ID = "BTC_V3_CORE_V1_FROZEN"
 FROZEN_CORE_HASH = "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd"
@@ -189,51 +198,109 @@ def _a4_confirmation_reject(candle, previous_candle, ema20, rsi) -> str:
     return "A4_CONFIRM_OK"
 
 
-def _t3_reject(view, candle, obs, *, in_session, trades_today, blocked) -> tuple[str, str, bool, bool]:
+@dataclass(frozen=True)
+class _A4Snapshot:
+    """A4 pullback/structure state as it stood BEFORE on_candle saw this bar.
+
+    The frozen strategy mutates this state while it decides, so the audit code
+    has to be derived from the pre-call values — exactly what EvaluateA4 in the
+    MQL5 twin reads. Using the post-call state reports the wrong reject code on
+    every bar that changes the pullback.
+    """
+    pullback_active: bool
+    pullback_low: float | None
+    pullback_start_time: object
+
+
+def _a4_state(strategy) -> _A4Snapshot:
+    a4 = strategy.a4
+    return _A4Snapshot(bool(a4.pullback_active), a4.pullback_low, a4.pullback_start_time)
+
+
+def _a4_pullback_reject(state: _A4Snapshot, view, candle, previous_candle,
+                        prior_high) -> tuple[str, tuple | None]:
+    """Pullback-state-machine outcome, in btc_v3_l2_trend_pullback_long's own order.
+
+    Mirrors on_candle from the depth test through the structure break, including
+    the fall-through that lets a confirmation or same-bar rejection outrank
+    A4_STRUCTURE_BREAK_BAR.
+    """
+    p = a4_parameters()
+    atr, ema20, rsi = view["atr"], view["ema20"], view["rsi"]
+    depth = max(0.0, (ema20 - candle.low) / atr)
+    code = ""
+    if state.pullback_active:
+        if depth > p.max_pullback_depth_below_ema20_atr:
+            return "A4_PULLBACK_TOO_DEEP", None
+        if state.pullback_start_time is not None and candle.timestamp > state.pullback_start_time:
+            code = _a4_confirmation_reject(candle, previous_candle, ema20, rsi)
+            if code == "A4_CONFIRM_OK":
+                pullback_low = (min(state.pullback_low, candle.low)
+                                if state.pullback_low is not None else candle.low)
+                trigger = candle.high + p.entry_buffer_atr * atr
+                stop = pullback_low - p.stop_buffer_atr * atr
+                risk_atr = (trigger - stop) / atr
+                # Levels are published on every bar that computed them, which is
+                # what Decision.has_levels means in the MQL5 twin.
+                levels = (trigger, stop, risk_atr)
+                if risk_atr < p.minimum_stop_atr:
+                    return "A4_STOP_TOO_TIGHT", levels
+                if risk_atr > p.maximum_stop_atr:
+                    return "A4_STOP_TOO_WIDE", levels
+                return "A4_SIGNAL_OK", levels
+        else:
+            code = "A4_SAME_BAR_AS_PULLBACK_START"
+    if prior_high is not None and candle.close > prior_high:
+        return code or "A4_STRUCTURE_BREAK_BAR", None
+    return code or "A4_NO_PULLBACK", None
+
+
+def _t3_reject(view, candle, obs, *, in_session, trades_today, blocked) -> tuple[str, str, bool, bool, tuple | None]:
     """Re-derive the T3 gate outcome using classify_regime and the frozen rules."""
     p = V3T3FrozenParameters()
     atr, rsi = view["atr"], view["rsi"]
     if blocked:
-        return "", blocked, False, False
+        return "", blocked, False, False, None
     if not in_session:
-        return "", "T3_OUT_OF_SESSION", False, False
+        return "", "T3_OUT_OF_SESSION", False, False, None
     if trades_today >= p.max_trades_per_day:
-        return "", "T3_MAX_TRADES_PER_DAY", False, False
+        return "", "T3_MAX_TRADES_PER_DAY", False, False, None
     if obs is None:
-        return "", "T3_WARMUP", False, False
+        return "", "T3_WARMUP", False, False, None
     regime = classify_regime(obs, p)
     label = regime.state.value
     if atr is None or atr <= 0 or rsi is None:
-        return label, "T3_WARMUP", False, False
+        return label, "T3_WARMUP", False, False, None
     if regime.state is not MarketRegime.TREND:
-        return label, "T3_REGIME_NOT_TREND", False, False
+        return label, "T3_REGIME_NOT_TREND", False, False, None
     if regime.direction is Direction.LONG:
-        return label, "T3_DIRECTION_LONG_DISABLED", True, False
+        return label, "T3_DIRECTION_LONG_DISABLED", True, False, None
     if obs.trend_previous_low is None:
-        return label, "T3_WARMUP", True, False
+        return label, "T3_WARMUP", True, False, None
     if not candle.close < obs.trend_previous_low:
-        return label, "T3_NO_BREAK_PREV_LOW", True, False
+        return label, "T3_NO_BREAK_PREV_LOW", True, False, None
     if not candle.close < candle.open:
-        return label, "T3_NOT_BEARISH_CANDLE", True, False
+        return label, "T3_NOT_BEARISH_CANDLE", True, False, None
     if body_percent(candle) < p.trend_minimum_body_percent:
-        return label, "T3_BODY_FAIL", True, False
+        return label, "T3_BODY_FAIL", True, False, None
     range_atr = (candle.high - candle.low) / atr
     if range_atr < p.trend_minimum_range_atr:
-        return label, "T3_RANGE_TOO_SMALL", True, False
+        return label, "T3_RANGE_TOO_SMALL", True, False, None
     if range_atr > p.trend_maximum_range_atr:
-        return label, "T3_RANGE_TOO_LARGE", True, False
+        return label, "T3_RANGE_TOO_LARGE", True, False, None
     if not p.trend_short_rsi_min <= rsi <= p.trend_short_rsi_max:
-        return label, "T3_RSI_OUT_OF_BAND", True, False
+        return label, "T3_RSI_OUT_OF_BAND", True, False, None
     if abs(candle.close - obs.ema_fast) / atr > p.trend_maximum_extension_atr:
-        return label, "T3_EXTENSION_FAIL", True, False
+        return label, "T3_EXTENSION_FAIL", True, False, None
     trigger = candle.low - p.entry_buffer_atr * atr
     stop = obs.trend_stop_high + p.stop_buffer_atr * atr
     risk_atr = (stop - trigger) / atr
+    levels = (trigger, stop, risk_atr)
     if risk_atr < p.minimum_stop_atr:
-        return label, "T3_STOP_TOO_TIGHT", True, False
+        return label, "T3_STOP_TOO_TIGHT", True, False, levels
     if risk_atr > p.maximum_stop_atr:
-        return label, "T3_STOP_TOO_WIDE", True, False
-    return label, "T3_SIGNAL_OK", True, True
+        return label, "T3_STOP_TOO_WIDE", True, False, levels
+    return label, "T3_SIGNAL_OK", True, True, levels
 
 
 def _settings(config: BacktestConfig) -> BacktestSettings:
@@ -315,6 +382,7 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
 
     for index, bid in enumerate(candles):
         opened = closed = None
+        expired = False
         entered_intrabar = False
         bar_spread = (float(spread_price.get(bid.timestamp, config.spread))
                       if spread_price is not None else config.spread)
@@ -325,6 +393,7 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
             order = pending
             if index > order.expiry_bar_index:
                 pending = None
+                expired = True
             else:
                 side = entry_candle(bid, bar_spread, order.direction)
                 position = fill_pending_order(order, side, index, len(all_trades) + 1, settings)
@@ -336,6 +405,7 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
                     pending = None
                 elif index == order.expiry_bar_index:
                     pending = None
+                    expired = True
         if position is not None:
             side = exit_candle(bid, bar_spread, position.direction)
             decision = exit_decision(position, side, settings.same_bar_resolution,
@@ -366,6 +436,7 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
         stop_low = min(x.low for x in (*stop_bars, bid))
         stop_high = max(x.high for x in (*stop_bars, bid))
 
+        a4_state = _a4_state(strategy)
         signal = strategy.on_candle(bid)
         prior.append(bid)
         if len(prior) > 16:
@@ -377,6 +448,8 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
                    "A4_BLOCKED_POSITION" if position is not None else
                    "" if in_window else "A4_BEFORE_WINDOW")
         t3_blocked = blocked.replace("A4_", "T3_") if blocked else ""
+        if blocked and (blocked, t3_blocked) not in BLOCKED_CODE_PAIRS:
+            raise ValueError(f"Unknown blocked code pair {(blocked, t3_blocked)}.")
 
         observation = None
         if view["atr"] is not None and view["h1"].fast_ema is not None:
@@ -391,15 +464,20 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
             view, bid, prior, in_session=in_session,
             trades_today=strategy.a4.trades_today, blocked=blocked)
         a4_signal_pass = isinstance(signal, Signal) and signal.setup_id == A4_SETUP_ID
+        a4_levels = None
         if a4_context and a4_code == "A4_CONTEXT_OK":
-            if strategy.a4.pullback_active or a4_signal_pass:
-                a4_code = _a4_confirmation_reject(bid, previous_candle, view["ema20"], view["rsi"])
-            else:
-                a4_code = "A4_NO_PULLBACK"
-        if a4_signal_pass:
-            a4_code = "A4_SIGNAL_OK"
+            a4_code, a4_levels = _a4_pullback_reject(
+                a4_state, view, bid, previous_candle, prior_high)
+        # The frozen strategy, not this derivation, decides whether a signal
+        # fired. If the two disagree the derivation is wrong and the audit would
+        # be misleading parity evidence, so fail loudly instead of papering over.
+        if (a4_code == "A4_SIGNAL_OK") != a4_signal_pass:
+            raise ValueError(
+                f"A4 audit derivation says {a4_code!r} but the frozen strategy "
+                f"{'emitted' if a4_signal_pass else 'did not emit'} a signal at "
+                f"{bid.timestamp}.")
 
-        t3_regime, t3_code, t3_context, _ = _t3_reject(
+        t3_regime, t3_code, t3_context, _, t3_levels = _t3_reject(
             view, bid, observation, in_session=in_session,
             trades_today=strategy.t3.trades_today, blocked=t3_blocked)
         t3_signal_pass = isinstance(signal, Signal) and signal.setup_id == T3_SETUP_ID
@@ -418,26 +496,28 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
                          strategy, a4_code, a4_context, a4_signal_pass, in_session,
                          prior_high, t3_regime, t3_code, t3_context, t3_signal_pass,
                          t3_high, t3_low, stop_high, stop_low, atr, observation,
-                         signal, new_pending, pending, opened, closed))
+                         signal, new_pending, pending, opened, closed, expired,
+                         a4_levels, t3_levels))
     return rows
 
 
 def _row(bid, view, spread_points, spread_price, config, strategy, a4_code, a4_context,
          a4_signal_pass, in_session, prior_high, t3_regime, t3_code, t3_context,
          t3_signal_pass, t3_high, t3_low, stop_high, stop_low, atr, observation,
-         signal, new_pending, pending, opened, closed) -> dict:
+         signal, new_pending, pending, opened, closed, expired,
+         a4_levels, t3_levels) -> dict:
     h1, h1_bar = view["h1"], view["h1_bar"]
     dmi = view["dmi"]
     p4, p3 = a4_parameters(), V3T3FrozenParameters()
-    a4_trigger = a4_stop = a4_stop_atr = None
+    # Levels appear only on bars that reached the point of computing them, so
+    # the two sides publish on the same condition instead of one side filling
+    # every bar with a hypothetical level the other never evaluated.
+    a4_trigger, a4_stop, a4_stop_atr = a4_levels if a4_levels else (None, None, None)
+    t3_trigger, t3_stop, t3_stop_atr = t3_levels if t3_levels else (None, None, None)
     if a4_signal_pass and isinstance(signal, Signal):
-        a4_trigger, a4_stop = signal.pending_entry_price, signal.pending_stop_price
-        a4_stop_atr = (a4_trigger - a4_stop) / atr if atr else None
-    t3_trigger = t3_stop = t3_stop_atr = None
-    if atr and observation is not None:
-        t3_trigger = bid.low - p3.entry_buffer_atr * atr
-        t3_stop = stop_high + p3.stop_buffer_atr * atr
-        t3_stop_atr = (t3_stop - t3_trigger) / atr
+        # The frozen signal is authoritative for the level it actually carries.
+        if (a4_trigger, a4_stop) != (signal.pending_entry_price, signal.pending_stop_price):
+            raise ValueError(f"Derived A4 levels disagree with the frozen signal at {bid.timestamp}.")
     return {
         "bar_time_utc": _iso(bid.timestamp), "symbol": SYMBOL,
         "open": _num(bid.open), "high": _num(bid.high), "low": _num(bid.low),
@@ -479,7 +559,12 @@ def _row(bid, view, spread_points, spread_price, config, strategy, a4_code, a4_c
         "signal_side": (signal.direction.value if isinstance(signal, Signal) else ""),
         "signal_setup_id": (signal.setup_id if isinstance(signal, Signal) else ""),
         "signal_time_utc": _iso(bid.timestamp + STEP if isinstance(signal, Signal) else None),
+        # CREATED / FILLED / EXPIRED / ACTIVE, in the order the twin resolves
+        # them: a fill or expiry is recorded on the bar it happens, and a
+        # replacement order created on that same bar supersedes the label.
         "pending_status": ("CREATED" if new_pending is not None else
+                           "FILLED" if opened is not None else
+                           "EXPIRED" if expired else
                            "ACTIVE" if pending is not None else ""),
         "pending_trigger": _num(pending.trigger_price if pending is not None else None),
         "pending_stop": _num(pending.stop_price if pending is not None else None),

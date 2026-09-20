@@ -48,6 +48,28 @@ T3_COLUMNS = [
     "t3_range_atr", "t3_extension_atr", "t3_trigger", "t3_stop", "t3_stop_atr",
 ]
 
+#: The pending order's lifecycle vocabulary, resolved in this precedence on the
+#: bar it happens: a replacement order created on the same bar supersedes the
+#: fill or expiry that freed the slot. CANCELLED_INVALID_RISK is an MT5-side
+#: defensive branch; the Python engine raises instead of emitting it.
+PENDING_STATUSES = ("CREATED", "FILLED", "EXPIRED", "ACTIVE", "CANCELLED_INVALID_RISK")
+
+#: Internal strategy state carried between bars. A twin can agree on every
+#: indicator and still diverge here, and when it does the reject codes and
+#: signals that follow are symptoms, not causes — so these are compared first.
+STATE_COLUMNS = [
+    "a4_trades_today", "a4_material_below_ema50", "a4_pullback_active",
+    "a4_pullback_low", "a4_pullback_depth_atr", "a4_pullback_bars",
+    "a4_pullback_touch", "a4_structure_level", "a4_prior_high",
+    "t3_prev_high", "t3_prev_low", "t3_stop_high", "t3_stop_low",
+    "t3_range_atr", "t3_extension_atr",
+]
+
+#: Hypothetical entry/stop levels a bar would have used. Derived from ATR, so
+#: they inherit the indicator tolerance rather than the exact one.
+LEVEL_COLUMNS = ["a4_trigger", "a4_stop", "a4_stop_atr",
+                 "t3_trigger", "t3_stop", "t3_stop_atr"]
+
 #: Order lifecycle as simulated identically on both sides.
 LIFECYCLE_COLUMNS = [
     "signal_side", "signal_setup_id", "signal_time_utc",
