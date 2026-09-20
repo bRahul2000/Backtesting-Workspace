@@ -31,3 +31,4 @@ data/exness/btc/r4/
 
 # Fresh broker re-exports for provenance checking (terminal output, large)
 data/exness/btc/provenance/raw/
+data/exness/btc/provenance/processed/

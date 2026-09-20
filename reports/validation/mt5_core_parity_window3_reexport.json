@@ -1,0 +1,159 @@
+{
+  "python_duplicate_bars_collapsed": 0,
+  "mt5_duplicate_bars_collapsed": 0,
+  "bars_compared": 6719,
+  "bars_only_in_python": 2,
+  "bars_only_in_mt5": 0,
+  "last_mt5_bar": "2026-05-09T23:30:00Z",
+  "window_boundary_bars": [
+    "2026-05-09T23:45:00Z",
+    "2026-05-10T00:00:00Z"
+  ],
+  "unresolved_one_sided_bars": [],
+  "bars_matching": 6718,
+  "bars_mismatching": 1,
+  "decision_parity_percent": 99.98511683286203,
+  "exact_ohlc_matches": 6719,
+  "indicator_matches": 6719,
+  "a4_decision_matches": 6719,
+  "t3_decision_matches": 6719,
+  "signal_matches": 6719,
+  "pending_matches": 6719,
+  "entry_matches": 6719,
+  "exit_matches": 6719,
+  "python_signals": 19,
+  "python_entries": 16,
+  "python_exits": 16,
+  "signals_with_a_divergence": 0,
+  "trades_with_a_divergence": 0,
+  "dimensions": {
+    "ohlc": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "volume_and_spread": {
+      "matching": 6718,
+      "of": 6719,
+      "percent": 99.985117
+    },
+    "h1_context": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "indicators": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "carried_state": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "a4_context": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "a4_signal": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "t3_context": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "t3_signal": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "signal": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "pending": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "entry": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "stop_and_target": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    },
+    "exit": {
+      "matching": 6719,
+      "of": 6719,
+      "percent": 100.0
+    }
+  },
+  "python_trades": 16,
+  "mt5_trades": 16,
+  "python_unclosed_trades": 0,
+  "mt5_unclosed_trades": 0,
+  "python_unmatched_exits": 0,
+  "mt5_unmatched_exits": 0,
+  "full_trade_matches": 16,
+  "full_trade_parity": true,
+  "mismatch_counts": {
+    "WINDOW_BOUNDARY": 2,
+    "DATA_MISMATCH": 1
+  },
+  "first_mismatch": {
+    "bar_time_utc": "2026-04-19T07:30:00Z",
+    "classification": "DATA_MISMATCH",
+    "column": "tick_volume",
+    "python": "271.0000000000",
+    "mt5": "270.0000000000",
+    "delta": 1.0
+  },
+  "first_20_mismatches": [
+    {
+      "bar_time_utc": "2026-04-19T07:30:00Z",
+      "classification": "DATA_MISMATCH",
+      "column": "tick_volume",
+      "python": "271.0000000000",
+      "mt5": "270.0000000000",
+      "delta": 1.0
+    },
+    {
+      "bar_time_utc": "2026-05-09T23:45:00Z",
+      "classification": "WINDOW_BOUNDARY",
+      "column": "bar_time_utc",
+      "python": "present",
+      "mt5": "after the last logged bar",
+      "delta": NaN
+    },
+    {
+      "bar_time_utc": "2026-05-10T00:00:00Z",
+      "classification": "WINDOW_BOUNDARY",
+      "column": "bar_time_utc",
+      "python": "present",
+      "mt5": "after the last logged bar",
+      "delta": NaN
+    }
+  ],
+  "worst_numeric_differences": [
+    {
+      "bar_time_utc": "2026-04-19T07:30:00Z",
+      "classification": "DATA_MISMATCH",
+      "column": "tick_volume",
+      "python": "271.0000000000",
+      "mt5": "270.0000000000",
+      "delta": 1.0
+    }
+  ],
+  "full_parity": false,
+  "acceptance_criterion": "100% strategy decision parity over every compared bar; no MT5-only bar; no Python-only bar inside the MT5 range; and any Python bars past the last logged MT5 bar must carry no signal, pending order, entry or exit."
+}

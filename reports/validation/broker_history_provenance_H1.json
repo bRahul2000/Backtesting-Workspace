@@ -1,0 +1,71 @@
+{
+  "bars_old": 25158,
+  "bars_new": 25163,
+  "bars_common": 25158,
+  "bars_only_in_old": [],
+  "bars_only_in_new": [
+    "2026-09-20 07:00:00+00:00",
+    "2026-09-20 08:00:00+00:00",
+    "2026-09-20 09:00:00+00:00",
+    "2026-09-20 10:00:00+00:00",
+    "2026-09-20 11:00:00+00:00"
+  ],
+  "bars_only_in_old_count": 0,
+  "bars_only_in_new_count": 5,
+  "changed_bars": 0,
+  "changed_fields_total": 0,
+  "changes_per_field": {},
+  "reformatted_only_fields": 0,
+  "price_fields_changed": [],
+  "gaps_old": 1,
+  "gaps_new": 1,
+  "gaps_added": [],
+  "gaps_removed": [],
+  "windows": {
+    "window1 (certified)": {
+      "range": [
+        "2026-01-01",
+        "2026-03-01"
+      ],
+      "revised_bars": 0,
+      "revised_fields": [],
+      "bars_added": 0,
+      "bars_removed": 0,
+      "clean": true,
+      "examples": []
+    },
+    "window2 (certified)": {
+      "range": [
+        "2025-09-01",
+        "2025-12-01"
+      ],
+      "revised_bars": 0,
+      "revised_fields": [],
+      "bars_added": 0,
+      "bars_removed": 0,
+      "clean": true,
+      "examples": []
+    },
+    "window3 (daily cap)": {
+      "range": [
+        "2026-03-01",
+        "2026-05-10"
+      ],
+      "revised_bars": 0,
+      "revised_fields": [],
+      "bars_added": 0,
+      "bars_removed": 0,
+      "clean": true,
+      "examples": []
+    }
+  },
+  "identical": false,
+  "old_file": {
+    "path": "data/exness/btc/phase_r1/raw/btcusd_BTCUSDm_H1.csv",
+    "sha256": "24c0c04ae05900c9b62e9046e497924be4dd15efd1497c006b05a9dfb133250a"
+  },
+  "new_file": {
+    "path": "data/exness/btc/provenance/raw/btcusd_reexport_BTCUSDm_H1.csv",
+    "sha256": "37207bc80215d07928f70c469e6d0c26331a58df3b47b3ab2afd933ff3bef98f"
+  }
+}

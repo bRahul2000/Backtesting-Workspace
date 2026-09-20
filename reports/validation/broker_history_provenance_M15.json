@@ -1,0 +1,85 @@
+{
+  "bars_old": 100239,
+  "bars_new": 100258,
+  "bars_common": 100239,
+  "bars_only_in_old": [],
+  "bars_only_in_new": [
+    "2026-09-20 07:30:00+00:00",
+    "2026-09-20 07:45:00+00:00",
+    "2026-09-20 08:00:00+00:00",
+    "2026-09-20 08:15:00+00:00",
+    "2026-09-20 08:30:00+00:00",
+    "2026-09-20 08:45:00+00:00",
+    "2026-09-20 09:00:00+00:00",
+    "2026-09-20 09:15:00+00:00",
+    "2026-09-20 09:30:00+00:00",
+    "2026-09-20 09:45:00+00:00",
+    "2026-09-20 10:00:00+00:00",
+    "2026-09-20 10:15:00+00:00",
+    "2026-09-20 10:30:00+00:00",
+    "2026-09-20 10:45:00+00:00",
+    "2026-09-20 11:00:00+00:00",
+    "2026-09-20 11:15:00+00:00",
+    "2026-09-20 11:30:00+00:00",
+    "2026-09-20 11:45:00+00:00",
+    "2026-09-20 12:00:00+00:00"
+  ],
+  "bars_only_in_old_count": 0,
+  "bars_only_in_new_count": 19,
+  "changed_bars": 0,
+  "changed_fields_total": 0,
+  "changes_per_field": {},
+  "reformatted_only_fields": 0,
+  "price_fields_changed": [],
+  "gaps_old": 6,
+  "gaps_new": 6,
+  "gaps_added": [],
+  "gaps_removed": [],
+  "windows": {
+    "window1 (certified)": {
+      "range": [
+        "2026-01-01",
+        "2026-03-01"
+      ],
+      "revised_bars": 0,
+      "revised_fields": [],
+      "bars_added": 0,
+      "bars_removed": 0,
+      "clean": true,
+      "examples": []
+    },
+    "window2 (certified)": {
+      "range": [
+        "2025-09-01",
+        "2025-12-01"
+      ],
+      "revised_bars": 0,
+      "revised_fields": [],
+      "bars_added": 0,
+      "bars_removed": 0,
+      "clean": true,
+      "examples": []
+    },
+    "window3 (daily cap)": {
+      "range": [
+        "2026-03-01",
+        "2026-05-10"
+      ],
+      "revised_bars": 0,
+      "revised_fields": [],
+      "bars_added": 0,
+      "bars_removed": 0,
+      "clean": true,
+      "examples": []
+    }
+  },
+  "identical": false,
+  "old_file": {
+    "path": "data/exness/btc/phase_r1/raw/btcusd_BTCUSDm_M15.csv",
+    "sha256": "b5ce7d60ab3b30490e42d26614e1ff4b9200b198bee71ea033e21b79d680f43a"
+  },
+  "new_file": {
+    "path": "data/exness/btc/provenance/raw/btcusd_reexport_BTCUSDm_M15.csv",
+    "sha256": "541818991625333136d38d92747bf72d259968ca018fba82a45d15e231d4bc82"
+  }
+}
