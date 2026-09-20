@@ -592,6 +592,7 @@ datetime      g_last_processed;
 bool          g_live;
 datetime      g_anchor;
 datetime      g_last_logged;
+datetime      g_session_last_logged;
 string        g_session_id;
 int           g_restarts;
 int           g_reconnects;
@@ -936,25 +937,46 @@ void LogEvent(const string kind,const string detail)
   }
 
 //--- Last bar_time_utc already present in the audit log, or 0 when empty.
-datetime LastLoggedBar()
+//--- Recovers the last bar already written to the audit log.
+//---
+//--- Returns false only when the log EXISTS but cannot be read. That case must
+//--- never be reported as "no bars yet": doing so disables the exactly-once
+//--- gate and re-emits the whole replay. It is also why this must run BEFORE
+//--- OpenLog() takes a write handle on the same file — MQL5 refuses a second
+//--- open of a file already held for writing, which is exactly how 1,500 bars
+//--- were emitted twice.
+bool LastLoggedBar(datetime &out)
   {
+   out = 0;
+   int common = InpUseCommonFiles ? FILE_COMMON : 0;
+   if(!FileIsExist(InpLogFile,common))
+      return true;                       // genuinely no log yet; 0 is correct
    int handle = FileOpen(InpLogFile,StageFileFlags(false));
-   if(handle==INVALID_HANDLE) return 0;
+   if(handle==INVALID_HANDLE)
+      return false;                      // exists but unreadable — refuse to guess
    string last = "";
+   long rows = 0;
    while(!FileIsEnding(handle))
      {
       string line = FileReadString(handle);
       if(StringLen(line)>=20 && StringSubstr(line,0,4)!="bar_")
-         last = line;
+        { last = line; rows++; }
      }
    FileClose(handle);
-   if(StringLen(last)<20) return 0;
+   if(rows==0)
+      return true;                       // header only; 0 is correct
+   if(StringLen(last)<20)
+      return false;                      // rows exist but the tail is unreadable
    string stamp = StringSubstr(last,0,StringFind(last,","));
    //--- "YYYY-MM-DDTHH:MM:SSZ" -> "YYYY.MM.DD HH:MM:SS"
-   if(StringLen(stamp)<20) return 0;
+   if(StringLen(stamp)<20)
+      return false;
    string norm = StringSubstr(stamp,0,4)+"."+StringSubstr(stamp,5,2)+"."
                  +StringSubstr(stamp,8,2)+" "+StringSubstr(stamp,11,8);
-   return StringToTime(norm);
+   out = StringToTime(norm);
+   //--- Rows present but no timestamp parsed is a contradiction, and treating
+   //--- it as "nothing logged" is precisely the failure this guards against.
+   return (out!=0);
   }
 
 void WriteSessionFile()
@@ -1051,6 +1073,12 @@ void ReadSessionFile()
          g_anchor = StringToTime(norm);
         }
       else if(key=="session_id" && StringLen(value)>0) g_session_id=value;
+      else if(key=="last_logged_bar_utc" && StringLen(value)>=20)
+        {
+         string norm2 = StringSubstr(value,0,4)+"."+StringSubstr(value,5,2)+"."
+                        +StringSubstr(value,8,2)+" "+StringSubstr(value,11,8);
+         g_session_last_logged = StringToTime(norm2);
+        }
       else if(key=="restarts")   g_restarts=(int)StringToInteger(value);
       else if(key=="reconnects") g_reconnects=(int)StringToInteger(value);
       else if(key=="duplicate_bars")  g_duplicate_bars=StringToInteger(value);
@@ -1816,7 +1844,7 @@ int OnInit()
    g_live = !IsTesterRun();
    g_restarts=0; g_reconnects=0;
    g_duplicate_bars=0; g_reversed_bars=0; g_backfilled_bars=0;
-   g_session_id=""; g_anchor=0; g_last_logged=0;
+   g_session_id=""; g_anchor=0; g_last_logged=0; g_session_last_logged=0;
    g_connected=(bool)TerminalInfoInteger(TERMINAL_CONNECTED);
    g_last_tick_time=0; g_outage_open=false;
 
@@ -1858,6 +1886,17 @@ int OnInit()
         }
      }
 
+   //--- Exactly-once depends on this value, so it is recovered before OpenLog()
+   //--- takes a write handle on the same file.
+   if(g_live && !LastLoggedBar(g_last_logged))
+     {
+      g_halted=true;
+      g_halt_reason="Audit log exists but its last bar could not be read. "
+                    "Refusing to start: emission would not be exactly-once.";
+      Print("BTC CORE V1 HALTED: ",g_halt_reason);
+      Comment("BTC CORE V1 — HALTED — ",g_halt_reason);
+      return INIT_SUCCEEDED;
+     }
    if(!OpenLog())
       return INIT_FAILED;
    ResetAll();
@@ -1865,7 +1904,13 @@ int OnInit()
    g_last_processed=0;
    if(g_live)
      {
-      g_last_logged = LastLoggedBar();
+      //--- The session file's own record of the last logged bar is an
+      //--- independent witness. If it disagrees with the audit, one of them is
+      //--- wrong and exactly-once cannot be assumed.
+      if(g_session_last_logged!=0 && g_session_last_logged!=g_last_logged)
+         LogEvent("LOG_SESSION_SKEW","session recorded "
+                  +IsoUtc(g_session_last_logged,true)+" but the audit ends at "
+                  +IsoUtc(g_last_logged,g_last_logged!=0));
       LogEvent(StartKind(g_restarts),
                "anchor "+IsoUtc(g_anchor,true)+", last logged bar "
                +IsoUtc(g_last_logged,g_last_logged!=0)+", build "+TWIN_BUILD);

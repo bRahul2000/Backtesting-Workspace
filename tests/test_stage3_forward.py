@@ -521,3 +521,114 @@ def test_starting_a_fresh_session_preserves_the_previous_evidence():
     assert "FileDelete" not in source
     for name in ("InpLogFile", "SessionFileName()", "InpEventFile"):
         assert f"RotateStageFile({name});" in source
+
+
+# --- exactly-once across restarts ---------------------------------------------------------
+#
+# The first live restart appended the entire 1,500-bar replay a second time.
+# LastLoggedBar() opened the audit while OpenLog() already held it for writing,
+# MQL5 refused the second handle, and the function returned 0 — which the
+# emission gate read as "nothing logged yet". The EA recorded the moment in its
+# own event log: RESTART ... "last logged bar " (empty).
+
+
+def _emit(anchor_bars, already_logged, last_logged):
+    """The EA's emission gate, modelled exactly.
+
+    Replay always rebuilds state over every bar from the anchor. A bar is
+    WRITTEN only when it is newer than the last bar already in the log.
+    """
+    written, state_rebuilt = [], []
+    for bar in anchor_bars:
+        state_rebuilt.append(bar)
+        if last_logged is None or bar > last_logged:
+            written.append(bar)
+            last_logged = bar
+    return written, state_rebuilt, list(already_logged) + written
+
+
+BARS = [f"2026-09-{d:02d}T{h:02d}:00:00Z" for d in (5, 6, 7) for h in range(4)]
+
+
+def test_a_fresh_session_emits_every_replayed_bar_once():
+    written, state, log = _emit(BARS, [], None)
+    assert written == BARS
+    assert state == BARS
+    assert len(log) == len(set(log))
+
+
+def test_an_immediate_restart_emits_nothing_new():
+    """The failure case: same bars, nothing closed in between."""
+    _, _, log = _emit(BARS, [], None)
+    written, state, log2 = _emit(BARS, log, BARS[-1])
+    assert written == [], "a restart must not re-emit bars already logged"
+    assert state == BARS, "state must still be rebuilt over every bar"
+    assert log2 == log
+    assert len(log2) == len(set(log2))
+
+
+def test_the_bug_reproduced_last_logged_lost_duplicates_everything():
+    """With last_logged lost, the restart appends the whole replay again."""
+    _, _, log = _emit(BARS, [], None)
+    written, _, log2 = _emit(BARS, log, None)          # None == the lost value
+    assert written == BARS
+    assert len(log2) == 2 * len(BARS)
+    assert len(set(log2)) == len(BARS)
+    reversals = sum(1 for i in range(1, len(log2)) if log2[i] < log2[i - 1])
+    assert reversals == 1, "exactly the single reversal seen live"
+
+
+def test_a_restart_after_one_new_bar_emits_only_that_bar():
+    _, _, log = _emit(BARS, [], None)
+    new = "2026-09-07T04:00:00Z"
+    written, state, log2 = _emit(BARS + [new], log, BARS[-1])
+    assert written == [new]
+    assert state == BARS + [new]
+    assert len(log2) == len(set(log2)) == len(BARS) + 1
+
+
+def test_a_restart_after_several_missed_bars_emits_each_of_them_once():
+    """Bars that closed while MT5 was down must still be emitted, exactly once."""
+    _, _, log = _emit(BARS, [], None)
+    missed = [f"2026-09-07T{h:02d}:00:00Z" for h in (4, 5, 6)]
+    written, state, log2 = _emit(BARS + missed, log, BARS[-1])
+    assert written == missed
+    assert state == BARS + missed
+    assert len(log2) == len(set(log2)) == len(BARS) + 3
+
+
+def test_no_restart_sequence_produces_a_duplicate_or_a_reversal():
+    log, last = [], None
+    for extra in (0, 0, 1, 0, 3, 2, 0):
+        bars = BARS + [f"2026-09-08T{h:02d}:00:00Z" for h in range(extra)]
+        _, state, log = _emit(bars, log, last)
+        last = log[-1] if log else None
+        assert state == bars, "every restart rebuilds state over the full replay"
+    assert len(log) == len(set(log)), "no duplicate audit rows"
+    assert all(log[i] > log[i - 1] for i in range(1, len(log))), "no time reversal"
+
+
+def test_state_after_restart_is_identical_to_an_uninterrupted_run():
+    uninterrupted, _, _ = _emit(BARS, [], None)
+    _, restarted_state, _ = _emit(BARS, list(BARS), BARS[-1])
+    assert restarted_state == uninterrupted == BARS
+
+
+# --- the EA properties that make the above true ------------------------------------------------
+
+
+def test_the_last_logged_bar_is_recovered_before_the_log_is_opened_for_writing():
+    report = static_check()
+    assert report["recovers_last_logged_before_opening_log"] is True
+    source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
+    assert source.index("LastLoggedBar(g_last_logged)") < source.index("if(!OpenLog())")
+
+
+def test_an_unreadable_audit_log_halts_rather_than_reporting_it_empty():
+    report = static_check()
+    assert report["unreadable_log_halts"] is True
+    assert report["distinguishes_absent_log_from_unreadable"] is True
+
+
+def test_a_disagreement_between_session_file_and_audit_is_reported():
+    assert static_check()["session_audit_skew_is_reported"] is True

@@ -319,6 +319,18 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
         "fresh_session_rotates_not_deletes": all(t in code for t in (
             "RotateStageFile", "RotateSessionEvidence", "FileMove", "InpNewSession"))
             and "FileDelete" not in code,
+        # Exactly-once across restarts depends entirely on recovering the last
+        # logged bar BEFORE OpenLog() takes a write handle on the same file.
+        # MQL5 refuses a second open of a file held for writing, and the old
+        # code read that refusal as "nothing logged yet".
+        "recovers_last_logged_before_opening_log": bool(re.search(
+            r"LastLoggedBar\(g_last_logged\)[\s\S]{0,400}?if\(!OpenLog\(\)\)", code)),
+        # An unreadable log must halt, never be reported as an empty one.
+        "unreadable_log_halts": bool(re.search(
+            r"bool LastLoggedBar\(datetime &out\)", code))
+            and bool(re.search(r"!LastLoggedBar\(g_last_logged\)\s*\)\s*\{[\s\S]{0,200}?g_halted=true;", code)),
+        "distinguishes_absent_log_from_unreadable": "FileIsExist(InpLogFile,common)" in code,
+        "session_audit_skew_is_reported": "LOG_SESSION_SKEW" in source,
         "no_implicit_datetime_to_string": not re.search(
             r"=\s*__DATETIME__\s*;", code),
         "stage3_files_separate_from_audit_schema": all(t in source for t in (

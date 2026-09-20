@@ -8,6 +8,16 @@ strategy *would* have done. Nothing reaches the broker.
 
 ---
 
+## If a run has to be abandoned
+
+Collect first (`./scripts/stage3 collect`) so the evidence is on disk, then
+start a fresh session as below. Failed runs are kept under
+`data/exness/btc/stage3/failed_runs/<session id>/` with their SHA-256s and a
+note on what went wrong. Never deduplicate, sort or edit an audit file — a
+broken one is evidence, a tidied one is nothing.
+
+---
+
 ## Starting a fresh forward session
 
 Use this when there is no session yet, or when a previous session must be
