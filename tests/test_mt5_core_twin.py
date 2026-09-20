@@ -613,15 +613,22 @@ def test_two_different_runs_in_one_file_are_still_refused(tmp_path):
         load_audit(path, label="MT5")
 
 
-def test_the_ea_starts_a_fresh_audit_per_run_by_default():
-    """FileOpen truncates without FILE_READ, so one run is one audit."""
+def test_a_tester_run_starts_a_fresh_audit_but_a_live_run_never_truncates():
+    """One tester run is one audit; a live restart must not destroy evidence.
+
+    FileOpen truncates when FILE_READ is absent. The tester keeps that Stage 2
+    rule so a rerun cannot silently double a file. Stage 3 live runs always
+    append, because the audit log is the forward evidence and a restart is
+    normal operation, not a fresh run.
+    """
     source = (ROOT / "mt5" / "BTC_V3_Core_V1.mq5").read_text()
     assert "input bool          InpAppendLog       = false;" in source
     open_log = source.split("bool OpenLog()")[1].split("\n  }")[0]
     assert "FILE_WRITE|FILE_TXT|FILE_ANSI" in open_log.replace(" ", "")
-    # FILE_READ is only added when appending was explicitly requested.
-    assert "if(InpAppendLog)      flags |= FILE_READ;" in open_log
+    assert "bool append = InpAppendLog || !IsTesterRun();" in open_log
+    assert "if(append)            flags |= FILE_READ;" in open_log
     assert open_log.count("FileSeek(g_file,0,SEEK_END)") == 1
+    assert static_check()["live_run_appends_audit"] is True
 
 
 def test_the_ea_prints_a_build_banner_so_a_stale_binary_is_visible():

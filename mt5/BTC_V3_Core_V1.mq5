@@ -54,6 +54,13 @@ input double        InpRewardMultiple  = 3.0;
 input double        InpMaxLeverage     = 1.0;
 input bool          InpRequireUtcServer = true;
 
+//--- Stage 3 (live forward shadow) runtime. These affect persistence and bar
+//--- scheduling only; no decision rule reads any of them.
+input string        InpSessionFile     = "btc_core_v1_session.csv";
+input string        InpEventFile       = "btc_core_v1_events.csv";
+input int           InpMaxReplayBars   = 20000;
+input int           InpTickOutageSecs  = 900;
+
 //--- Frozen fingerprints, stamped into every log row so a log can never be
 //--- silently matched against a different Python build.
 //--- Twin build marker. MetaTrader runs the compiled .ex5, not the .mq5 on
@@ -62,6 +69,8 @@ input bool          InpRequireUtcServer = true;
 //--- build you expect, the .ex5 is stale and the audit is from the old logic.
 #define TWIN_BUILD "R4-S2-2 warmup+session-reset+DI+risk-budget"
 #define CORE_FINGERPRINT "631374d50cfa75d46349c0e7e8b2f26ac482e2bbf6dc1cf74dc8e1a00e16a9fd"
+#define A4_FINGERPRINT   "55fedf8564537549f076e726916286256f504749283a2b587b3cdc964926f3d9"
+#define T3_FINGERPRINT   "4c4ab845852ff973530f30ebee86061ea72bd29d68ff6165970dd5a9efde7910"
 #define A4_SETUP_ID "BTC_V3_A4_PULLBACK_LONG_FROZEN"
 #define T3_SETUP_ID "BTC_V3_T3_BREAKOUT_SHORT_FROZEN"
 #define STEP_SECONDS 900
@@ -558,6 +567,9 @@ struct AuditPosition
    bool     entered_intrabar;
   };
 
+#define SESSION_SCHEMA_VERSION 1
+#define EVENT_SCHEMA_VERSION   1
+
 //--- globals
 H1Regime      g_h1;
 PineEma       g_ema20, g_ema50;
@@ -573,6 +585,20 @@ double        g_balance;
 int           g_bar_index;
 datetime      g_last_bar_time;
 datetime      g_last_processed;
+//--- Stage 3 live-forward state. g_anchor fixes the replay origin so a restart
+//--- rebuilds byte-identical state; g_last_logged makes emission exactly-once.
+bool          g_live;
+datetime      g_anchor;
+datetime      g_last_logged;
+string        g_session_id;
+int           g_restarts;
+int           g_reconnects;
+long          g_duplicate_bars;
+long          g_reversed_bars;
+long          g_backfilled_bars;
+bool          g_connected;
+datetime      g_last_tick_time;
+bool          g_outage_open;
 datetime      g_segment_start;
 datetime      g_first_search;
 int           g_day_key;
@@ -823,6 +849,8 @@ bool WriteAuditHeader()
    return WriteAuditRow(fields);
   }
 
+bool IsTesterRun() { return (bool)MQLInfoInteger(MQL_TESTER); }
+
 bool OpenLog()
   {
    //--- FILE_TXT, not FILE_CSV: whole lines are written by WriteAuditRow, so
@@ -833,23 +861,170 @@ bool OpenLog()
    //--- file writes every bar a second time, and the comparator then sees a
    //--- doubled log rather than a run. Opt into appending only for a genuinely
    //--- continuous live session.
+   //--- Stage 3: a live restart must never truncate forward evidence, so live
+   //--- runs always append. The tester keeps the Stage 2 one-run-one-file rule.
+   bool append = InpAppendLog || !IsTesterRun();
    uint flags = FILE_WRITE|FILE_TXT|FILE_ANSI;
    if(InpUseCommonFiles) flags |= FILE_COMMON;
-   if(InpAppendLog)      flags |= FILE_READ;
+   if(append)            flags |= FILE_READ;
    g_file = FileOpen(InpLogFile,flags);
    if(g_file==INVALID_HANDLE)
      { Print("Cannot open audit log ",InpLogFile,": ",GetLastError()); return false; }
    bool fresh = (FileSize(g_file)==0);
-   if(InpAppendLog)
+   if(append)
      {
       FileSeek(g_file,0,SEEK_END);
-      if(!fresh)
+      if(!fresh && IsTesterRun())
          Print("Appending to an existing audit log. Bars already present will "
                "repeat if this run covers the same range.");
      }
    if(fresh && !WriteAuditHeader())
       return false;
    return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Stage 3 — live forward shadow runtime                             |
+//|                                                                   |
+//| RECOVERY MODEL: deterministic replay from a fixed anchor.         |
+//|                                                                   |
+//| No strategy state is ever serialised. On every start the EA       |
+//| replays every closed bar from g_anchor forward through the same   |
+//| ProcessClosedBar() the live path uses, so the rebuilt indicator,   |
+//| pullback, order and position state is identical to an             |
+//| uninterrupted run by construction rather than by agreement with a  |
+//| checkpoint format. A checkpoint can be stale, truncated or written |
+//| by a different build; replayed state cannot.                      |
+//|                                                                   |
+//| Only two facts persist, in the session file: the anchor and the    |
+//| last bar already written to the audit log. The anchor keeps the    |
+//| warmup window and therefore every decision boundary stable across  |
+//| restarts. The last-logged bar makes emission exactly-once, so a    |
+//| replayed bar rebuilds state without writing a duplicate row.       |
+//+------------------------------------------------------------------+
+string SessionFileName() { return InpSessionFile; }
+
+uint StageFileFlags(const bool for_write)
+  {
+   uint flags = for_write ? (FILE_WRITE|FILE_TXT|FILE_ANSI)
+                          : (FILE_READ|FILE_TXT|FILE_ANSI);
+   if(InpUseCommonFiles) flags |= FILE_COMMON;
+   return flags;
+  }
+
+//--- Append-only operational event log. Kept separate from the 76-column audit
+//--- so Stage 2 schema semantics are untouched.
+void LogEvent(const string kind,const string detail)
+  {
+   if(IsTesterRun()) return;
+   uint flags = FILE_READ|FILE_WRITE|FILE_TXT|FILE_ANSI;
+   if(InpUseCommonFiles) flags |= FILE_COMMON;
+   int handle = FileOpen(InpEventFile,flags);
+   if(handle==INVALID_HANDLE) return;
+   bool fresh = (FileSize(handle)==0);
+   FileSeek(handle,0,SEEK_END);
+   if(fresh)
+      FileWriteString(handle,"event_time_utc,session_id,schema_version,kind,detail\r\n");
+   string row = IsoUtc(TimeGMT(),true)+","+g_session_id+","
+                +IntegerToString(EVENT_SCHEMA_VERSION)+","+CsvEscape(kind)+","
+                +CsvEscape(detail)+"\r\n";
+   FileWriteString(handle,row);
+   FileClose(handle);
+   Print("EVENT ",kind,": ",detail);
+  }
+
+//--- Last bar_time_utc already present in the audit log, or 0 when empty.
+datetime LastLoggedBar()
+  {
+   int handle = FileOpen(InpLogFile,StageFileFlags(false));
+   if(handle==INVALID_HANDLE) return 0;
+   string last = "";
+   while(!FileIsEnding(handle))
+     {
+      string line = FileReadString(handle);
+      if(StringLen(line)>=20 && StringSubstr(line,0,4)!="bar_")
+         last = line;
+     }
+   FileClose(handle);
+   if(StringLen(last)<20) return 0;
+   string stamp = StringSubstr(last,0,StringFind(last,","));
+   //--- "YYYY-MM-DDTHH:MM:SSZ" -> "YYYY.MM.DD HH:MM:SS"
+   if(StringLen(stamp)<20) return 0;
+   string norm = StringSubstr(stamp,0,4)+"."+StringSubstr(stamp,5,2)+"."
+                 +StringSubstr(stamp,8,2)+" "+StringSubstr(stamp,11,8);
+   return StringToTime(norm);
+  }
+
+void WriteSessionFile()
+  {
+   if(IsTesterRun()) return;
+   int handle = FileOpen(SessionFileName(),StageFileFlags(true));
+   if(handle==INVALID_HANDLE)
+     { Print("Cannot write session file ",SessionFileName()); return; }
+   FileWriteString(handle,"key,value\r\n");
+   string rows[][2];
+   ArrayResize(rows,26);
+   int n=0;
+   rows[n][0]="schema_version";        rows[n++][1]=IntegerToString(SESSION_SCHEMA_VERSION);
+   rows[n][0]="session_id";            rows[n++][1]=g_session_id;
+   rows[n][0]="twin_build";            rows[n++][1]=TWIN_BUILD;
+   rows[n][0]="compiled_utc";          rows[n++][1]=__DATETIME__;
+   rows[n][0]="core_fingerprint";      rows[n++][1]=CORE_FINGERPRINT;
+   rows[n][0]="a4_fingerprint";        rows[n++][1]=A4_FINGERPRINT;
+   rows[n][0]="t3_fingerprint";        rows[n++][1]=T3_FINGERPRINT;
+   rows[n][0]="mode";                  rows[n++][1]=(InpMode==AUDIT_ONLY?"AUDIT_ONLY":"OTHER");
+   rows[n][0]="symbol";                rows[n++][1]=_Symbol;
+   rows[n][0]="broker";                rows[n++][1]=AccountInfoString(ACCOUNT_COMPANY);
+   rows[n][0]="server";                rows[n++][1]=AccountInfoString(ACCOUNT_SERVER);
+   rows[n][0]="account_trade_mode";    rows[n++][1]=IntegerToString(
+                                            (int)AccountInfoInteger(ACCOUNT_TRADE_MODE));
+   rows[n][0]="digits";                rows[n++][1]=IntegerToString(g_digits);
+   rows[n][0]="point";                 rows[n++][1]=DoubleToString(g_point,10);
+   rows[n][0]="tick_size";             rows[n++][1]=DoubleToString(
+                                            SymbolInfoDouble(_Symbol,SYMBOL_TRADE_TICK_SIZE),10);
+   rows[n][0]="server_utc_offset_secs";rows[n++][1]=IntegerToString(
+                                            (int)(TimeTradeServer()-TimeGMT()));
+   rows[n][0]="anchor_utc";            rows[n++][1]=IsoUtc(g_anchor,g_anchor!=0);
+   rows[n][0]="first_start_utc";       rows[n++][1]=g_session_id;
+   rows[n][0]="last_start_utc";        rows[n++][1]=IsoUtc(TimeGMT(),true);
+   rows[n][0]="last_logged_bar_utc";   rows[n++][1]=IsoUtc(g_last_logged,g_last_logged!=0);
+   rows[n][0]="restarts";              rows[n++][1]=IntegerToString(g_restarts);
+   rows[n][0]="reconnects";            rows[n++][1]=IntegerToString(g_reconnects);
+   rows[n][0]="duplicate_bars";        rows[n++][1]=IntegerToString((int)g_duplicate_bars);
+   rows[n][0]="reversed_bars";         rows[n++][1]=IntegerToString((int)g_reversed_bars);
+   rows[n][0]="backfilled_bars";       rows[n++][1]=IntegerToString((int)g_backfilled_bars);
+   rows[n][0]="audit_file";            rows[n++][1]=InpLogFile;
+   for(int i=0;i<n;i++)
+      FileWriteString(handle,CsvEscape(rows[i][0])+","+CsvEscape(rows[i][1])+"\r\n");
+   FileClose(handle);
+  }
+
+//--- Reads back only what must survive a restart: the anchor and the counters.
+void ReadSessionFile()
+  {
+   int handle = FileOpen(SessionFileName(),StageFileFlags(false));
+   if(handle==INVALID_HANDLE) return;
+   while(!FileIsEnding(handle))
+     {
+      string line = FileReadString(handle);
+      int comma = StringFind(line,",");
+      if(comma<=0) continue;
+      string key = StringSubstr(line,0,comma);
+      string value = StringSubstr(line,comma+1);
+      if(key=="anchor_utc" && StringLen(value)>=20)
+        {
+         string norm = StringSubstr(value,0,4)+"."+StringSubstr(value,5,2)+"."
+                       +StringSubstr(value,8,2)+" "+StringSubstr(value,11,8);
+         g_anchor = StringToTime(norm);
+        }
+      else if(key=="session_id" && StringLen(value)>0) g_session_id=value;
+      else if(key=="restarts")   g_restarts=(int)StringToInteger(value);
+      else if(key=="reconnects") g_reconnects=(int)StringToInteger(value);
+      else if(key=="duplicate_bars")  g_duplicate_bars=StringToInteger(value);
+      else if(key=="reversed_bars")   g_reversed_bars=StringToInteger(value);
+      else if(key=="backfilled_bars") g_backfilled_bars=StringToInteger(value);
+     }
+   FileClose(handle);
   }
 
 double BodyPercent(const double open,const double high,const double low,const double close)
@@ -1279,12 +1454,32 @@ void ProcessClosedBar(const int shift)
    bar.tick_volume = iTickVolume(_Symbol,PERIOD_M15,shift);
    bar.spread_points = (int)iSpread(_Symbol,PERIOD_M15,shift);
 
+   //--- Exactly-once and monotonicity. A bar we have already consumed must
+   //--- never be consumed twice, and time must never run backwards. Both are
+   //--- counted and reported rather than quietly tolerated.
+   if(g_last_processed!=0 && bar.time==g_last_processed)
+     {
+      g_duplicate_bars++;
+      LogEvent("DUPLICATE_BAR","bar "+IsoUtc(bar.time,true)+" already processed");
+      return;
+     }
+   if(g_last_processed!=0 && bar.time<g_last_processed)
+     {
+      g_reversed_bars++;
+      LogEvent("TIME_REVERSAL","bar "+IsoUtc(bar.time,true)+" precedes last processed "
+               +IsoUtc(g_last_processed,true));
+      return;
+     }
+
    //--- A missing bar breaks indicator continuity. The Python engine splits
    //--- the dataset into continuous segments and resets; mirror that here.
    if(g_last_processed!=0 && bar.time-g_last_processed!=STEP_SECONDS)
      {
+      long missing = (long)((bar.time-g_last_processed)/STEP_SECONDS)-1;
       ResetAll();
       Print("Data gap before ",TimeToString(bar.time),": indicators and state reset.");
+      LogEvent("DATA_GAP",IntegerToString((int)missing)+" M15 bars absent before "
+               +IsoUtc(bar.time,true)+"; state reset");
      }
    g_last_processed=bar.time;
    if(g_segment_start==0)
@@ -1454,8 +1649,102 @@ void ProcessClosedBar(const int shift)
    fields[n++] = "UNVERIFIED";
    fields[n++] = "UNVERIFIED";
    fields[n++] = "UNVERIFIED";
-   WriteAuditRow(fields);
-   FileFlush(g_file);
+   //--- Exactly-once emission. A replayed bar rebuilds state but must not add a
+   //--- second row for a bar the log already holds.
+   if(g_last_logged==0 || bar.time>g_last_logged)
+     {
+      WriteAuditRow(fields);
+      FileFlush(g_file);
+      g_last_logged = bar.time;
+     }
+   else
+      g_backfilled_bars++;
+  }
+
+//+------------------------------------------------------------------+
+//| Closed-bar scheduler                                              |
+//|                                                                   |
+//| Processes EVERY closed bar not yet consumed, oldest first, and     |
+//| never the forming bar (shift 0). One mechanism serves three cases  |
+//| the Stage 2 tester path could not:                                 |
+//|                                                                    |
+//|   * the first closed bar after an attach, which the old            |
+//|     "skip until g_last_bar_time is set" rule silently dropped;      |
+//|   * bars that closed while the terminal was down or disconnected,   |
+//|     which the old one-bar-per-tick rule dropped and then mistook    |
+//|     for a data gap, resetting 204 hours of warmup;                  |
+//|   * replay from the anchor on restart.                              |
+//|                                                                    |
+//| Bars absent from broker history remain a genuine gap and still      |
+//| reset state, exactly as in Stage 2.                                 |
+//+------------------------------------------------------------------+
+string StartKind(const int restarts) { return (restarts>0) ? "RESTART" : "SESSION_START"; }
+
+void ProcessPendingBars()
+  {
+   int shift = 1;
+   bool reached = false;
+   while(shift < InpMaxReplayBars)
+     {
+      datetime stamp = iTime(_Symbol,PERIOD_M15,shift);
+      if(stamp==0)                                      { reached=true; break; }
+      if(g_last_processed!=0 && stamp<=g_last_processed) { reached=true; break; }
+      if(g_anchor!=0 && stamp<g_anchor)                 { reached=true; break; }
+      shift++;
+     }
+   //--- Silently starting the replay somewhere other than the anchor would give
+   //--- a different warmup boundary and therefore different decisions, which is
+   //--- exactly the kind of drift this stage exists to rule out. Halt instead.
+   if(!reached)
+     {
+      g_halted=true;
+      g_halt_reason="Replay origin unreachable within "+IntegerToString(InpMaxReplayBars)
+                    +" bars. Raise InpMaxReplayBars or start a new session.";
+      LogEvent("ANCHOR_UNREACHABLE",g_halt_reason);
+      Print("BTC CORE V1 HALTED: ",g_halt_reason);
+      Comment("BTC CORE V1 — HALTED — ",g_halt_reason);
+      return;
+     }
+   if(shift>2 && g_last_processed!=0)
+      LogEvent("BACKFILL",IntegerToString(shift-1)+" closed bars pending since "
+               +IsoUtc(g_last_processed,true));
+   for(int s=shift-1; s>=1; s--)
+      ProcessClosedBar(s);
+  }
+
+//--- Connection transitions and tick outages are recorded, never inferred away.
+void PollConnectivity()
+  {
+   if(IsTesterRun()) return;
+   bool connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+   if(connected!=g_connected)
+     {
+      if(connected)
+        {
+         g_reconnects++;
+         LogEvent("RECONNECT","terminal reconnected; reconnect #"
+                  +IntegerToString(g_reconnects));
+         WriteSessionFile();
+        }
+      else
+         LogEvent("DISCONNECT","terminal reported disconnected");
+      g_connected = connected;
+     }
+   datetime now = TimeGMT();
+   if(g_last_tick_time!=0 && (now-g_last_tick_time)>InpTickOutageSecs)
+     {
+      if(!g_outage_open)
+        {
+         g_outage_open = true;
+         LogEvent("TICK_OUTAGE","no ticks for "
+                  +IntegerToString((int)(now-g_last_tick_time))+"s");
+        }
+     }
+   else if(g_outage_open)
+     {
+      g_outage_open = false;
+      LogEvent("TICK_RESUMED","ticks resumed");
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -1486,11 +1775,56 @@ int OnInit()
       Comment("BTC CORE V1 — HALTED — ",g_halt_reason);
       return INIT_SUCCEEDED;   // stay loaded so the operator can read the reason
      }
+   g_live = !IsTesterRun();
+   g_restarts=0; g_reconnects=0;
+   g_duplicate_bars=0; g_reversed_bars=0; g_backfilled_bars=0;
+   g_session_id=""; g_anchor=0; g_last_logged=0;
+   g_connected=(bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+   g_last_tick_time=0; g_outage_open=false;
+
+   if(g_live)
+     {
+      //--- Recover the anchor and counters, then re-derive everything else.
+      ReadSessionFile();
+      bool resumed = (g_session_id!="");
+      if(!resumed)
+         g_session_id = IsoUtc(TimeGMT(),true);
+      else
+         g_restarts++;
+      if(g_anchor==0)
+        {
+         //--- First start fixes the replay origin. Everything downstream —
+         //--- warmup boundary, first search time, every decision — is derived
+         //--- from it, so it must never move again.
+         int deepest = MathMin(InpMaxReplayBars-1,Bars(_Symbol,PERIOD_M15)-1);
+         if(deepest<1)
+           {
+            g_halted=true; g_halt_reason="No M15 history available to anchor the session.";
+            Print("BTC CORE V1 HALTED: ",g_halt_reason);
+            Comment("BTC CORE V1 — HALTED — ",g_halt_reason);
+            return INIT_SUCCEEDED;
+           }
+         g_anchor = iTime(_Symbol,PERIOD_M15,deepest);
+        }
+     }
+
    if(!OpenLog())
       return INIT_FAILED;
    ResetAll();
    g_last_bar_time=0;
    g_last_processed=0;
+   if(g_live)
+     {
+      g_last_logged = LastLoggedBar();
+      LogEvent(StartKind(g_restarts),
+               "anchor "+IsoUtc(g_anchor,true)+", last logged bar "
+               +IsoUtc(g_last_logged,g_last_logged!=0)+", build "+TWIN_BUILD);
+      ProcessPendingBars();
+      g_last_bar_time = iTime(_Symbol,PERIOD_M15,0);
+      WriteSessionFile();
+      Print("Stage 3 live forward ready. Session ",g_session_id,
+            "  restarts ",g_restarts,"  bars replayed to ",IsoUtc(g_last_processed,true));
+     }
    Comment("BTC CORE V1 — AUDIT ONLY — NO ORDERS");
    Print("BTC CORE V1 — AUDIT ONLY — NO ORDERS. Fingerprint ",CORE_FINGERPRINT);
    Print("Twin build ",TWIN_BUILD,", compiled ",__DATETIME__,
@@ -1503,20 +1837,34 @@ int OnInit()
 
 void OnDeinit(const int reason)
   {
+   if(g_live)
+     {
+      WriteSessionFile();
+      LogEvent("DEINIT","reason code "+IntegerToString(reason)
+               +"; bars processed to "+IsoUtc(g_last_processed,g_last_processed!=0));
+     }
    if(g_file!=INVALID_HANDLE) FileClose(g_file);
+   g_file=INVALID_HANDLE;
    Comment("");
   }
 
 void OnTick()
   {
    if(g_halted) return;
+   g_last_tick_time = TimeGMT();
+   PollConnectivity();
    datetime current = iTime(_Symbol,PERIOD_M15,0);
    if(current==0 || current==g_last_bar_time)
       return;
-   //--- A new forming bar exists, so shift 1 is the bar that just closed.
-   if(g_last_bar_time!=0)
+   //--- A new forming bar exists, so every bar up to shift 1 has closed.
+   //--- Live consumes all of them; the tester keeps the Stage 2 single-bar rule
+   //--- so certified runs stay reproducible bar for bar.
+   if(g_live)
+      ProcessPendingBars();
+   else if(g_last_bar_time!=0)
       ProcessClosedBar(1);
    g_last_bar_time=current;
+   if(g_live) WriteSessionFile();
    Comment("BTC CORE V1 — ",(InpMode==AUDIT_ONLY ? "AUDIT ONLY — NO ORDERS" : "NO TRANSMISSION IMPLEMENTED"),
            "\nBars audited: ",IntegerToString(g_bar_index),
            "\nPending: ",(g_order.active?"YES":"no"),

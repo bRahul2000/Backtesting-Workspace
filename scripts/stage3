@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# R4 Stage 3 operator helper.
+#
+#   ./scripts/stage3 collect     copy evidence out of MetaTrader
+#   ./scripts/stage3 check       is the evidence usable?
+#   ./scripts/stage3 compare     run the parity check (logic only, no export needed)
+#   ./scripts/stage3 full        run the parity check against a fresh broker export
+#   ./scripts/stage3 status      where does Stage 3 stand?
+#   ./scripts/stage3 ledger      show recorded evidence periods
+#
+# Read-only over MetaTrader's files. Nothing here can place a broker order.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+COMMON="$HOME/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/users/user/AppData/Roaming/MetaQuotes/Terminal/Common/Files"
+DEST="data/exness/btc/stage3"
+ARCHIVE="$DEST/archive"
+
+collect() {
+  if [ ! -d "$COMMON" ]; then
+    echo "MetaTrader Common\\Files not found at:"; echo "  $COMMON"
+    echo "Open MetaTrader: File > Open Data Folder, then copy the three files into $DEST/"
+    exit 1
+  fi
+  mkdir -p "$DEST" "$ARCHIVE"
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  copied=0
+  for name in btc_core_v1_audit.csv btc_core_v1_session.csv btc_core_v1_events.csv; do
+    if [ -f "$COMMON/$name" ]; then
+      # Keep every collection; evidence is never overwritten in place.
+      [ -f "$DEST/$name" ] && cp "$DEST/$name" "$ARCHIVE/${stamp}_${name}"
+      cp "$COMMON/$name" "$DEST/$name"
+      echo "collected $name  ($(wc -l < "$DEST/$name" | tr -d ' ') lines)"
+      copied=$((copied+1))
+    else
+      echo "MISSING   $name  — is the EA attached and running?"
+    fi
+  done
+  [ "$copied" -gt 0 ] || { echo "Nothing collected."; exit 1; }
+  echo
+  echo "sha256:"; shasum -a 256 "$DEST"/btc_core_v1_*.csv
+}
+
+case "${1:-status}" in
+  collect) collect ;;
+  check)   python -m tools.stage3 check ;;
+  compare) python -m tools.stage3 compare ;;
+  full)
+    market="${2:-}"
+    [ -n "$market" ] || { echo "usage: ./scripts/stage3 full <fresh-M15-export.csv>"; exit 2; }
+    python -m tools.stage3 compare --market "$market" ;;
+  status)  python -m tools.stage3 status ;;
+  ledger)  python -m tools.stage3 ledger ;;
+  *) sed -n '2,12p' "$0"; exit 2 ;;
+esac

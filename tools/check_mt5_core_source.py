@@ -262,6 +262,44 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
             r"is_a4\s*&&\s*\(!A4ContextValid\(bar\)\s*\|\|\s*A4MaterialBelowEma50\(bar\)\)",
             code)),
         "emits_cancelled_status": '"CANCELLED"' in source,
+        # --- Stage 3 live-forward runtime -------------------------------
+        # Only closed bars are ever evaluated. shift 0 is the forming bar and
+        # must never reach ProcessClosedBar.
+        "never_processes_forming_bar": "ProcessClosedBar(0)" not in code,
+        "closed_bar_scheduler_present": "ProcessPendingBars" in code,
+        # Every pending closed bar is consumed oldest-first, so a bar that
+        # closed while the terminal was down is back-filled rather than lost.
+        "backfills_missed_bars": bool(re.search(
+            r"for\(int s=shift-1; s>=1; s--\)\s*ProcessClosedBar\(s\);", code)),
+        "rejects_duplicate_bar": bool(re.search(
+            r"bar\.time==g_last_processed", code)) and "g_duplicate_bars++" in code,
+        "rejects_time_reversal": bool(re.search(
+            r"bar\.time<g_last_processed", code)) and "g_reversed_bars++" in code,
+        # Emission is exactly-once: a replayed bar rebuilds state silently.
+        "exactly_once_emission": bool(re.search(
+            r"g_last_logged==0 \|\| bar\.time>g_last_logged", code)),
+        # Recovery is replay from a fixed anchor, never a deserialised state.
+        "replays_from_fixed_anchor": all(t in code for t in ("g_anchor", "ReadSessionFile",
+                                                             "WriteSessionFile")),
+        "halts_if_anchor_unreachable": "ANCHOR_UNREACHABLE" in source,
+        # A live restart must never truncate forward evidence.
+        "live_run_appends_audit": bool(re.search(
+            r"bool append = InpAppendLog \|\| !IsTesterRun\(\);", code)),
+        # Stage 2 tester semantics must stay reachable and unchanged.
+        "tester_path_preserved": bool(re.search(
+            r"else if\(g_last_bar_time!=0\)\s*ProcessClosedBar\(1\);", code)),
+        "records_run_identity": all(t in source for t in (
+            "session_id", "twin_build", "compiled_utc", "core_fingerprint",
+            "a4_fingerprint", "t3_fingerprint", "anchor_utc", "restarts",
+            "reconnects", "server_utc_offset_secs", "tick_size")),
+        "tracks_connectivity": all(t in code for t in ("PollConnectivity",
+                                                       "TERMINAL_CONNECTED", "g_reconnects")),
+        "logs_operational_events": all(f'"{k}"' in source for k in (
+            "SESSION_START", "RESTART", "RECONNECT", "DISCONNECT", "TICK_OUTAGE",
+            "DATA_GAP", "BACKFILL", "DUPLICATE_BAR", "TIME_REVERSAL", "DEINIT")),
+        "stage3_files_separate_from_audit_schema": all(t in source for t in (
+            "InpSessionFile", "InpEventFile", "SESSION_SCHEMA_VERSION",
+            "EVENT_SCHEMA_VERSION")),
     }
     report["reject_codes_only_in_mt5"] = sorted(reject_codes(source) - python_reject_codes())
     report["reject_codes_only_in_python"] = sorted(python_reject_codes() - reject_codes(source))
