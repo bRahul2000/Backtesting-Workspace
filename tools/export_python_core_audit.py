@@ -382,7 +382,7 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
 
     for index, bid in enumerate(candles):
         opened = closed = None
-        expired = False
+        expired = cancelled = False
         entered_intrabar = False
         bar_spread = (float(spread_price.get(bid.timestamp, config.spread))
                       if spread_price is not None else config.spread)
@@ -489,7 +489,10 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
             new_pending = create_pending_order(signal, bid, index, balance, settings)
             pending = new_pending
         elif isinstance(signal, CancelPendingOrder) and pending is not None:
+            # Only the child that owns the order can cancel it; the frozen Core
+            # has already enforced that before handing the action over.
             pending = None
+            cancelled = True
 
         atr = view["atr"]
         rows.append(_row(bid, view, spread_points, spread_price, config,
@@ -497,7 +500,7 @@ def _replay_segment(frame, trade_start, settings, config, spread_points, spread_
                          prior_high, t3_regime, t3_code, t3_context, t3_signal_pass,
                          t3_high, t3_low, stop_high, stop_low, atr, observation,
                          signal, new_pending, pending, opened, closed, expired,
-                         a4_levels, t3_levels))
+                         cancelled, a4_levels, t3_levels))
     return rows
 
 
@@ -505,7 +508,7 @@ def _row(bid, view, spread_points, spread_price, config, strategy, a4_code, a4_c
          a4_signal_pass, in_session, prior_high, t3_regime, t3_code, t3_context,
          t3_signal_pass, t3_high, t3_low, stop_high, stop_low, atr, observation,
          signal, new_pending, pending, opened, closed, expired,
-         a4_levels, t3_levels) -> dict:
+         cancelled, a4_levels, t3_levels) -> dict:
     h1, h1_bar = view["h1"], view["h1_bar"]
     dmi = view["dmi"]
     p4, p3 = a4_parameters(), V3T3FrozenParameters()
@@ -565,6 +568,7 @@ def _row(bid, view, spread_points, spread_price, config, strategy, a4_code, a4_c
         "pending_status": ("CREATED" if new_pending is not None else
                            "FILLED" if opened is not None else
                            "EXPIRED" if expired else
+                           "CANCELLED" if cancelled else
                            "ACTIVE" if pending is not None else ""),
         "pending_trigger": _num(pending.trigger_price if pending is not None else None),
         "pending_stop": _num(pending.stop_price if pending is not None else None),

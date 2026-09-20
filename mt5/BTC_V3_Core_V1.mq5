@@ -892,6 +892,56 @@ void DecisionInit(Decision &decision)
   }
 
 //+------------------------------------------------------------------+
+//| Pending-order cancellation                                        |
+//|                                                                   |
+//| Each frozen child handles its own pending order before any other  |
+//| decision, and btc_v3_core_v1.on_candle forwards a cancellation    |
+//| only from the child that OWNS the order. A4 also cancels when its |
+//| bullish context is invalidated; T3 deliberately does not.         |
+//|                                                                   |
+//| These are pure predicates: the order stays live while this bar's  |
+//| reject codes are derived, exactly as the Python exporter reports   |
+//| A4_BLOCKED_PENDING on the bar a cancellation happens.             |
+//+------------------------------------------------------------------+
+bool A4ContextValid(const BarView &bar)
+  {
+   //--- _context_valid + the A4 overlay's normalized-slope clause. It reads
+   //--- adx only; atr and rsi are not part of it.
+   if(!bar.has_adx)                  return false;
+   if(!H1Bullish(g_h1))              return false;
+   if(!(bar.ema20>bar.ema50))        return false;
+   if(bar.adx<A4_MIN_ADX)            return false;
+   double slope=0.0;
+   if(!H1Slope(g_h1,slope))          return false;
+   if(!g_h1.has_atr || g_h1.confirmed_atr<=0.0) return false;
+   return (slope/g_h1.confirmed_atr >= A4_MIN_NORM_H1_SLOPE);
+  }
+
+bool A4MaterialBelowEma50(const BarView &bar)
+  {
+   return (bar.has_atr && bar.atr>0.0
+           && bar.close < bar.ema50 - A4_MATERIAL_EMA50_ATR*bar.atr);
+  }
+
+bool ShouldCancelPending(const BarView &bar,const bool in_window,string &reason)
+  {
+   reason="";
+   if(!g_order.active || !in_window)
+      return false;
+   bool is_a4 = (g_order.setup_id==A4_SETUP_ID);
+   int trades_today = is_a4 ? g_a4.trades_today : g_t3.trades_today;
+   if(!bar.in_session)
+      reason="UTC trading session ended.";
+   else if(trades_today>=MAX_TRADES_PER_DAY)
+      reason="Maximum filled trades per UTC day reached.";
+   else if(is_a4 && (!A4ContextValid(bar) || A4MaterialBelowEma50(bar)))
+      reason="V3-L2 bullish trend context invalidated.";
+   else
+      return false;
+   return true;
+  }
+
+//+------------------------------------------------------------------+
 //| A4 — port of BtcV3A4PullbackLongFrozen over V3-L2.                |
 //| Called with the just-closed bar and the prior-bar buffer taken    |
 //| BEFORE this bar was pushed, exactly as the Python deque is read.  |
@@ -1292,6 +1342,11 @@ void ProcessClosedBar(const int shift)
                           : g_position.active ? "T3_BLOCKED_POSITION"
                                               : "T3_BEFORE_WINDOW";
 
+   //--- Decided here, applied after this bar's codes are derived, so the
+   //--- cancelling bar still reports A4_/T3_BLOCKED_PENDING as Python does.
+   string cancel_reason="";
+   bool cancel_pending = ShouldCancelPending(bar,in_window,cancel_reason);
+
    Decision a4, t3;
    string regime_label="";
    EvaluateA4(bar,prior_high,has_prior_high,previous_high,has_previous,
@@ -1306,6 +1361,12 @@ void ProcessClosedBar(const int shift)
         { CreateAuditOrder(a4,bar,A4_SETUP_ID); signal_side="LONG"; signal_setup=A4_SETUP_ID; pending_status="CREATED"; }
       else if(t3.signal_pass)
         { CreateAuditOrder(t3,bar,T3_SETUP_ID); signal_side="SHORT"; signal_setup=T3_SETUP_ID; pending_status="CREATED"; }
+     }
+   if(cancel_pending)
+     {
+      g_order.active=false;
+      pending_status="CANCELLED";
+      Print("Pending cancelled at ",IsoUtc(bar.time,true),": ",cancel_reason);
      }
    if(pending_status=="" && g_order.active) pending_status="ACTIVE";
 

@@ -1,25 +1,25 @@
 {
   "python_duplicate_bars_collapsed": 0,
-  "mt5_duplicate_bars_collapsed": 5663,
+  "mt5_duplicate_bars_collapsed": 0,
   "bars_compared": 5663,
   "bars_only_in_python": 2,
   "bars_only_in_mt5": 0,
-  "bars_matching": 4813,
-  "bars_mismatching": 850,
-  "decision_parity_percent": 84.9902878333039,
+  "bars_matching": 5661,
+  "bars_mismatching": 2,
+  "decision_parity_percent": 99.96468303019601,
   "exact_ohlc_matches": 5663,
   "indicator_matches": 5663,
-  "a4_decision_matches": 4830,
-  "t3_decision_matches": 4847,
-  "signal_matches": 5657,
-  "pending_matches": 5648,
-  "entry_matches": 5658,
-  "exit_matches": 5655,
+  "a4_decision_matches": 5663,
+  "t3_decision_matches": 5663,
+  "signal_matches": 5663,
+  "pending_matches": 5661,
+  "entry_matches": 5663,
+  "exit_matches": 5663,
   "python_signals": 26,
   "python_entries": 22,
   "python_exits": 22,
   "signals_with_a_divergence": 0,
-  "trades_with_a_divergence": 1,
+  "trades_with_a_divergence": 0,
   "dimensions": {
     "ohlc": {
       "matching": 5663,
@@ -37,29 +37,29 @@
       "percent": 100.0
     },
     "indicators": {
-      "matching": 5650,
+      "matching": 5663,
       "of": 5663,
-      "percent": 99.77044
+      "percent": 100.0
     },
     "carried_state": {
-      "matching": 5118,
+      "matching": 5663,
       "of": 5663,
-      "percent": 90.376126
+      "percent": 100.0
     },
     "a4_context": {
-      "matching": 4830,
+      "matching": 5663,
       "of": 5663,
-      "percent": 85.290482
+      "percent": 100.0
     },
     "a4_signal": {
-      "matching": 5654,
+      "matching": 5663,
       "of": 5663,
-      "percent": 99.841074
+      "percent": 100.0
     },
     "t3_context": {
-      "matching": 4847,
+      "matching": 5663,
       "of": 5663,
-      "percent": 85.590676
+      "percent": 100.0
     },
     "t3_signal": {
       "matching": 5663,
@@ -67,295 +67,82 @@
       "percent": 100.0
     },
     "signal": {
-      "matching": 5657,
+      "matching": 5663,
       "of": 5663,
-      "percent": 99.894049
+      "percent": 100.0
     },
     "pending": {
-      "matching": 5648,
+      "matching": 5661,
       "of": 5663,
-      "percent": 99.735123
+      "percent": 99.964683
     },
     "entry": {
-      "matching": 5658,
+      "matching": 5663,
       "of": 5663,
-      "percent": 99.911708
+      "percent": 100.0
     },
     "stop_and_target": {
-      "matching": 5658,
+      "matching": 5663,
       "of": 5663,
-      "percent": 99.911708
+      "percent": 100.0
     },
     "exit": {
-      "matching": 5655,
+      "matching": 5663,
       "of": 5663,
-      "percent": 99.858732
+      "percent": 100.0
     }
   },
   "python_trades": 22,
-  "mt5_trades": 27,
-  "full_trade_matches": 0,
-  "full_trade_parity": false,
+  "mt5_trades": 22,
+  "full_trade_matches": 22,
+  "full_trade_parity": true,
   "mismatch_counts": {
-    "STATE_MISMATCH": 545,
-    "CONTEXT_MISMATCH": 287,
-    "INDICATOR_MISMATCH": 13,
-    "EXIT_MISMATCH": 3,
     "PENDING_STATE_MISMATCH": 2,
     "TIMESTAMP_ALIGNMENT": 2
   },
   "first_mismatch": {
-    "bar_time_utc": "2026-01-01T00:00:00Z",
-    "classification": "CONTEXT_MISMATCH",
-    "column": "a4_reject_code",
-    "python": "A4_BEFORE_WINDOW",
-    "mt5": "A4_WARMUP",
-    "delta": NaN
+    "bar_time_utc": "2026-01-14T13:30:00Z",
+    "classification": "PENDING_STATE_MISMATCH",
+    "column": "pending_status",
+    "python": "CANCELLED",
+    "mt5": "ACTIVE",
+    "delta": null
   },
   "first_20_mismatches": [
     {
-      "bar_time_utc": "2026-01-01T00:00:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
+      "bar_time_utc": "2026-01-14T13:30:00Z",
+      "classification": "PENDING_STATE_MISMATCH",
+      "column": "pending_status",
+      "python": "CANCELLED",
+      "mt5": "ACTIVE",
+      "delta": null
     },
     {
-      "bar_time_utc": "2026-01-01T00:15:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
+      "bar_time_utc": "2026-01-14T13:45:00Z",
+      "classification": "PENDING_STATE_MISMATCH",
+      "column": "pending_status",
+      "python": "",
+      "mt5": "EXPIRED",
+      "delta": null
     },
     {
-      "bar_time_utc": "2026-01-01T00:30:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
+      "bar_time_utc": "2026-02-28T23:45:00Z",
+      "classification": "TIMESTAMP_ALIGNMENT",
+      "column": "bar_time_utc",
+      "python": "present",
+      "mt5": "MISSING",
+      "delta": null
     },
     {
-      "bar_time_utc": "2026-01-01T00:45:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T01:00:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T01:15:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T01:30:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T01:45:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T02:00:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T02:15:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T02:30:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T02:45:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T03:00:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T03:15:00Z",
-      "classification": "CONTEXT_MISMATCH",
-      "column": "a4_reject_code",
-      "python": "A4_BEFORE_WINDOW",
-      "mt5": "A4_WARMUP",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T03:30:00Z",
-      "classification": "INDICATOR_MISMATCH",
-      "column": "plus_di",
-      "python": "29.9397169674",
-      "mt5": "",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T03:45:00Z",
-      "classification": "INDICATOR_MISMATCH",
-      "column": "plus_di",
-      "python": "27.9218697338",
-      "mt5": "",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T04:00:00Z",
-      "classification": "INDICATOR_MISMATCH",
-      "column": "plus_di",
-      "python": "24.2079536835",
-      "mt5": "",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T04:15:00Z",
-      "classification": "INDICATOR_MISMATCH",
-      "column": "plus_di",
-      "python": "22.2079997218",
-      "mt5": "",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T04:30:00Z",
-      "classification": "INDICATOR_MISMATCH",
-      "column": "plus_di",
-      "python": "20.7296816115",
-      "mt5": "",
-      "delta": NaN
-    },
-    {
-      "bar_time_utc": "2026-01-01T04:45:00Z",
-      "classification": "INDICATOR_MISMATCH",
-      "column": "plus_di",
-      "python": "19.5595280830",
-      "mt5": "",
-      "delta": NaN
+      "bar_time_utc": "2026-03-01T00:00:00Z",
+      "classification": "TIMESTAMP_ALIGNMENT",
+      "column": "bar_time_utc",
+      "python": "present",
+      "mt5": "MISSING",
+      "delta": null
     }
   ],
-  "worst_numeric_differences": [
-    {
-      "bar_time_utc": "2026-01-14T04:15:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_pullback_low",
-      "python": "95331.2700000000",
-      "mt5": "94043.3500000000",
-      "delta": 1287.9199999999983
-    },
-    {
-      "bar_time_utc": "2026-01-14T04:00:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_pullback_low",
-      "python": "95331.2700000000",
-      "mt5": "94043.3500000000",
-      "delta": 1287.9199999999983
-    },
-    {
-      "bar_time_utc": "2026-01-14T04:30:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_pullback_low",
-      "python": "95229.4200000000",
-      "mt5": "94043.3500000000",
-      "delta": 1186.0699999999924
-    },
-    {
-      "bar_time_utc": "2026-01-14T04:45:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_pullback_low",
-      "python": "95182.6000000000",
-      "mt5": "94043.3500000000",
-      "delta": 1139.25
-    },
-    {
-      "bar_time_utc": "2026-01-14T05:00:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_pullback_low",
-      "python": "95067.4400000000",
-      "mt5": "94043.3500000000",
-      "delta": 1024.0899999999965
-    },
-    {
-      "bar_time_utc": "2026-01-04T22:00:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_trades_today",
-      "python": "0",
-      "mt5": "2",
-      "delta": 2.0
-    },
-    {
-      "bar_time_utc": "2026-01-05T19:00:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_trades_today",
-      "python": "0",
-      "mt5": "2",
-      "delta": 2.0
-    },
-    {
-      "bar_time_utc": "2026-01-04T19:00:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_trades_today",
-      "python": "0",
-      "mt5": "2",
-      "delta": 2.0
-    },
-    {
-      "bar_time_utc": "2026-01-04T19:15:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_trades_today",
-      "python": "0",
-      "mt5": "2",
-      "delta": 2.0
-    },
-    {
-      "bar_time_utc": "2026-01-05T17:45:00Z",
-      "classification": "STATE_MISMATCH",
-      "column": "a4_trades_today",
-      "python": "0",
-      "mt5": "2",
-      "delta": 2.0
-    }
-  ],
+  "worst_numeric_differences": [],
   "full_parity": false,
   "acceptance_criterion": "100% strategy decision parity over every compared bar, with no bar present on only one side."
 }

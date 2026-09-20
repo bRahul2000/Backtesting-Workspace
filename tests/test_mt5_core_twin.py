@@ -584,3 +584,79 @@ def test_the_ea_prints_a_build_banner_so_a_stale_binary_is_visible():
     assert "#define TWIN_BUILD" in source
     assert "__DATETIME__" in source
     assert 'Print("Twin build ",TWIN_BUILD' in source
+
+
+# --- pending-order cancellation -----------------------------------------------------------
+#
+# The certification run agreed on every indicator, gate, signal and trade but
+# kept a pending order alive for one bar after the frozen strategy had cancelled
+# it. Letting an order expire is not the same as withdrawing it: on another
+# price path the twin would fill an order the frozen Core had already pulled.
+
+
+def test_the_frozen_core_really_does_cancel_on_invalidated_context():
+    """Guards the premise: A4 withdraws its own order when context breaks."""
+    from engine.models import CancelPendingOrder
+    from strategies.btc_v3_a4_pullback_long import frozen_parameters
+    import inspect
+    from strategies import btc_v3_l2_trend_pullback_long as l2
+
+    body = inspect.getsource(l2.BtcV3L2TrendPullbackLong.on_candle)
+    pending_branch = body.split("if state.pending_order is not None:")[1]
+    pending_branch = pending_branch.split("if state.position is not None:")[0]
+    for clause in ("UTC trading session ended.",
+                   "Maximum filled trades per UTC day reached.",
+                   "V3-L2 bullish trend context invalidated."):
+        assert clause in pending_branch
+    assert CancelPendingOrder is not None
+    assert frozen_parameters().min_adx == 18.0
+
+
+def test_only_the_owning_child_may_cancel_and_t3_never_cancels_on_context():
+    """btc_v3_core_v1 forwards a cancellation only from the order's owner."""
+    import inspect
+    from strategies import btc_v3_core_v1, btc_v3_t3_breakout_short as t3
+
+    core = inspect.getsource(btc_v3_core_v1.BtcV3CoreV1Frozen.on_candle)
+    assert "if pending.setup_id == A4_SETUP_ID:" in core
+    assert "if pending.setup_id == T3_SETUP_ID:" in core
+
+    body = inspect.getsource(t3.BtcV3T3BreakoutShortFrozen.on_candle)
+    assert "UTC trading session ended." in body
+    assert "Maximum filled trades per UTC day reached." in body
+    # T3 has no context-invalidation cancel; the asymmetry is deliberate.
+    assert "context invalidated" not in body
+
+    report = static_check()
+    assert report["implements_pending_cancellation"] is True
+    assert report["cancellation_respects_order_ownership"] is True
+    assert report["only_a4_cancels_on_context"] is True
+    assert report["emits_cancelled_status"] is True
+
+
+def test_a_cancelled_order_is_not_reported_as_merely_expired():
+    python_row = _blank_row("2026-01-01T00:00:00Z")
+    python_row["pending_status"] = "CANCELLED"
+    mt5_row = dict(python_row, pending_status="ACTIVE")
+    result = classify_row(pd.Series(python_row), pd.Series(mt5_row))
+    assert result["classification"] == "PENDING_STATE_MISMATCH"
+    assert result["column"] == "pending_status"
+
+
+def test_every_created_pending_reaches_a_terminal_state(tmp_path):
+    """CREATED == FILLED + EXPIRED + CANCELLED + still open at the end.
+
+    A pending order that simply stops being mentioned is a lost order, and the
+    ledger is what makes that visible.
+    """
+    from tools.core_audit_schema import PENDING_STATUSES
+
+    audit = ROOT / "data/exness/btc/r4/python_core_audit_20260101_20260301.csv"
+    if not audit.exists():
+        pytest.skip("parity export not present in this checkout")
+    frame = load_audit(audit, label="Python")
+    counts = frame.pending_status.value_counts()
+    assert set(counts.index) - {""} <= set(PENDING_STATUSES)
+    terminal = sum(int(counts.get(state, 0)) for state in ("FILLED", "EXPIRED", "CANCELLED"))
+    open_at_end = frame.pending_status.iloc[-1] in ("CREATED", "ACTIVE")
+    assert int(counts.get("CREATED", 0)) == terminal + int(open_at_end)

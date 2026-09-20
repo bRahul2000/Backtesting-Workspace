@@ -246,6 +246,22 @@ def check(source_path: Path = SOURCE) -> dict[str, object]:
         # Position.initial_risk is the risk budget and survives the leverage cap.
         "planned_risk_is_budget": bool(re.search(r"planned_risk\s*=\s*budget\s*;", code)),
         "reject_codes_match_python": reject_codes(source) == python_reject_codes(),
+        # The frozen children cancel their own pending order before any other
+        # decision; a twin that only lets orders expire can fill one the frozen
+        # strategy had already withdrawn.
+        "implements_pending_cancellation": all(
+            token in code for token in ("ShouldCancelPending", "A4ContextValid",
+                                        "A4MaterialBelowEma50")),
+        # Only the child that owns the order may cancel it, and it reads that
+        # child's own trade counter.
+        "cancellation_respects_order_ownership": bool(re.search(
+            r"is_a4\s*=\s*\(\s*g_order\.setup_id\s*==\s*A4_SETUP_ID\s*\)", code)
+            and re.search(r"is_a4\s*\?\s*g_a4\.trades_today\s*:\s*g_t3\.trades_today", code)),
+        # A4 cancels on invalidated context, T3 does not. The asymmetry is real.
+        "only_a4_cancels_on_context": bool(re.search(
+            r"is_a4\s*&&\s*\(!A4ContextValid\(bar\)\s*\|\|\s*A4MaterialBelowEma50\(bar\)\)",
+            code)),
+        "emits_cancelled_status": '"CANCELLED"' in source,
     }
     report["reject_codes_only_in_mt5"] = sorted(reject_codes(source) - python_reject_codes())
     report["reject_codes_only_in_python"] = sorted(python_reject_codes() - reject_codes(source))

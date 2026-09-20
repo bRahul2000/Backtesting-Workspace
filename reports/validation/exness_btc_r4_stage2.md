@@ -1,5 +1,8 @@
 # R4 Stage 2 — Backtester ↔ MT5 parity run (BTC Core V1, AUDIT_ONLY)
 
+> **Run 3 (certification, 16:37) reached 99.965% and 22/22 matching trades, but
+> one defect remains: the twin never cancels a pending order.** See "Run 3".
+>
 > **Run 2 (2026-09-20 16:10) did not exercise the corrected EA.** The submitted
 > `..._corrected.csv` is byte-for-byte identical to run 1 after collapsing an
 > appended duplicate of every bar. Cause: MetaTrader runs the compiled `.ex5`,
@@ -202,3 +205,74 @@ the binary compiled from the previous source.
 
 Neither F1 nor F2 affects a decision, an indicator, a timestamp or an execution
 semantic. 752 tests pass; all seven protected fingerprints unchanged.
+
+
+---
+
+## Run 3 — certification attempt, `..._certification.csv` (2026-09-20 16:37)
+
+Confirmed fresh from the MT5 Journal (`Twin build R4-S2-2 …, compiled
+2026.09.20 16:26:36`, `first signal search at 2026.01.09 12:00`) and from the
+file itself: 5,663 distinct bars, no duplicates, 816 `*_BEFORE_WINDOW` rows,
+13 bars publishing +DI before ADX, 0 pre-warmup entries, and the pullback
+cleared at the 2026-01-13 22:00 session close. All five corrections are live.
+
+| Dimension | Matching | Parity |
+|---|---|---|
+| `ohlc`, `volume_and_spread`, `h1_context` | 5,663 / 5,663 | **100%** |
+| `indicators` | 5,663 / 5,663 | **100%** |
+| `carried_state` | 5,663 / 5,663 | **100%** |
+| `a4_context`, `a4_signal` | 5,663 / 5,663 | **100%** |
+| `t3_context`, `t3_signal` | 5,663 / 5,663 | **100%** |
+| `signal` | 5,663 / 5,663 | **100%** |
+| `entry`, `stop_and_target`, `exit` | 5,663 / 5,663 | **100%** |
+| `pending` | 5,661 / 5,663 | 99.965% |
+
+Whole-bar decision parity **99.965%**. Trades **22 / 22, all 22 matching
+end-to-end** on entry time, entry price, stop, target, exit time, exit price,
+exit reason and realized R. The warmup, session-reset, DI and risk-budget
+corrections are all confirmed effective against real observed MT5 output.
+
+### Earliest causal mismatch
+
+`2026-01-14T13:30:00Z` — `pending_status`: Python `CANCELLED`, MT5 `ACTIVE`.
+
+ADX falls from 18.0103 at 13:15 (the bar that created the order) to 17.3808 at
+13:30, below A4's `min_adx` of 18.0. The frozen A4 therefore returns
+`CancelPendingOrder("V3-L2 bullish trend context invalidated.")` and the order
+is withdrawn. The twin had **no cancellation path at all**: it left the order
+live and recorded `EXPIRED` one bar later at 13:45, the second mismatch.
+
+Here the outcome coincided — the order would not have filled either way, which
+is why all 22 trades still match. That is luck, not equivalence: on a path where
+price reached the trigger at 13:30, the twin would have filled an order the
+frozen Core had already pulled. This is a material divergence and blocks
+certification.
+
+### Correction C10 — pending-order cancellation
+
+| | Where | Correction |
+|---|---|---|
+| C10 | EA | `ShouldCancelPending` ports the frozen contract: session end and daily cap cancel for either child, invalidated A4 context (`A4ContextValid` / `A4MaterialBelowEma50`) cancels only an A4-owned order, and only the child that owns the order may cancel it (`btc_v3_core_v1.on_candle`). It is a pure predicate applied *after* the bar's reject codes, so the cancelling bar still reports `A4_BLOCKED_PENDING` as Python does |
+| C10 | Exporter | Emits `CANCELLED` instead of a blank cell on the bar the frozen Core withdraws an order |
+
+T3 has no context-invalidation cancel; the asymmetry is in the frozen source and
+is pinned by a test.
+
+The Python pending ledger now balances exactly: **26 CREATED = 22 FILLED +
+3 EXPIRED + 1 CANCELLED**, with nothing open at the end of the window. A test
+enforces that invariant on any audit, so a silently dropped order cannot pass.
+
+### Verification
+
+* 38/38 static checks PASS, including `implements_pending_cancellation`,
+  `cancellation_respects_order_ownership`, `only_a4_cancels_on_context`.
+* **756 tests pass** (752 → 756).
+* All seven protected fingerprints unchanged; PB1/PB2/PB3 remain REJECTED.
+* AUDIT_ONLY default intact; DEMO_EXECUTION not enabled.
+
+### Still NOT CERTIFIED
+
+C10 is an EA change and is not present in the certification file. Nothing was
+reconstructed: the numbers above are measured from the observed MT5 output as
+submitted. One more run of the recompiled EA is required.

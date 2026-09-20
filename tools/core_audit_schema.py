@@ -52,7 +52,8 @@ T3_COLUMNS = [
 #: bar it happens: a replacement order created on the same bar supersedes the
 #: fill or expiry that freed the slot. CANCELLED_INVALID_RISK is an MT5-side
 #: defensive branch; the Python engine raises instead of emitting it.
-PENDING_STATUSES = ("CREATED", "FILLED", "EXPIRED", "ACTIVE", "CANCELLED_INVALID_RISK")
+PENDING_STATUSES = ("CREATED", "FILLED", "EXPIRED", "CANCELLED", "ACTIVE",
+                    "CANCELLED_INVALID_RISK")
 
 #: Internal strategy state carried between bars. A twin can agree on every
 #: indicator and still diverge here, and when it does the reject codes and
