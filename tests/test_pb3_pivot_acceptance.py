@@ -652,13 +652,31 @@ def test_xray_does_not_duplicate_the_trading_decision():
 # --- Registry and fingerprints ------------------------------------------------------------------
 
 
-def test_pb3_registers_as_a_long_only_research_strategy():
+def test_pb3_registers_as_rejected_after_research_closure():
+    """PB3 v1 was closed as REJECTED for DEVELOPMENT sample insufficiency and
+    negative expectancy after opportunity expansion.
+
+    Closure is governance only: the id, parameter schema, defaults and LONG-only
+    architecture are preserved so every historical PB3 result stays reproducible.
+    """
     descriptor = discover_builtin_strategies().get(PB3_ID)
-    assert descriptor.metadata.status is StrategyStatus.RESEARCH
+    assert descriptor.metadata.status is StrategyStatus.REJECTED
     assert descriptor.metadata.strategy_id == PB3_ID
     assert descriptor.metadata.supported_instruments == ("BTCUSD",)
     assert set(descriptor.required_timeframes) == {"15m", "1h"}
     assert descriptor.create({}).direction is Direction.LONG
+    assert effective_parameter_payload(descriptor, {}) == asdict(PB3Parameters())
+
+
+def test_rejected_pb3_cannot_start_optimization_or_walk_forward():
+    from research.optimizer import guard_optimization
+    from research.walk_forward import WalkForwardBlocked, guard_walk_forward
+
+    descriptor = discover_builtin_strategies().get(PB3_ID)
+    with pytest.raises(ValueError, match="REJECTED STRATEGY"):
+        guard_optimization(descriptor, DatasetRole.DEVELOPMENT)
+    with pytest.raises(WalkForwardBlocked, match="REJECTED STRATEGY"):
+        guard_walk_forward(descriptor, DatasetRole.DEVELOPMENT)
 
 
 def test_no_short_pb3_component_exists_in_phase_a():

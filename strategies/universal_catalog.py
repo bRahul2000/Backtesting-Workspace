@@ -309,13 +309,19 @@ def _pb3_warmup(start):
 
 register_strategy(StrategyDescriptor(
     metadata=_meta("BTC_PB3_PIVOT_ACCEPTANCE_LONG_V1",
-                   "BTC PB3 — Confirmed Pivot Reclaim & Acceptance Long [Research]", "1.0",
-                   StrategyStatus.RESEARCH, "trend_continuation",
+                   "BTC PB3 — Confirmed Pivot Reclaim & Acceptance Long [Rejected]", "1.0",
+                   StrategyStatus.REJECTED, "trend_continuation",
                    "H1 bullish context -> break of a confirmed M15 swing/pivot high -> retest of "
                    "that pivot level -> strict reclaim -> strict next-bar acceptance -> stop "
-                   "entry. Phase A research baseline: DEVELOPMENT 2021-2023 only, zero "
-                   "optimization. Independent of PB1 and PB2; the pivot is unusable until both "
-                   "right-side confirmation bars have completed.",
+                   "entry. "
+                   "REJECTED — DEVELOPMENT insufficient sample and negative expectancy after "
+                   "opportunity expansion. The confirmed-pivot generator increased frequency "
+                   "relative to PB2 but produced only 48 closed trades across 2021-2023, with "
+                   "negative overall expectancy and negative results in both 2022 and 2023. The "
+                   "sample does not justify parameter optimization, and the added opportunity "
+                   "population did not preserve PB2 LONG's localized selectivity. Parameters, "
+                   "defaults and source behavior are preserved unchanged for historical "
+                   "reproduction. See reports/pb3/RESEARCH_SUMMARY.md.",
                    "btc_pb3_pivot_acceptance_long.py"),
     factory=BtcPB3PivotAcceptanceLong,
     parameters=(
