@@ -46,6 +46,9 @@ class BacktestConfig:
     # BROKER_NATIVE_PER_BAR uses the real per-bar spread carried by the
     # dataset, which is only meaningful for a broker-native export.
     spread_source: str = "CONSTANT"
+    # Execution-stress knob: scales whichever spread is in use, constant or
+    # broker-native per-bar. 1.0 is the unstressed run and changes nothing.
+    spread_multiplier: float = 1.0
     commission_percent: float = 0.0
     slippage_percent: float = 0.0
     leverage: float = 1.0
@@ -73,5 +76,7 @@ class BacktestConfig:
             raise ValueError("risk_reward_ratio must be positive.")
         if self.spread < 0 or self.commission_percent < 0 or self.slippage_percent < 0:
             raise ValueError("Costs cannot be negative.")
+        if self.spread_multiplier <= 0:
+            raise ValueError("spread_multiplier must be positive.")
         if self.max_simultaneous_positions != 1:
             raise ValueError("Phase 1 audited adapter supports exactly one global position/pending order.")

@@ -173,6 +173,11 @@ def run_universal_backtest(
     # default CONSTANT path is untouched.
     broker_spread = _broker_native_spread(path, data) if \
         config.spread_source == "BROKER_NATIVE_PER_BAR" else None
+    #--- Execution stress scales whichever spread is in use. At the default 1.0
+    #--- this is the identity and no run changes.
+    if broker_spread is not None:
+        broker_spread = broker_spread * config.spread_multiplier
+    constant_spread = config.spread * config.spread_multiplier
 
     # Fingerprint the *effective* configuration (defaults merged with overrides),
     # not the raw override mapping — a default-only run must not fingerprint as
@@ -230,7 +235,7 @@ def run_universal_backtest(
             adapter.create_legacy_strategy(config.strategy_parameters),
             descriptor.metadata.strategy_id)
         strategy = DiagnosticStrategyObserver(inner_strategy, descriptor.metadata.strategy_id)
-        segment_spread = (config.spread if broker_spread is None
+        segment_spread = (constant_spread if broker_spread is None
                           else [broker_spread[stamp] for stamp in frame.timestamp])
         result = run_synthetic_segment(frame, strategy, segment_spread, trade_start, settings)
         # Strategies may optionally emit their own rule-level diagnostics/X-Ray evaluations
@@ -246,7 +251,7 @@ def run_universal_backtest(
         # Excursion enrichment mirrors the execution spread so short-side
         # excursions are measured against the same Ask stream that filled them.
         enrich_result(result, frame,
-                      spread=config.spread if broker_spread is None
+                      spread=constant_spread if broker_spread is None
                       else float(pd.Series(segment_spread).median()))
         add_closed_trade_equity(result)
         results.append(result)
@@ -333,6 +338,9 @@ def run_universal_backtest(
             "segments": len(results), "order_events": order_status,
             "execution_adapter": "research.exness_cost_calibrated.run_synthetic_segment",
             "spread_price": config.spread,
+            "spread_multiplier": config.spread_multiplier,
+            "effective_spread_price": (constant_spread if broker_spread is None
+                                       else float(broker_spread.median())),
             "commission_percent": config.commission_percent,
             "forward_runs_for_strategy": forward_count,
             "forward_validation_warning": forward_warning,
