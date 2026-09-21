@@ -26,7 +26,7 @@ from strategies.btc_v3_core_diagnostics import (
     CoreFunnelReport, DEFAULT_XRAY_LIMIT as XRAY_ROW_LIMIT,
     instrument as instrument_strategy, lifecycle_from_order_events,
 )
-from strategies.registry import discover_builtin_strategies
+from strategies.registry import StrategyRegistry, discover_builtin_strategies
 from utils.data_validation import continuous_segments, load_ohlcv_csv
 
 MONTH_DAYS = 30.436875
@@ -131,12 +131,18 @@ def run_universal_backtest(
     config: BacktestConfig,
     *,
     ledger_path: str | Path | None = None,
+    registry: StrategyRegistry | None = None,
 ) -> UniversalBacktestResult:
     """Run through an adapter that delegates execution to the audited replay.
 
     No fill, gap, stop/target, risk, or Bid/Ask semantics are reimplemented here.
+
+    ``registry`` lets research code supply its own strategy set. Ablation arms
+    must not be registered globally: the production registry is what the
+    Universal Workspace lists, and a research import would put every arm in the
+    user's strategy dropdown.
     """
-    registry = discover_builtin_strategies()
+    registry = registry or discover_builtin_strategies()
     descriptor = registry.get(config.strategy_id)
     if config.instrument not in descriptor.metadata.supported_instruments:
         raise ValueError(f"{descriptor.metadata.name} does not support {config.instrument}.")
