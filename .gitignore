@@ -36,3 +36,29 @@ data/exness/btc/provenance/processed/
 # Stage 3 live-forward evidence collected from the terminal
 data/exness/btc/stage3/
 data/exness/btc/stage4/
+
+# Alternative virtualenv layout.
+.venv/
+
+# Agent/tooling scratch space; never part of the repository.
+scratchpad/
+.scratchpad/
+
+# Temporary and editor artefacts.
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# Log directories (bare *.log is already covered above).
+logs/
+log/
+
+# The experiment ledger is a local run artefact: it grows with every backtest,
+# differs per machine, and is reproducible from the research modules. The other
+# experiments/*.sqlite3 files are small committed research records and stay.
+experiments/experiments.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
