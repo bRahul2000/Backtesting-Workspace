@@ -303,6 +303,147 @@ def _integrity_panel(integrity: IntegrityModel) -> None:
         st.info("Gold broker-native history: Dec 2025 to Sep 2026. Spread is historical per-bar; margin, leverage, and commission remain UNVERIFIED.")
 
 
+def _funnel_child_choice(funnel: dict[str, Any], key: str) -> str:
+    """Pick which frozen child to inspect. Labels carry the traded direction."""
+    children = funnel.get("children") or {}
+    order = [name for name in ("A4", "T3") if name in children]
+    if not order:
+        return ""
+    labels = {name: f"{children[name]['direction']} · {children[name]['name']}" for name in order}
+    chosen = st.radio("Component", order, format_func=lambda name: labels[name],
+                      horizontal=True, key=key)
+    return chosen
+
+
+def _reject_period_table(child: dict[str, Any], field: str, codes: list[str]) -> pd.DataFrame:
+    """Reject counts per period, restricted to the codes being inspected."""
+    periods = child.get(field) or {}
+    if not periods:
+        return pd.DataFrame()
+    frame = pd.DataFrame.from_dict(periods, orient="index").fillna(0).astype(int)
+    keep = [code for code in codes if code in frame.columns]
+    frame = frame[keep] if keep else frame
+    frame.insert(0, "total rejects", frame.sum(axis=1))
+    return frame.sort_index()
+
+
+def _render_core_funnel(funnel: dict[str, Any]) -> None:
+    """Child-specific pre-setup funnel built from the frozen source conditions."""
+    st.caption(
+        "Diagnostic-only instrumentation. Every gate below is a real condition in the "
+        "frozen source, evaluated in source order; the observer calls the strategy's own "
+        "predicates and never changes a decision."
+    )
+    integrity = funnel.get("integrity") or {}
+    mismatches = int(integrity.get("signal_mismatches", 0)) + int(integrity.get("price_mismatches", 0))
+    if mismatches:
+        st.error(
+            f"{mismatches} of {integrity.get('bars_cross_checked', 0)} cross-checked bars disagreed "
+            "with the action the frozen Core actually returned. This funnel has drifted from the "
+            "source and must not be used as evidence."
+        )
+    else:
+        st.success(
+            f"{int(integrity.get('bars_cross_checked', 0)):,} bars cross-checked against the frozen "
+            "Core's own action: no signal or price disagreement."
+        )
+    child_key = _funnel_child_choice(funnel, "core_funnel_child")
+    if not child_key:
+        return
+    child = funnel["children"][child_key]
+    total_bars = int(funnel.get("total_bars") or 0)
+
+    gates = pd.DataFrame(child["gates"])
+    st.markdown(f"**{child['name']} — pre-setup funnel** · {total_bars:,} M15 bars evaluated")
+    st.dataframe(
+        gates.rename(columns={
+            "gate": "Gate", "entered": "Entered", "passed": "Passed", "failed": "Failed",
+            "conversion_from_prior_percent": "Conversion from prior %",
+            "pass_rate_percent": "Pass rate %", "percent_of_all_bars": "% of all bars",
+            "source_condition": "Source condition",
+        }).drop(columns=["gate_key"]),
+        use_container_width=True, hide_index=True,
+    )
+    lifecycle = child.get("lifecycle") or {}
+    if lifecycle:
+        st.markdown("**Order lifecycle**")
+        st.dataframe(pd.DataFrame([lifecycle]), use_container_width=True, hide_index=True)
+
+    rejects = child.get("reject_codes") or {}
+    if not rejects:
+        st.info("No bar was rejected for this component.")
+        return
+    ranked = sorted(rejects.items(), key=lambda item: item[1], reverse=True)
+    top = ranked[:10]
+    st.markdown("**Top 10 reject reasons**")
+    top_frame = pd.DataFrame(
+        [{"Reject code": code, "Bars": count,
+          "% of all bars": round(100 * count / total_bars, 3) if total_bars else None}
+         for code, count in top])
+    st.dataframe(top_frame, use_container_width=True, hide_index=True)
+    st.plotly_chart(
+        go.Figure(go.Bar(x=[count for _, count in reversed(top)],
+                         y=[code for code, _ in reversed(top)], orientation="h")),
+        use_container_width=True, key=f"core_funnel_top_{child_key}",
+    )
+
+    codes = [code for code, _ in ranked]
+    selected = st.multiselect(
+        "Reject codes to break down by period", codes, default=[code for code, _ in top],
+        key=f"core_funnel_codes_{child_key}",
+    )
+    #--- An empty selection is a legitimate state, not an error: render the
+    #--- totals rather than letting an empty frame reach plotly.
+    chosen = selected or codes
+    st.markdown("**Rejects per year**")
+    yearly = _reject_period_table(child, "reject_yearly", chosen)
+    st.dataframe(yearly if not yearly.empty else pd.DataFrame({"note": ["no rejects recorded"]}),
+                 use_container_width=True)
+    st.markdown("**Rejects per month**")
+    monthly = _reject_period_table(child, "reject_monthly", chosen)
+    st.dataframe(monthly if not monthly.empty else pd.DataFrame({"note": ["no rejects recorded"]}),
+                 use_container_width=True)
+    cancels = child.get("cancel_reasons") or {}
+    if cancels:
+        st.markdown("**Pending cancellations issued by this component**")
+        st.dataframe(pd.DataFrame([{"Reason": reason, "Count": count}
+                                   for reason, count in cancels.items()]),
+                     use_container_width=True, hide_index=True)
+
+
+def _render_xray(result: UniversalBacktestResult) -> None:
+    rows = result.xray_diagnostics
+    if not rows:
+        st.info("Strategy X-Ray: no structured rule evaluations were emitted by this strategy.")
+        return
+    frame = pd.DataFrame(rows)
+    if (result.core_funnel or {}).get("xray_truncated"):
+        st.warning("X-Ray output reached its per-run row cap; the tail of this run is not shown.")
+    st.caption(
+        "One row per rule the strategy actually evaluated. Source predicates short-circuit, "
+        "so rules after the first failure on a bar are absent by design — they were never evaluated."
+    )
+    components = sorted(frame.component.dropna().unique()) if "component" in frame else []
+    if components:
+        chosen = st.multiselect("Component", components, default=list(components), key="xray_component")
+        if chosen:
+            frame = frame[frame.component.isin(chosen)]
+    if "result" in frame:
+        outcome = st.radio("Outcome", ("All", "FAIL", "PASS"), horizontal=True, key="xray_outcome")
+        if outcome != "All":
+            frame = frame[frame.result == outcome]
+    if frame.empty:
+        st.info("No rule evaluation matches this selection.")
+        return
+    st.dataframe(
+        frame.groupby(["component", "rule", "result"], dropna=False).size()
+        .reset_index(name="evaluations"),
+        use_container_width=True, hide_index=True,
+    )
+    st.dataframe(frame.head(2000), use_container_width=True, hide_index=True)
+    st.caption(f"{len(frame):,} rule evaluations match; the first 2,000 are listed.")
+
+
 def _render_tester(run: WorkspaceRun) -> None:
     result, data, config = run.result, run.data, run.config
     _metric_cards(result)
@@ -313,12 +454,15 @@ def _render_tester(run: WorkspaceRun) -> None:
             {"Side": "Long", **asdict(result.long_statistics)},
             {"Side": "Short", **asdict(result.short_statistics)},
         ]), use_container_width=True, hide_index=True)
-        st.plotly_chart(_price_chart(data, result, config.instrument), use_container_width=True)
+        st.plotly_chart(_price_chart(data, result, config.instrument),
+                        use_container_width=True, key="overview_price")
     with tabs[1]:
         equity = pd.DataFrame(result.equity_curve)
         if not equity.empty:
-            st.plotly_chart(go.Figure(go.Scatter(x=equity.timestamp, y=equity.balance, name="Equity")), use_container_width=True)
-            st.plotly_chart(go.Figure(go.Scatter(x=equity.timestamp, y=equity.drawdown_percent, fill="tozeroy", name="Drawdown")), use_container_width=True)
+            st.plotly_chart(go.Figure(go.Scatter(x=equity.timestamp, y=equity.balance, name="Equity")),
+                            use_container_width=True, key="performance_equity")
+            st.plotly_chart(go.Figure(go.Scatter(x=equity.timestamp, y=equity.drawdown_percent, fill="tozeroy", name="Drawdown")),
+                            use_container_width=True, key="performance_drawdown")
         st.dataframe(pd.DataFrame(result.monthly_statistics).T if result.monthly_statistics else pd.DataFrame(), use_container_width=True)
     with tabs[2]:
         table = trades_dataframe(result, config.instrument)
@@ -327,7 +471,9 @@ def _render_tester(run: WorkspaceRun) -> None:
     with tabs[3]:
         analysis_tabs = st.tabs(["Excursion Analysis", "Signal Funnel", "Strategy X-Ray", "Execution Ambiguities"])
         trades = pd.DataFrame(result.trade_log)
-        filter_value = analysis_tabs[0].selectbox("Trade subset", ("All", "Long", "Short", "Winners", "Losers"))
+        filter_value = analysis_tabs[0].selectbox(
+        "Trade subset", ("All", "Long", "Short", "Winners", "Losers"),
+        key="analysis_trade_subset")
         if not trades.empty:
             if filter_value == "Long":
                 trades = trades[trades.direction == "LONG"]
@@ -344,9 +490,15 @@ def _render_tester(run: WorkspaceRun) -> None:
                 st.caption(f"{result.excursion_model}: OHLC extrema are not tick-exact.")
                 for column in ("mfe_r", "mae_r", "capture_efficiency"):
                     if column in trades:
-                        st.plotly_chart(go.Figure(go.Histogram(x=trades[column], name=column)), use_container_width=True)
-                st.plotly_chart(go.Figure(go.Scatter(x=trades.mfe_r, y=trades.realized_r, mode="markers", name="MFE R vs R")), use_container_width=True)
+                        st.plotly_chart(go.Figure(go.Histogram(x=trades[column], name=column)),
+                                        use_container_width=True, key=f"excursion_hist_{column}")
+                st.plotly_chart(go.Figure(go.Scatter(x=trades.mfe_r, y=trades.realized_r, mode="markers", name="MFE R vs R")),
+                                use_container_width=True, key="excursion_mfe_vs_r")
         with analysis_tabs[1]:
+            if result.core_funnel.get("available"):
+                _render_core_funnel(result.core_funnel)
+                st.divider()
+                st.markdown("**Execution-stage funnel (all strategies)**")
             if not result.signal_diagnostics:
                 st.info("Signal Funnel: this strategy emitted no diagnostic events.")
             else:
@@ -358,10 +510,7 @@ def _render_tester(run: WorkspaceRun) -> None:
                 funnel["conversion_percent"] = funnel.passed.div(funnel.passed.shift(1)).mul(100)
                 st.dataframe(funnel, use_container_width=True, hide_index=True)
         with analysis_tabs[2]:
-            if not result.xray_diagnostics:
-                st.info("Strategy X-Ray: no structured rule evaluations were emitted by this strategy.")
-            else:
-                st.dataframe(pd.DataFrame(result.xray_diagnostics), use_container_width=True, hide_index=True)
+            _render_xray(result)
         with analysis_tabs[3]:
             if not result.execution_ambiguities:
                 st.success("No execution ambiguities were detected in this result.")

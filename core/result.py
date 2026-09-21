@@ -44,6 +44,9 @@ class UniversalBacktestResult:
     execution_diagnostics: dict[str, Any] = field(default_factory=dict)
     signal_diagnostics: list[dict[str, Any]] = field(default_factory=list)
     xray_diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    #--- Diagnostic-only pre-setup funnel. Populated for instrumented strategies
+    #--- (see strategies/btc_v3_core_diagnostics.py); empty for every other one.
+    core_funnel: dict[str, Any] = field(default_factory=dict)
     execution_ambiguities: list[dict[str, Any]] = field(default_factory=list)
     excursion_model: str = "UNAVAILABLE"
     legacy_segment_results: list[Any] = field(default_factory=list, repr=False)

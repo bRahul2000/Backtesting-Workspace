@@ -22,6 +22,10 @@ from research.exness_cost_calibrated import run_synthetic_segment
 from research.v3_regime_adaptive_baseline import add_closed_trade_equity
 from strategies.base_strategy import AuditedStrategyAdapter, effective_parameter_payload, parameter_fingerprint
 from strategies.diagnostics import DiagnosticStrategyObserver
+from strategies.btc_v3_core_diagnostics import (
+    CoreFunnelReport, DEFAULT_XRAY_LIMIT as XRAY_ROW_LIMIT,
+    instrument as instrument_strategy, lifecycle_from_order_events,
+)
 from strategies.registry import discover_builtin_strategies
 from utils.data_validation import continuous_segments, load_ohlcv_csv
 
@@ -205,13 +209,16 @@ def run_universal_backtest(
     )
 
     pooled, results, usable_months, xray_evaluations = [], [], 0.0, []
+    funnel = CoreFunnelReport()
     order_status = {}
     for segment in continuous_segments(data):
         frame = data.loc[data.timestamp.between(segment.start, segment.end)].reset_index(drop=True)
         trade_start = descriptor.warmup_resolver(segment.start) if descriptor.warmup_resolver else segment.start
         if trade_start > segment.end:
             continue
-        inner_strategy = adapter.create_legacy_strategy(config.strategy_parameters)
+        inner_strategy = instrument_strategy(
+            adapter.create_legacy_strategy(config.strategy_parameters),
+            descriptor.metadata.strategy_id)
         strategy = DiagnosticStrategyObserver(inner_strategy, descriptor.metadata.strategy_id)
         segment_spread = (config.spread if broker_spread is None
                           else [broker_spread[stamp] for stamp in frame.timestamp])
@@ -221,6 +228,11 @@ def run_universal_backtest(
         # behavior — frozen strategies without these attributes are unaffected.
         result.diagnostic_events = list(strategy.events) + list(getattr(inner_strategy, "diagnostic_events", ()))
         xray_evaluations.extend(getattr(inner_strategy, "xray_evaluations", ()))
+        segment_funnel = getattr(inner_strategy, "report", None)
+        if isinstance(segment_funnel, CoreFunnelReport):
+            for child, counts in lifecycle_from_order_events(result.order_events).items():
+                segment_funnel.children[child].lifecycle.update(counts)
+            funnel.merge(segment_funnel)
         # Excursion enrichment mirrors the execution spread so short-side
         # excursions are measured against the same Ask stream that filled them.
         enrich_result(result, frame,
@@ -235,6 +247,13 @@ def run_universal_backtest(
 
     if not results:
         raise ValueError("No continuous segment had enough warm-up data for this strategy.")
+
+    #--- Each segment gets its own observer, so the observer's own cap bounds a
+    #--- segment, not a run. The whole result is persisted into the experiment
+    #--- ledger, so the run-level cap is the one that matters.
+    if len(xray_evaluations) > XRAY_ROW_LIMIT:
+        del xray_evaluations[XRAY_ROW_LIMIT:]
+        funnel.xray_truncated = True
 
     max_dd = max(calculate_metrics(item).max_drawdown_percent for item in results)
     total = len(pooled)
@@ -297,6 +316,7 @@ def run_universal_backtest(
         mfe_mae={"available": bool(pooled), "model": "BAR_BASED_APPROXIMATION"},
         signal_diagnostics=[asdict(event) for segment in results for event in segment.diagnostic_events],
         xray_diagnostics=[asdict(event) for event in xray_evaluations],
+        core_funnel=funnel.to_payload() if funnel.total_bars else {},
         execution_ambiguities=[asdict(item) for segment in results for item in segment.execution_ambiguities],
         excursion_model="BAR_BASED_APPROXIMATION" if pooled else "UNAVAILABLE",
         execution_diagnostics={
