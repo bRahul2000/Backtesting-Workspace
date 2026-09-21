@@ -1,0 +1,457 @@
+{
+ "split": {
+  "development_start": "2023-11-10T23:15:00+00:00",
+  "development_end": "2025-06-30T23:45:00+00:00",
+  "holdout_start": "2025-07-01T00:00:00+00:00",
+  "holdout_touched": false
+ },
+ "m15_dataset_fingerprint": "80735a2cf521363747f48368814267ad6ca146eb294bb7bd7252666d06c76af3",
+ "m5_data_audit": {
+  "validated_m5_dataset_registered": false,
+  "registered_timeframes": {
+   "EXNESS_BTCUSDM_M15": "15m",
+   "EXNESS_BTCUSDM_H1": "1h",
+   "EXNESS_XAUUSDM_M15": "15m",
+   "EXNESS_XAUUSDM_H1": "1h",
+   "BITSTAMP_BTCUSD_15M": "15m"
+  },
+  "m5_files_on_disk": [],
+  "exporter": "mt5/Export_BTCUSD_History.mq5",
+  "exporter_present": true,
+  "exporter_timeframes_emitted": [
+   "PERIOD_H1",
+   "PERIOD_M15"
+  ],
+  "acquisition_requires": "a Windows MetaTrader 5 terminal logged into the Exness-MT5Trial5 account running the existing exporter with PERIOD_M5 added; CopyRates history is only reachable from the terminal itself",
+  "blocked": true
+ },
+ "acceptance_criteria_from_accepted_files": {
+  "EXNESS_BTCUSDM_M15": {
+   "path": "data/exness/btc/phase_r1/processed/btcusdm_M15.csv",
+   "fingerprint": "80735a2cf521363747f48368814267ad6ca146eb294bb7bd7252666d06c76af3",
+   "symbol": "BTCUSDm",
+   "broker": "Exness Technologies Ltd",
+   "timeframe": "15m",
+   "step_seconds": 900,
+   "bars_in_development": 57403,
+   "first": "2023-11-10T23:15:00+00:00",
+   "last": "2025-06-30T23:45:00+00:00",
+   "timezone": "UTC",
+   "monotonic_increasing": true,
+   "duplicate_timestamps": 0,
+   "bars_on_step_grid": 57397,
+   "gap_count": 5,
+   "largest_gap_bars": 4,
+   "invalid_ohlc_rows": 0,
+   "zero_or_negative_tick_volume": 0,
+   "spread_source": "BROKER_NATIVE_PER_BAR",
+   "spread_price_median": 28.8,
+   "spread_price_p95": 53.9,
+   "spread_price_max": 88.09,
+   "spread_non_positive": 0
+  },
+  "EXNESS_BTCUSDM_H1": {
+   "path": "data/exness/btc/phase_r1/processed/btcusdm_H1.csv",
+   "fingerprint": "6d35fe9d7feb7635e0973084fb6520ccbc0f99f7b17fc49760692a97dec55658",
+   "symbol": "BTCUSDm",
+   "broker": "Exness Technologies Ltd",
+   "timeframe": "1h",
+   "step_seconds": 3600,
+   "bars_in_development": 14352,
+   "first": "2023-11-11T00:00:00+00:00",
+   "last": "2025-06-30T23:00:00+00:00",
+   "timezone": "UTC",
+   "monotonic_increasing": true,
+   "duplicate_timestamps": 0,
+   "bars_on_step_grid": 14351,
+   "gap_count": 0,
+   "largest_gap_bars": 1,
+   "invalid_ohlc_rows": 0,
+   "zero_or_negative_tick_volume": 0,
+   "spread_source": "BROKER_NATIVE_PER_BAR",
+   "spread_price_median": 28.8,
+   "spread_price_p95": 51.79,
+   "spread_price_max": 77.63,
+   "spread_non_positive": 0
+  }
+ },
+ "spread_invariance": {
+  "M15": {
+   "median": 28.8,
+   "mean": 29.997719805585074,
+   "p95": 53.9,
+   "p99": 68.86,
+   "max": 88.09
+  },
+  "H1": {
+   "median": 28.8,
+   "mean": 29.066653428093645,
+   "p95": 51.79,
+   "p99": 62.963699999999974,
+   "max": 77.63
+  },
+  "h1_over_m15_median_ratio": 1.0,
+  "timeframe_invariant": true
+ },
+ "cost_geometry": {
+  "rows": [
+   {
+    "frame": "M15",
+    "duration_multiple": 1,
+    "bars": 57403,
+    "median_atr": 229.5661,
+    "median_structural_stop_atr": 0.9709,
+    "percent_inside_frozen_stop_band": 75.74,
+    "median_spread": 28.8,
+    "spread_over_atr": 0.125454,
+    "cost_per_r": 0.129214
+   },
+   {
+    "frame": "M30",
+    "duration_multiple": 2,
+    "bars": 28704,
+    "median_atr": 332.3893,
+    "median_structural_stop_atr": 0.9627,
+    "percent_inside_frozen_stop_band": 75.81,
+    "median_spread": 28.8,
+    "spread_over_atr": 0.086645,
+    "cost_per_r": 0.090002
+   },
+   {
+    "frame": "H1",
+    "duration_multiple": 4,
+    "bars": 14353,
+    "median_atr": 486.3321,
+    "median_structural_stop_atr": 0.9581,
+    "percent_inside_frozen_stop_band": 75.53,
+    "median_spread": 28.8,
+    "spread_over_atr": 0.059219,
+    "cost_per_r": 0.061807
+   },
+   {
+    "frame": "H2",
+    "duration_multiple": 8,
+    "bars": 7177,
+    "median_atr": 706.1861,
+    "median_structural_stop_atr": 0.9519,
+    "percent_inside_frozen_stop_band": 76.38,
+    "median_spread": 28.8,
+    "spread_over_atr": 0.040782,
+    "cost_per_r": 0.042844
+   },
+   {
+    "frame": "H4",
+    "duration_multiple": 16,
+    "bars": 3589,
+    "median_atr": 1016.175,
+    "median_structural_stop_atr": 0.956,
+    "percent_inside_frozen_stop_band": 76.12,
+    "median_spread": 28.8,
+    "spread_over_atr": 0.028342,
+    "cost_per_r": 0.029648
+   },
+   {
+    "frame": "H6",
+    "duration_multiple": 24,
+    "bars": 2393,
+    "median_atr": 1253.3154,
+    "median_structural_stop_atr": 0.9606,
+    "percent_inside_frozen_stop_band": 77.39,
+    "median_spread": 28.8,
+    "spread_over_atr": 0.022979,
+    "cost_per_r": 0.023921
+   }
+  ]
+ },
+ "atr_scaling": {
+  "exponent_h": 0.535367,
+  "fit": [
+   {
+    "frame": "M15",
+    "actual": 229.5661,
+    "fitted": 230.2238,
+    "error_percent": 0.2865
+   },
+   {
+    "frame": "M30",
+    "actual": 332.3893,
+    "fitted": 333.6658,
+    "error_percent": 0.384
+   },
+   {
+    "frame": "H1",
+    "actual": 486.3321,
+    "fitted": 483.5855,
+    "error_percent": -0.5648
+   },
+   {
+    "frame": "H2",
+    "actual": 706.1861,
+    "fitted": 700.8656,
+    "error_percent": -0.7534
+   },
+   {
+    "frame": "H4",
+    "actual": 1016.175,
+    "fitted": 1015.7719,
+    "error_percent": -0.0397
+   },
+   {
+    "frame": "H6",
+    "actual": 1253.3154,
+    "fitted": 1262.0298,
+    "error_percent": 0.6953
+   }
+  ],
+  "worst_fit_error_percent": 0.7534,
+  "broker_h1_median_atr": 486.335,
+  "aggregated_h1_median_atr": 486.3321,
+  "aggregation_agreement_percent": 99.9994
+ },
+ "m5_projection": {
+  "m15_cost_per_r": 0.129214,
+  "m15_median_structural_stop_atr": 0.9709,
+  "spread_used": 28.8,
+  "projections": {
+   "random_walk_h_0.50": {
+    "h": 0.5,
+    "atr_m5_over_atr_m15": 0.57735,
+    "projected_median_atr_m5": 132.54,
+    "projected_spread_over_atr": 0.217293,
+    "projected_cost_per_r": 0.223806,
+    "versus_m15": 1.7321
+   },
+   "fitted_h_0.535": {
+    "h": 0.535367,
+    "atr_m5_over_atr_m15": 0.555348,
+    "projected_median_atr_m5": 127.489,
+    "projected_spread_over_atr": 0.225902,
+    "projected_cost_per_r": 0.232673,
+    "versus_m15": 1.8007
+   }
+  },
+  "favourable_bound_multiplier": 1.7321
+ },
+ "required_win_rates": {
+  "m15": {
+   "1.00": {
+    "frictionless": 50.0,
+    "with_cost": 56.461,
+    "uplift_points": 6.461
+   },
+   "1.25": {
+    "frictionless": 44.444,
+    "with_cost": 50.187,
+    "uplift_points": 5.743
+   },
+   "1.50": {
+    "frictionless": 40.0,
+    "with_cost": 45.169,
+    "uplift_points": 5.169
+   },
+   "1.75": {
+    "frictionless": 36.364,
+    "with_cost": 41.062,
+    "uplift_points": 4.699
+   },
+   "2.00": {
+    "frictionless": 33.333,
+    "with_cost": 37.64,
+    "uplift_points": 4.307
+   }
+  },
+  "m5_favourable_bound": {
+   "1.00": {
+    "frictionless": 50.0,
+    "with_cost": 61.19,
+    "uplift_points": 11.19
+   },
+   "1.25": {
+    "frictionless": 44.444,
+    "with_cost": 54.391,
+    "uplift_points": 9.947
+   },
+   "1.50": {
+    "frictionless": 40.0,
+    "with_cost": 48.952,
+    "uplift_points": 8.952
+   },
+   "1.75": {
+    "frictionless": 36.364,
+    "with_cost": 44.502,
+    "uplift_points": 8.138
+   },
+   "2.00": {
+    "frictionless": 33.333,
+    "with_cost": 40.794,
+    "uplift_points": 7.46
+   }
+  }
+ },
+ "m5_equivalent_cost_stress": {
+  "CORE": {
+   "1.75": {
+    "M15 native": {
+     "trades": 188,
+     "profit_factor": 1.111606558575997,
+     "total_r": 13.1357,
+     "max_drawdown_percent": 2.8452
+    },
+    "M15 stress x1.20": {
+     "trades": 192,
+     "profit_factor": 1.0718825026708034,
+     "total_r": 8.8957,
+     "max_drawdown_percent": 2.938
+    },
+    "M5-equivalent x1.73": {
+     "trades": 193,
+     "profit_factor": 0.996269240660631,
+     "total_r": -0.1624,
+     "max_drawdown_percent": 3.0369
+    },
+    "M5-equivalent x1.80": {
+     "trades": 193,
+     "profit_factor": 0.9959097556394835,
+     "total_r": -0.2067,
+     "max_drawdown_percent": 3.052
+    },
+    "M5-equivalent x1.73 + slippage 0.01%": {
+     "trades": 192,
+     "profit_factor": 0.913576580689258,
+     "total_r": -10.7252,
+     "max_drawdown_percent": 3.5536
+    }
+   },
+   "2.00": {
+    "M15 native": {
+     "trades": 186,
+     "profit_factor": 1.126591638696518,
+     "total_r": 15.4234,
+     "max_drawdown_percent": 2.7078
+    },
+    "M15 stress x1.20": {
+     "trades": 190,
+     "profit_factor": 1.0871827866648585,
+     "total_r": 11.1402,
+     "max_drawdown_percent": 2.7234
+    },
+    "M5-equivalent x1.73": {
+     "trades": 191,
+     "profit_factor": 1.0067388347107427,
+     "total_r": 1.2478,
+     "max_drawdown_percent": 2.7833
+    },
+    "M5-equivalent x1.80": {
+     "trades": 191,
+     "profit_factor": 1.0062263529783109,
+     "total_r": 1.1852,
+     "max_drawdown_percent": 2.7929
+    },
+    "M5-equivalent x1.73 + slippage 0.01%": {
+     "trades": 191,
+     "profit_factor": 0.9383576627479631,
+     "total_r": -7.7595,
+     "max_drawdown_percent": 3.9837
+    }
+   },
+   "3.00": {
+    "M15 native": {
+     "trades": 177,
+     "profit_factor": 1.0812314161750394,
+     "total_r": 11.2252,
+     "max_drawdown_percent": 2.951
+    },
+    "M15 stress x1.20": {
+     "trades": 181,
+     "profit_factor": 1.0468241002470302,
+     "total_r": 6.9721,
+     "max_drawdown_percent": 2.9666
+    },
+    "M5-equivalent x1.73": {
+     "trades": 180,
+     "profit_factor": 0.9977662015831374,
+     "total_r": 0.3656,
+     "max_drawdown_percent": 3.0357
+    },
+    "M5-equivalent x1.80": {
+     "trades": 180,
+     "profit_factor": 0.9687682897011345,
+     "total_r": -3.6725,
+     "max_drawdown_percent": 3.6097
+    },
+    "M5-equivalent x1.73 + slippage 0.01%": {
+     "trades": 180,
+     "profit_factor": 0.9490571758163119,
+     "total_r": -6.4302,
+     "max_drawdown_percent": 3.6624
+    }
+   }
+  },
+  "T3": {
+   "2.00": {
+    "M15 native": {
+     "trades": 88,
+     "profit_factor": 1.2595728360193847,
+     "total_r": 14.0456,
+     "max_drawdown_percent": 1.4598
+    },
+    "M15 stress x1.20": {
+     "trades": 88,
+     "profit_factor": 1.2595728360193847,
+     "total_r": 14.0456,
+     "max_drawdown_percent": 1.4598
+    },
+    "M5-equivalent x1.73": {
+     "trades": 88,
+     "profit_factor": 1.0927831653917284,
+     "total_r": 5.3846,
+     "max_drawdown_percent": 1.4598
+    },
+    "M5-equivalent x1.80": {
+     "trades": 88,
+     "profit_factor": 1.0927831653917284,
+     "total_r": 5.3846,
+     "max_drawdown_percent": 1.4598
+    },
+    "M5-equivalent x1.73 + slippage 0.01%": {
+     "trades": 88,
+     "profit_factor": 0.9639447510288046,
+     "total_r": -1.9749,
+     "max_drawdown_percent": 1.8129
+    }
+   },
+   "3.00": {
+    "M15 native": {
+     "trades": 84,
+     "profit_factor": 1.1265017621866515,
+     "total_r": 7.9326,
+     "max_drawdown_percent": 1.9826
+    },
+    "M15 stress x1.20": {
+     "trades": 84,
+     "profit_factor": 1.1265017621866515,
+     "total_r": 7.9326,
+     "max_drawdown_percent": 1.9826
+    },
+    "M5-equivalent x1.73": {
+     "trades": 83,
+     "profit_factor": 1.0178119159200674,
+     "total_r": 1.3846,
+     "max_drawdown_percent": 1.9826
+    },
+    "M5-equivalent x1.80": {
+     "trades": 83,
+     "profit_factor": 0.9537457248974204,
+     "total_r": -2.6154,
+     "max_drawdown_percent": 1.9826
+    },
+    "M5-equivalent x1.73 + slippage 0.01%": {
+     "trades": 83,
+     "profit_factor": 0.9351151694521608,
+     "total_r": -3.8037,
+     "max_drawdown_percent": 2.0461
+    }
+   }
+  }
+ }
+}
