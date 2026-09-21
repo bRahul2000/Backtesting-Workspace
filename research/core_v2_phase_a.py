@@ -26,6 +26,7 @@ from core.adapters.audited_engine import run_universal_backtest
 from core.config import BacktestConfig, DatasetRole
 from core.fingerprints import sha256_file
 from core.result import UniversalBacktestResult
+from core.trade_log import to_timestamp as _timestamp
 from services import market_datasets as md
 from strategies.btc_core_v2_variants import (
     A4_VARIANT_IDS, BASELINE_THRESHOLD, BODY_THRESHOLDS, CORE_A4_VARIANT_IDS,
@@ -80,18 +81,6 @@ def run_arm(strategy_id: str, ledger_path: Path) -> UniversalBacktestResult:
 
 
 # --- metrics -----------------------------------------------------------------
-
-
-def _timestamp(value: Any) -> pd.Timestamp:
-    """Normalise a trade_log timestamp.
-
-    core.adapters.audited_engine._trade_row unwraps any value exposing ``.value``
-    before its pd.Timestamp branch can run, and pd.Timestamp exposes ``.value``
-    as epoch nanoseconds — so trade_log timestamps arrive as integers, not ISO
-    strings. pd.Timestamp accepts both, so this keeps working if that is fixed.
-    """
-    stamp = pd.Timestamp(value)
-    return stamp if stamp.tzinfo is not None else stamp.tz_localize("UTC")
 
 
 def _month(value: Any) -> str:

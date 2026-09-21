@@ -16,6 +16,7 @@ from core.adapters.audited_engine import run_universal_backtest
 from core.config import BacktestConfig, DatasetRole
 from core.fingerprints import sha256_file, stable_fingerprint
 from core.result import UniversalBacktestResult
+from core.trade_log import timestamp_series, timestamp_text
 from experiments.ledger import ExperimentLedger
 from instruments.btcusd import BTCUSD
 from instruments.xauusd import XAUUSD, load_xauusd_profile
@@ -108,12 +109,12 @@ def trades_dataframe(result: UniversalBacktestResult, instrument: str) -> pd.Dat
         rows.append({
             "Trade #": trade.get("trade_id"),
             "Side": trade.get("direction"),
-            "Signal Time": trade.get("signal_time"),
-            "Entry Time": trade.get("entry_time"),
+            "Signal Time": timestamp_text(trade.get("signal_time")),
+            "Entry Time": timestamp_text(trade.get("entry_time")),
             "Entry Price": format_price(trade.get("entry_price"), instrument),
             "SL": format_price(trade.get("stop_loss"), instrument),
             "Target": format_price(trade.get("take_profit"), instrument),
-            "Exit Time": trade.get("exit_time"),
+            "Exit Time": timestamp_text(trade.get("exit_time")),
             "Exit Price": format_price(trade.get("exit_price"), instrument),
             "Exit Reason": trade.get("exit_reason"),
             "Quantity/Lots": trade.get("quantity"),
@@ -270,7 +271,10 @@ def _price_chart(data: pd.DataFrame, result: UniversalBacktestResult, instrument
         time_key = "exit_time" if label == "EXIT" else "entry_time"
         if selected:
             fig.add_trace(go.Scatter(
-                x=[t.get(time_key) for t in selected], y=[t.get(key) for t in selected],
+                #--- Parsed, not raw: the candlestick x-axis is real timestamps, so a
+                #--- legacy epoch-nanosecond value puts every marker off the chart.
+                x=timestamp_series(t.get(time_key) for t in selected),
+                y=[t.get(key) for t in selected],
                 mode="markers", name=label, marker={"symbol": symbol, "size": 9, "color": color},
             ))
     for trade in trades[:40]:

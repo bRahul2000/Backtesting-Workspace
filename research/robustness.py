@@ -18,6 +18,7 @@ import uuid
 import numpy as np
 
 from core.fingerprints import stable_fingerprint
+from core.trade_log import to_timestamp as to_trade_timestamp
 from research.walk_forward import FoldResult, StitchedTrade
 
 RESERVED_DATASET_ROLES = ("FORWARD_VALIDATION", "HOLDOUT")
@@ -58,6 +59,12 @@ class RobustnessTrade:
 def _parse_timestamp(value: Any) -> datetime:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    #--- Experiments stored before the trade-log timestamp fix carry epoch
+    #--- nanoseconds, which reach here as a string of digits.
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return to_trade_timestamp(value).to_pydatetime()
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return to_trade_timestamp(value).to_pydatetime()
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value)

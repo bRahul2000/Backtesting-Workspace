@@ -12,6 +12,7 @@ from brokers.exness import EXNESS
 from core.config import BacktestConfig, DatasetRole, ExecutionMode
 from core.fingerprints import sha256_file, stable_fingerprint
 from core.result import DirectionStatistics, UniversalBacktestResult
+from core.trade_log import serialize_timestamp
 from engine.metrics import calculate_metrics
 from engine.diagnostics import enrich_result
 from engine.models import BacktestSettings, Direction, RiskCalculation, RiskMode, SameBarResolution
@@ -104,10 +105,13 @@ def _broker_native_spread(path: Path, data: pd.DataFrame) -> pd.Series:
 def _trade_row(trade):
     row = asdict(trade)
     for key, value in list(row.items()):
-        if hasattr(value, "value"):
+        #--- Timestamps first: pd.Timestamp also exposes ``.value`` (epoch
+        #--- nanoseconds), so the enum branch used to swallow every one of them
+        #--- and leave this branch unreachable.
+        if isinstance(value, pd.Timestamp):
+            row[key] = serialize_timestamp(value)
+        elif hasattr(value, "value"):
             row[key] = value.value
-        elif isinstance(value, pd.Timestamp):
-            row[key] = value.isoformat()
     row["realized_r"] = trade.realized_r
     return row
 
