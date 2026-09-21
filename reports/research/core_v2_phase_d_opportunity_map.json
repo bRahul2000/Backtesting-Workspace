@@ -1,0 +1,107 @@
+{
+ "bars": 57403,
+ "regime": {
+  "TRANSITION": {
+   "bars": 28879,
+   "percent_of_bars": 50.309,
+   "bars_inside_a_core_position": 2212,
+   "percent_of_bucket_covered": 7.66
+  },
+  "NEUTRAL_RANGE": {
+   "bars": 11504,
+   "percent_of_bars": 20.041,
+   "bars_inside_a_core_position": 0,
+   "percent_of_bucket_covered": 0.0
+  },
+  "BULLISH_TREND": {
+   "bars": 10192,
+   "percent_of_bars": 17.755,
+   "bars_inside_a_core_position": 1897,
+   "percent_of_bucket_covered": 18.613
+  },
+  "BEARISH_TREND": {
+   "bars": 6769,
+   "percent_of_bars": 11.792,
+   "bars_inside_a_core_position": 1658,
+   "percent_of_bucket_covered": 24.494
+  },
+  "WARMUP": {
+   "bars": 59,
+   "percent_of_bars": 0.103,
+   "bars_inside_a_core_position": 0,
+   "percent_of_bucket_covered": 0.0
+  }
+ },
+ "volatility": {
+  "NORMAL_VOL": {
+   "bars": 24771,
+   "percent_of_bars": 43.153
+  },
+  "HIGH_VOL_EXPANSION": {
+   "bars": 16399,
+   "percent_of_bars": 28.568
+  },
+  "LOW_VOL_COMPRESSION": {
+   "bars": 16100,
+   "percent_of_bars": 28.047
+  },
+  "WARMUP": {
+   "bars": 133,
+   "percent_of_bars": 0.232
+  }
+ },
+ "events": {
+  "PULLBACK_TOUCH_LONG": {
+   "bars": 15166,
+   "percent_of_bars": 26.42,
+   "bars_inside_a_core_position": 1700,
+   "percent_covered": 11.209
+  },
+  "PULLBACK_TOUCH_SHORT": {
+   "bars": 13359,
+   "percent_of_bars": 23.272,
+   "bars_inside_a_core_position": 1105,
+   "percent_covered": 8.272
+  },
+  "BREAKOUT_UP": {
+   "bars": 6399,
+   "percent_of_bars": 11.148,
+   "bars_inside_a_core_position": 639,
+   "percent_covered": 9.986
+  },
+  "BREAKDOWN": {
+   "bars": 5753,
+   "percent_of_bars": 10.022,
+   "bars_inside_a_core_position": 635,
+   "percent_covered": 11.038
+  },
+  "FAILED_BREAKOUT_RECLAIM_DOWN": {
+   "bars": 2007,
+   "percent_of_bars": 3.496,
+   "bars_inside_a_core_position": 194,
+   "percent_covered": 9.666
+  },
+  "FAILED_BREAKDOWN_RECLAIM_UP": {
+   "bars": 1931,
+   "percent_of_bars": 3.364,
+   "bars_inside_a_core_position": 223,
+   "percent_covered": 11.548
+  }
+ },
+ "core_position_bars": 5767,
+ "core_position_percent": 10.047,
+ "core_entries_by_setup": {
+  "BTC_V3_T3_BREAKOUT_SHORT_FROZEN": 84,
+  "BTC_V3_A4_PULLBACK_LONG_FROZEN": 93
+ },
+ "core_entries_by_setup_and_regime": {
+  "BTC_V3_T3_BREAKOUT_SHORT_FROZEN|BEARISH_TREND": 83,
+  "BTC_V3_A4_PULLBACK_LONG_FROZEN|BULLISH_TREND": 86,
+  "BTC_V3_A4_PULLBACK_LONG_FROZEN|TRANSITION": 7,
+  "BTC_V3_T3_BREAKOUT_SHORT_FROZEN|TRANSITION": 1
+ },
+ "setup_ids": {
+  "a4": "BTC_V3_A4_PULLBACK_LONG_FROZEN",
+  "t3": "BTC_V3_T3_BREAKOUT_SHORT_FROZEN"
+ }
+}
