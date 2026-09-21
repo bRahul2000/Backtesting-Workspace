@@ -24,6 +24,7 @@ from strategies.base_strategy import (
 )
 from strategies.registry import discover_builtin_strategies
 from services.gold_spec import load_mt5_gold_snapshot
+from services import market_datasets as datasets
 from utils.data_validation import continuous_segments, load_ohlcv_csv, missing_gaps, validate_ohlcv
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -159,11 +160,37 @@ def _broker_for_instrument(instrument: str):
 
 
 def dataset_for_instrument(instrument: str, timeframe: str = "15m") -> tuple[Path, str]:
-    if instrument == "BTCUSD":
+    """Back-compatible default. New code should select a dataset explicitly.
+
+    Kept so existing experiment rows, which recorded the legacy data_source
+    strings, still resolve to the file they actually ran on.
+    """
+    if instrument == "BTCUSD" and timeframe == "15m":
         return BTC_DATA, "canonical_btcusd_15m"
+    if instrument == "BTCUSD":
+        entry = datasets.dataset(datasets.EXNESS_BTCUSDM_H1)
+        return entry.path, entry.key
     if timeframe == "1h":
         return GOLD_H1, "exness_xauusd_phase2a_h1"
     return GOLD_M15, "exness_xauusd_phase2a_m15"
+
+
+#: Legacy data_source strings, so a historical row still resolves to its file.
+_LEGACY_SOURCES = {
+    "canonical_btcusd_15m": datasets.BITSTAMP_BTCUSD_15M,
+    "exness_xauusd_phase2a_m15": datasets.EXNESS_XAUUSDM_M15,
+    "exness_xauusd_phase2a_h1": datasets.EXNESS_XAUUSDM_H1,
+}
+
+
+def dataset_for_source(data_source: str, instrument: str = "BTCUSD",
+                       timeframe: str = "15m") -> datasets.MarketDataset:
+    """Resolve the dataset an experiment recorded, new key or legacy string."""
+    key = _LEGACY_SOURCES.get(data_source, data_source)
+    try:
+        return datasets.dataset(key)
+    except KeyError:
+        return datasets.default_dataset(instrument, timeframe)
 
 
 def build_integrity(
@@ -183,7 +210,9 @@ def build_integrity(
         dataset_role=config.dataset_role.value, data_source=config.data_source,
         start=config.start_date.isoformat(), end=config.end_date.isoformat(),
         execution_model=config.execution_mode.value,
-        spread_model=("Historical per-bar spread" if config.instrument == "XAUUSDm" else "Synthetic Bid/Ask"),
+        spread_model=("Historical per-bar broker spread"
+                      if config.spread_source == "BROKER_NATIVE_PER_BAR"
+                      else f"Synthetic Bid/Ask at {config.spread:g}"),
         commission=f"{config.commission_percent}%", slippage=f"{config.slippage_percent}%",
         continuous_segments=len(continuous_segments(data, timeframe_minutes * 60)),
         missing_gapped_candles=report.missing_candles,
@@ -346,13 +375,24 @@ def _render_controls() -> tuple[str, str, StrategyDescriptor | None, BacktestCon
     left, right = st.columns([1.1, 2.2])
     instrument = left.selectbox("Instrument", instrument_options(), format_func=lambda value: "XAUUSDm" if value == "XAUUSDm" else value)
     timeframe = left.selectbox("Timeframe", ("15m", "1h"), index=0)
+    #--- The dataset is an explicit choice, never inferred from the instrument.
+    #--- Two BTC datasets exist and they are not interchangeable.
+    available = datasets.datasets_for_instrument(instrument, timeframe)
+    available = tuple(entry for entry in available if entry.exists)
+    if not available:
+        st.warning(f"No dataset is registered for {instrument} {timeframe}.")
+        return instrument, timeframe, None, None, Path(), pd.DataFrame()
+    entry = left.selectbox(
+        "Dataset", available, format_func=lambda item: item.label,
+        help="Which candles the backtest runs on. Bitstamp is exchange mid data; "
+             "Exness is broker-native and carries a real per-bar spread.")
     left.selectbox("Broker Profile", ("EXNESS_STANDARD",), disabled=True)
     include_rejected = left.checkbox("Show rejected/research history", value=False)
     descriptors = compatible_strategies(instrument, include_rejected=include_rejected)
     strategy_labels = [f"{d.metadata.name} · {d.metadata.status.value}" for d in descriptors]
     selected_label = right.selectbox("Strategy", strategy_labels) if strategy_labels else None
     descriptor = descriptors[strategy_labels.index(selected_label)] if selected_label else None
-    data_path, data_source = dataset_for_instrument(instrument, timeframe)
+    data_path, data_source = entry.path, entry.key
     data = load_ohlcv_csv(data_path) if data_path.exists() else pd.DataFrame()
     if data.empty:
         st.warning(f"No dataset available at {data_path.relative_to(ROOT)}")
@@ -363,12 +403,22 @@ def _render_controls() -> tuple[str, str, StrategyDescriptor | None, BacktestCon
     start_date = date_col.date_input("Start", value=start, min_value=start, max_value=end)
     end_date = date_col.date_input("End", value=end, min_value=start, max_value=end)
     risk = risk_col.number_input("Risk %", min_value=0.01, max_value=10.0, value=0.25, step=0.05)
-    spread = cost_col.number_input("Spread", min_value=0.0, value=10.0 if instrument == "BTCUSD" else 0.0, step=0.01,
-                                   disabled=instrument == "XAUUSDm", help="Gold uses historical per-bar spread from the imported broker dataset.")
+    #--- A dataset carrying its own spread must not be overridden by a typed
+    #--- number; the field is shown disabled so the reason is visible.
+    if entry.carries_per_bar_spread:
+        cost_col.number_input(
+            "Spread", min_value=0.0, value=0.0, step=0.01, disabled=True,
+            help=f"{entry.label} carries a real per-bar broker spread, which is "
+                 "used instead of a fixed value.")
+        spread = 0.0
+    else:
+        spread = cost_col.number_input(
+            "Spread", min_value=0.0, value=10.0, step=0.01,
+            help="Exchange candles carry no broker spread; the audited engine "
+                 "applies this value as synthetic Bid/Ask.")
     role = st.selectbox("Dataset Role", [role.value for role in DatasetRole], index=0)
     broker_name = "EXNESS_STANDARD"
-    if instrument == "XAUUSDm":
-        st.caption("Exness Technologies Ltd · XAUUSDm · broker-native history Dec 2025 to Sep 2026")
+    _dataset_banner(entry, data)
     if descriptor is None:
         st.info("No compatible production strategy is registered for this instrument yet. Gold data and integrity views are available; strategy execution is intentionally disabled.")
         return instrument, timeframe, descriptor, None, data_path, data
@@ -378,12 +428,34 @@ def _render_controls() -> tuple[str, str, StrategyDescriptor | None, BacktestCon
         end_date=pd.Timestamp(end_date, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(minutes=15),
         dataset_role=DatasetRole(role), higher_timeframes=("1h",) if timeframe == "15m" else (),
         risk_per_trade_percent=risk, spread=spread, data_source=data_source,
+        spread_source=entry.spread_source,
     )
+    #--- The run cannot silently drift onto another instrument's candles.
+    if entry.instrument != instrument:
+        st.error(f"{entry.label} is a {entry.instrument} dataset; refusing to run "
+                 f"it as {instrument}.")
+        return instrument, timeframe, descriptor, None, data_path, data
     st.caption(f"Version {descriptor.metadata.version} · Status {descriptor.metadata.status.value} · {'LOCKED' if descriptor.metadata.status is StrategyStatus.FROZEN else 'EDITABLE'}")
     with st.expander("Strategy Inputs", expanded=True):
         for parameter in descriptor.parameters:
             st.number_input(parameter.name, value=float(parameter.default), disabled=parameter.frozen, key=f"param_{parameter.name}")
     return instrument, timeframe, descriptor, config, data_path, data
+
+
+def _dataset_banner(entry: datasets.MarketDataset, data: pd.DataFrame) -> None:
+    """Make the active dataset unmissable, with its identity and shape."""
+    summary = datasets.summarise(entry)
+    lock = "read-only" if summary.read_only else "updatable"
+    spread = ("per-bar broker spread"
+              + (f", median {summary.spread_points_median:,.0f} points"
+                 if summary.spread_points_median is not None else "")
+              if entry.carries_per_bar_spread else "synthetic Bid/Ask")
+    st.info(
+        f"**{summary.label}** · {lock}\n\n"
+        f"{summary.broker} · {summary.symbol} · {summary.timeframe} · {spread}\n\n"
+        f"{summary.bars:,} candles · {summary.first_candle} → {summary.last_candle} · "
+        f"{summary.segments} segment(s) · {summary.gapped_candles:,} gapped candle(s)\n\n"
+        f"`{summary.path}`\n\nfingerprint `{summary.fingerprint[:32]}…`")
 
 
 def render_universal_workspace() -> None:
@@ -427,7 +499,15 @@ def render_experiment_history() -> None:
         st.json(row)
         descriptor = discover_builtin_strategies().get(row["strategy_id"])
         instrument = row["instrument"]
-        dataset_path, _ = dataset_for_instrument(instrument, json.loads(row["config_json"]).get("timeframe", "15m"))
+        config_json = json.loads(row["config_json"])
+        #--- Verify against the dataset the run RECORDED, not whatever this
+        #--- instrument defaults to today. Two BTC datasets exist, and checking
+        #--- the wrong one would either block a valid run or clear an invalid
+        #--- one.
+        recorded = dataset_for_source(row.get("data_source", ""), instrument,
+                                      config_json.get("timeframe", "15m"))
+        dataset_path = recorded.path
+        st.caption(f"Recorded dataset: {recorded.label} · `{recorded.path.name}`")
         broker = _broker_for_instrument(instrument)
         allowed, message = verify_reproduction(
             row, descriptor, dataset_path, broker.fingerprint(),

@@ -208,11 +208,61 @@ def display_dataset_details(data: pd.DataFrame) -> None:
         st.caption("Showing the first 100 rows, sorted oldest to newest. Timestamps are UTC.")
 
 
+def _render_dataset_registry() -> None:
+    """Every registered dataset, with the identity a run would record.
+
+    Only the Bitstamp dataset is updatable from this page; the Exness datasets
+    are validated evidence and are read-only here.
+    """
+    from services import market_datasets as datasets
+
+    st.subheader("Available Datasets")
+    st.caption(
+        "Backtests select one of these explicitly in the Universal Workspace. "
+        "Exness BTCUSDm is broker-native and carries a real per-bar spread; "
+        "Bitstamp BTC/USD is exchange mid data with a synthetic spread."
+    )
+    rows = []
+    for entry in datasets.all_datasets():
+        if not entry.exists:
+            rows.append({"Dataset": entry.label, "Status": "missing", "Broker": entry.broker,
+                         "Symbol": entry.symbol, "Timeframe": entry.timeframe,
+                         "Candles": "-", "First": "-", "Last": "-", "Segments": "-",
+                         "Gapped": "-", "Spread": entry.spread_source,
+                         "Access": "read-only" if entry.read_only else "updatable",
+                         "Fingerprint": "-", "Path": str(entry.path)})
+            continue
+        summary = datasets.summarise(entry)
+        rows.append({
+            "Dataset": summary.label, "Status": "ok", "Broker": summary.broker,
+            "Symbol": summary.symbol, "Timeframe": summary.timeframe,
+            "Candles": f"{summary.bars:,}",
+            "First": summary.first_candle, "Last": summary.last_candle,
+            "Segments": summary.segments, "Gapped": f"{summary.gapped_candles:,}",
+            "Spread": ("per-bar broker" if entry.carries_per_bar_spread
+                       else "synthetic Bid/Ask"),
+            "Access": "read-only" if summary.read_only else "updatable",
+            "Fingerprint": summary.fingerprint[:16] + "…", "Path": summary.path,
+        })
+    full_width_dataframe(pd.DataFrame(rows))
+    st.caption(
+        "Read-only datasets are validated broker evidence. This page will not "
+        "download, overwrite or modify them; only Bitstamp has an update path."
+    )
+
+
 def render_market_data() -> pd.DataFrame:
     st.title("BTC Strategy Backtester")
     st.caption("Download and validate BTC/USD data, then run the demo or BTC V2.2 Setup B backtest.")
 
-    st.subheader("Market Data")
+    _render_dataset_registry()
+    st.divider()
+
+    st.subheader("Bitstamp BTC/USD — download and validation")
+    st.caption(
+        "This section manages the legacy Bitstamp dataset only. The Exness "
+        "BTCUSDm datasets above are read-only and are not touched by anything here."
+    )
     symbol_col, timeframe_col, location_col = st.columns([1, 1, 2])
     symbol_col.text_input("Symbol", value="BTC/USD", disabled=True)
     timeframe_col.text_input("Timeframe", value="15 Minutes", disabled=True)
