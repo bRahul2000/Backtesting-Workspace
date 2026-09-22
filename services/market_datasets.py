@@ -29,6 +29,7 @@ BITSTAMP_BTCUSD_15M = "BITSTAMP_BTCUSD_15M"
 #: Validated Exness broker-native BTCUSDm. Read-only from the UI.
 EXNESS_BTCUSDM_M15 = "EXNESS_BTCUSDM_M15"
 EXNESS_BTCUSDM_H1 = "EXNESS_BTCUSDM_H1"
+EXNESS_BTCUSDM_M30 = "EXNESS_BTCUSDM_M30"
 #: Existing Exness gold datasets, registered so the registry is the one place
 #: that answers "what can I run on?".
 EXNESS_XAUUSDM_M15 = "EXNESS_XAUUSDM_M15"
@@ -98,6 +99,19 @@ _REGISTRY: tuple[MarketDataset, ...] = (
         manifest_path=EXNESS_BTC_ROOT / "manifest.json",
         notes="Broker-native candles carrying a real per-bar spread. Read-only: "
               "this is the dataset the Stage 2 parity certifications rest on.",
+    ),
+    MarketDataset(
+        key=EXNESS_BTCUSDM_M30,
+        label="Exness BTCUSDm · M30 (validated R1)",
+        instrument="BTCUSD", symbol="BTCUSDm",
+        broker="Exness Technologies Ltd",
+        source="Exness MT5 broker history (Phase R1, validated)",
+        timeframe="30m", step_seconds=1800,
+        path=EXNESS_BTC_ROOT / "processed" / "btcusdm_M30.csv",
+        spread_source="BROKER_NATIVE_PER_BAR",
+        read_only=True, supports_update=False,
+        manifest_path=EXNESS_BTC_ROOT / "manifest.json",
+        notes="Broker-native candles carrying a real per-bar spread.",
     ),
     MarketDataset(
         key=EXNESS_BTCUSDM_H1,

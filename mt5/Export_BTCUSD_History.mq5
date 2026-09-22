@@ -162,7 +162,9 @@ void OnStart()
    string prefix = SafeFilePart(InpFilePrefix) + "_" + SafeFilePart(symbol);
    bool m15_ok = ExportTimeframe(symbol, PERIOD_M15, "M15", prefix + "_M15.csv");
    bool h1_ok  = ExportTimeframe(symbol, PERIOD_H1,  "H1",  prefix + "_H1.csv");
+   bool m30_ok = ExportTimeframe(symbol, PERIOD_M30, "M30", prefix + "_M30.csv");
    Print("BTC history export complete for ", symbol,
          ". M15=", m15_ok ? "OK" : "FAILED",
+         ", M30=" + (m30_ok ? "OK" : "FAILED"),
          ", H1=",  h1_ok  ? "OK" : "FAILED");
   }
