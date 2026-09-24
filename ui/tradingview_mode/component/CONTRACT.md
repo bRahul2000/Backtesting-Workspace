@@ -219,9 +219,60 @@ again. `trade_overlay` draws only trades that closed within the revealed bars,
 and the selected trade's SL/TP segments come from that overlay. The watchlist
 shows reference last closes, labelled as not replay prices.
 
+## Live (read-only Exness MT5)
+
+Transport: the MQL5 service `ui/tradingview_mode/mt5_bridge/TradingViewLiveFeed.mq5`
+writes quote and bar files into MetaTrader's Common/Files folder. `live.py` only
+reads them; see `mt5_bridge/README.md`. The service has no trading calls, and a
+test fails if one is added. Python never writes to that folder. No web price,
+dataset file or other provider is ever used in place of the feed.
+
+**Events:** Live has two steps, and entering the mode never needs a feed.
+- `enter_live {}` switches the mode to Live **setup**. The chart keeps the historical
+  dataset, and nothing is read from MT5. The current symbol is preselected only if it
+  is an Exness live symbol. Otherwise the strip shows "Live mode supports Exness BTCUSDm
+  and XAUUSDm only." and the historical dataset is not changed.
+- `go_live {symbol ∈ BTCUSDm, XAUUSDm; timeframe ∈ 15m, 30m, 1h}` starts streaming.
+  Only MT5-native periods are allowed; nothing is derived. Sending it again while
+  streaming switches the symbol.
+- `exit_live` leaves Live from either step.
+- `live_poll`: the browser sends it about once a second while streaming, only when
+  no event is in flight. It changes no state and is not logged.
+- While Live is on, dataset and date-range changes are rejected, and Replay can't
+  start. While streaming, `select_timeframe` changes only the live timeframe. Live
+  can't start during Replay. The historical selection is restored unchanged on exit.
+
+**Merge:** bars are kept in memory per session, keyed by bar time:
+book, then the seed file, then the newest quote bars, with later sources winning.
+That gives no duplicates, a forming candle updated in place, and rollover by
+appending. The window holds the last 500 bars. Snapshots with the same `seq`
+are duplicates and ignored. A lower `seq` or an older tick from the same writer
+is rejected and counted. A new `writer_id` (service restart) starts a new sequence.
+
+**Payload:**
+- `mode: "live"`, `dataset_key` / `source.dataset_key` = `MT5_LIVE:<symbol>`,
+  provider "Exness Technologies Ltd", and `timeframes` = the live periods.
+- `live` = `{status, reason, symbol, timeframe, bid, ask, spread (same-tick ask − bid at
+  the symbol's digits), spread_points (broker), digits, point, tick_time_ms, updated_utc,
+  heartbeat_age_s, tick_age_s, forming_bar_time, bar_count, rejected_updates,
+  indicators_include_forming_bar: true}`.
+- Indicators are calculated in Python on the live bars, **including the forming candle**.
+- Strategy Tester markers are hidden (`trade_overlay.available = false`).
+- Watchlist rows for the live symbols carry `live {status, bid, ask, …}` only while
+  their feed is LIVE or STALE; other rows stay historical reference.
+
+**States:** DISCONNECTED (no file, or heartbeat > 60 s), STALE (heartbeat 5–60 s, or no
+tick for > 60 s), CONNECTING (terminal not connected to the broker, or no history yet),
+ERROR (invalid file, symbol mismatch, bad bars, ask < bid, a server clock that isn't
+UTC+0, or a future heartbeat), and LIVE otherwise.
+
+**Updates:** each poll is a normal rerun with the full live window of about 500 bars.
+The chart applies it incrementally: it updates the forming candle in place, or
+appends at rollover, whenever the window did not slide, and resets otherwise.
+
 ## Reserved for later phases
 
-`capabilities`, the drawing toolbar, the Live mode button and the disabled
+`capabilities` and the drawing toolbar and the disabled
 Replay/Live mode buttons are placeholders. When those features arrive,
 Python supplies the results through new payload fields (bump `contract`) and
 the frontend only renders them.

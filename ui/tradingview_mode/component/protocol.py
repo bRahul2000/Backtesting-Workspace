@@ -21,7 +21,7 @@ from .replay import SPEEDS as REPLAY_SPEEDS, is_utc_text
 
 
 CONTRACT_VERSION = 1
-MODES = ("historical",)
+MODES = ("historical", "replay", "live")
 BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs")
 _BAR_FIELDS = ("time", "open", "high", "low", "close", "volume")
 _REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
@@ -331,6 +331,11 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "set_replay_speed": {"speed": (True, lambda v: type(v) is int and v in REPLAY_SPEEDS)},
     "exit_replay": {},
     "go_to_replay_latest": {},
+    # Live (read-only MT5 market data). Symbols/timeframes are validated in state.py.
+    "enter_live": {},  # Live mode setup; no feed is read yet
+    "go_live": {"symbol": (True, _is_str), "timeframe": (True, _is_str)},
+    "exit_live": {},
+    "live_poll": {},
     # Strategy Tester. Semantics (registry, dataset, broker, parameters) are
     # validated in tester.py against the authoritative configuration model.
     "run_backtest": {"strategy_id": (True, _is_str), "dataset_key": (True, _is_str),

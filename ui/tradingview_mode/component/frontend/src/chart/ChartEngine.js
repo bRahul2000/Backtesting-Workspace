@@ -10,6 +10,7 @@ import {
   createChart,
   createSeriesMarkers,
 } from "lightweight-charts";
+import { tailUpdate } from "../liveControls.js";
 
 export const COLORS = {
   bg: "#0b0e14",
@@ -107,13 +108,24 @@ export class ChartEngine {
     // panning away stops following until "Latest" is used. Zoom is kept.
     const replay = !!payload.replay?.enabled;
     const logical = this.chart.timeScale().getVisibleLogicalRange();
-    const following = replay && !newView && newBars && logical && logical.to >= this.bars.length - 1.5;
+    const liveStreaming = payload.live?.phase === "streaming";
+    const streaming = replay || liveStreaming;
+    const following = streaming && !newView && newBars && logical && logical.to >= this.bars.length - 1.5;
 
     if (precision !== this.precision) {
       this.precision = precision;
       this.candles.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
     }
-    if (newBars) {
+    // Live: update the forming candle (or append at rollover) in place when the
+    // window did not slide; otherwise replace the data.
+    const tail = liveStreaming && !newView && newBars ? tailUpdate(this.bars, payload.bars) : null;
+    if (tail) {
+      this.bars = payload.bars;
+      for (const b of tail) {
+        this.candles.update({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close });
+        this.volume.update({ time: b.time, value: b.volume, color: b.close >= b.open ? `${COLORS.up}55` : `${COLORS.down}55` });
+      }
+    } else if (newBars) {
       this.bars = payload.bars;
       this.candles.setData(payload.bars.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
       this.volume.setData(payload.bars.map((b) => ({
@@ -126,7 +138,7 @@ export class ChartEngine {
 
     this.viewKey = payload.view_key;
     this.barsRev = payload.bars_rev;
-    if (newView && replay) this.showLatest();
+    if (newView && streaming) this.showLatest();
     else if (newView) this.restoreOrDefaultRange();
     else if (following) this.scrollToLatest();
     else if (newBars) this.applyRange(keepRange);

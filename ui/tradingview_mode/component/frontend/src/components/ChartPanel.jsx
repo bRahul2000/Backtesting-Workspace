@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { sendEvent } from "../events.js";
 import { ChartEngine } from "../chart/ChartEngine.js";
+import { LiveBar } from "./LiveBar.jsx";
 import { ReplayBar } from "./ReplayBar.jsx";
 import { formatPrice, formatSigned, formatVolume, paramsLabel, providerShort, timeframeLabel } from "../format.js";
 
@@ -77,10 +78,11 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
 
   const notices = payload.notices.filter((notice) => !dismissed.has(notice.message));
   return (
-    <main className={`chart-panel ${payload.replay?.enabled ? "replaying" : ""}`}>
+    <main className={`chart-panel ${payload.replay?.enabled || payload.live?.enabled ? "replaying" : ""}`}>
       <div className="chart-host" ref={host} />
       {engine && <Legend engine={engine} payload={payload} />}
       {payload.bars.length === 0 && <div className="chart-empty">No bars in the selected range.</div>}
+      <LiveBar live={payload.live} />
       <ReplayBar replay={payload.replay} busy={busy} onLatest={() => {
         engine?.scrollToLatest();
         sendEvent("go_to_replay_latest");

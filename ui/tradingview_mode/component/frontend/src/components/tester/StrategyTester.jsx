@@ -85,6 +85,9 @@ export function StrategyTester({ payload, pending, selectedKey, onSelectTrade, f
       )}
       {tester.status === "failed" && !running && <div className="tester-error">{tester.error}</div>}
       {hidden && <div className="tester-note">{tester.run.replay_view.message}</div>}
+      {payload.live?.enabled && tester.run && (
+        <div className="tester-note">Live mode: this is a historical backtest result, not live signals. Its markers are hidden on the live chart.</div>
+      )}
       {focusNote && <div className="tester-note">{focusNote}</div>}
       <div className="subtabs">
         {SUBTABS.map(([key, label]) => (

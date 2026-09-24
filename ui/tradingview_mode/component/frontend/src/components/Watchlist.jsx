@@ -2,7 +2,7 @@ import React from "react";
 import { sendEvent } from "../events.js";
 import { formatPrice, formatSigned, providerShort, timeframeLabel } from "../format.js";
 
-export function Watchlist({ items, replay }) {
+export function Watchlist({ items, replay, live }) {
   return (
     <aside className="watchlist" aria-label="Watchlist">
       <div className="panel-head">
@@ -18,8 +18,17 @@ export function Watchlist({ items, replay }) {
               title={`${item.symbol} · ${item.provider}`}
               onClick={() => !item.selected && sendEvent("select_watchlist_item", { dataset_key: item.dataset_key })}>
               <span className="wl-symbol">{item.symbol}</span>
-              <span className="wl-last mono">{formatPrice(item.last_close, item.price_precision)}</span>
-              <span className={`wl-chg mono ${direction}`}>{formatSigned(item.change_pct, 2, "%")}</span>
+              {item.live ? (
+                <>
+                  <span className="wl-last mono" title={`Bid ${item.live.bid} · Ask ${item.live.ask} (MT5)`}>{formatPrice(item.live.bid, item.live.digits)}</span>
+                  <span className={`wl-live mono ${item.live.status === "LIVE" ? "is-live" : "is-stale"}`}>{item.live.status === "LIVE" ? "LIVE" : "STALE"}</span>
+                </>
+              ) : (
+                <>
+                  <span className="wl-last mono">{formatPrice(item.last_close, item.price_precision)}</span>
+                  <span className={`wl-chg mono ${direction}`}>{formatSigned(item.change_pct, 2, "%")}</span>
+                </>
+              )}
               <span className="wl-sub">{providerShort(item.provider)} · {item.native_timeframes.map(timeframeLabel).join(" ")}</span>
             </button>
           );
@@ -28,7 +37,9 @@ export function Watchlist({ items, replay }) {
       <div className="wl-foot">
         {replay
           ? <span className="warn-inline">Reference only: latest local close, not replay prices.</span>
-          : "Registered local datasets · last native bar"}
+          : live
+            ? "LIVE = Exness MT5 bid · other rows: historical reference close"
+            : "Registered local datasets · last native bar"}
       </div>
     </aside>
   );

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Streamlit } from "streamlit-component-lib";
 import { acknowledge, isIdle, onPendingChange, sendEvent } from "./events.js";
 import { intervalMs, tickAction } from "./replayControls.js";
+import { POLL_MS, pollAction } from "./liveControls.js";
 import { formatUtc } from "./format.js";
 import { BottomPanel } from "./components/BottomPanel.jsx";
 import { ChartPanel } from "./components/ChartPanel.jsx";
@@ -161,6 +162,21 @@ function useReplayPlayback(replay) {
   }, [playing, speed]);
 }
 
+// Live: ask Python to re-read the MT5 feed about once a second, never while an
+// event is still in flight.
+function useLivePolling(live) {
+  const latest = useRef(live);
+  latest.current = live;
+  const enabled = !!live?.enabled && live.phase === "streaming";
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const timer = setInterval(() => {
+      if (pollAction(latest.current, isIdle()) === "poll") sendEvent("live_poll");
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [enabled]);
+}
+
 // Python-generated exports arrive once in the payload; download each id once.
 function useExportDownload(exportFile) {
   const seen = useRef(new Set());
@@ -206,6 +222,7 @@ function Terminal({ payload, fallbackHeight }) {
   const focus = useTradeFocus(payload, engine);
   useExportDownload(payload.tester.export);
   useReplayPlayback(payload.replay);
+  useLivePolling(payload.live);
   const engineActions = useMemo(() => ({
     fit: () => engine?.fit(),
     latest: () => engine?.goToLatest(),
@@ -220,7 +237,7 @@ function Terminal({ payload, fallbackHeight }) {
         engineActions={engineActions} drawingsEnabled={payload.capabilities.drawings} />
       <ChartPanel payload={payload} onEngine={setEngine} onCrosshairTime={setCrosshairTime}
         tradesByKey={focus.tradesByKey} selectedKey={focus.selectedKey} busy={!!pending} />
-      <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} />
+      <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} live={payload.live?.phase === "streaming"} />
       <BottomPanel payload={payload} clientLogs={clientLogs} pending={pending}
         selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note} />
       <StatusBar payload={payload} crosshairTime={crosshairTime} />

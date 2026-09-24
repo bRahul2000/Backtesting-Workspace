@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import asdict, replace
+import time
 from datetime import date, timedelta
 import json
 from pathlib import Path
@@ -33,6 +34,7 @@ from ..timeframes import (
 )
 from ..workspace import watchlist_groups
 from . import render_terminal_component
+from . import live as live_model
 from . import replay as replay_model
 from . import tester
 from .protocol import (
@@ -66,6 +68,7 @@ READY_KEY = "tv_terminal_ready"
 TESTER_KEY = "tv_terminal_tester"
 TESTER_RESULT_KEY = "tv_terminal_tester_result"
 TESTER_RUNS_KEY = "tv_terminal_tester_runs"
+LIVE_BOOKS_KEY = "tv_terminal_live_books"
 MAX_LOGS = 200
 _RSI_LEVELS = (70.0, 50.0, 30.0)
 _SECONDARY_COLORS = {"signal": "#f5a623", "histogram": "#7d8799"}
@@ -119,6 +122,7 @@ def context_for(bounds: tuple[date, date] | None = None, bar_times=None) -> Term
         timeframe_seconds=timeframe_seconds,
         data_bounds=bounds,
         bar_times=bar_times,
+        dataset_symbol=lambda key: dataset(key).symbol if key in keys else None,
     )
 
 
@@ -186,7 +190,24 @@ def indicator_payload(frame: pd.DataFrame, times: list[int], instances: tuple[In
     return overlays, panes, notices
 
 
-def watchlist_payload(selected: MarketDataset) -> list[dict]:
+def live_quotes(folder: Path, now: float) -> dict[str, dict]:
+    """Current MT5 quote per live symbol (read-only); only LIVE/STALE feeds are reported."""
+    quotes = {}
+    for symbol in live_model.LIVE_SYMBOLS:
+        path = live_model.quote_path(folder, symbol)
+        if not path.exists():
+            continue
+        try:
+            snapshot = live_model.parse_quote(path.read_text(encoding="utf-8"), symbol)
+        except (OSError, live_model.LiveFeedError):
+            continue
+        status, _ = live_model.connection_status(file_found=True, snapshot=snapshot, error=None, has_bars=True, now=now)
+        if status in ("LIVE", "STALE"):
+            quotes[symbol] = {"status": status, **live_model.quote_payload(snapshot)}
+    return quotes
+
+
+def watchlist_payload(selected: MarketDataset, quotes: dict[str, dict] | None = None) -> list[dict]:
     items = []
     for group in watchlist_groups():
         available = [entry for entry in group if entry.exists]
@@ -200,6 +221,8 @@ def watchlist_payload(selected: MarketDataset) -> list[dict]:
             "instrument": primary.instrument, "native_timeframes": [entry.timeframe for entry in available],
             "last_close": last, "change_pct": change, "price_precision": precision,
             "selected": any(entry.key == selected.key for entry in group),
+            # Only the live feed's own symbol gets live values; others stay historical reference.
+            "live": (quotes or {}).get(primary.symbol) if primary.broker == "Exness Technologies Ltd" else None,
         })
     return items
 
@@ -208,7 +231,8 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
                            frame: pd.DataFrame, bounds: tuple[date, date] | None, shown: tuple[date, date] | None,
                            logs: list[LogEntry], notices: list[dict[str, str]],
                            watchlist: list[dict], ack: str | None = None,
-                           tester_payload: dict | None = None, replay_status: dict | None = None) -> dict:
+                           tester_payload: dict | None = None, replay_status: dict | None = None,
+                           live_status: dict | None = None) -> dict:
     bars = bars_from_frame(frame)
     times = [bar["time"] for bar in bars]
     overlays, panes, indicator_notices = indicator_payload(frame, times, state.indicators)
@@ -266,11 +290,30 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         # Id of the last frontend event Python processed; the frontend serializes on it.
         "ack": ack,
         "replay": replay_status or {"enabled": False},
+        "live": live_status or {"enabled": False},
     }
+    if live_status and live_status.get("phase") == "setup":
+        payload["mode"] = "live"  # setup: the chart still shows the historical dataset
+    elif live_status:
+        # Live bars come from the MT5 feed, not from a registry dataset file.
+        symbol, timeframe = live_status["symbol"], live_status["timeframe"]
+        payload.update({
+            "mode": "live", "dataset_key": f"MT5_LIVE:{symbol}", "timeframe": timeframe,
+            "timeframes": list(live_model.LIVE_TIMEFRAMES),
+            "view_key": f"{selected.instrument}|{selected.broker}|{selected.symbol}|{timeframe}|live",
+            "source": {"dataset_key": f"MT5_LIVE:{symbol}", "label": f"Exness MT5 live · {symbol} (read-only)",
+                       "provider": selected.broker, "symbol": selected.symbol, "timeframe": timeframe, "native": True,
+                       "description": "MT5 live · native", "read_only": True},
+        })
+        if live_status.get("digits") is not None:
+            payload["price_precision"] = live_status["digits"]
+    elif replay_status:
+        payload["mode"] = "replay"
     tester_payload = tester_payload or {"status": "idle", "options": {}, "form": None, "run": None, "error": None,
                                         "history": [], "active_history_id": None, "export": None}
     payload["tester"] = tester_payload
-    payload["trade_overlay"] = tester.trade_overlay(
+    payload["trade_overlay"] = {"available": False, "trades": [],
+                                "reason": "Strategy Tester markers are hidden in Live mode."} if live_status else tester.trade_overlay(
         tester_payload.get("run"), chart_identity=(selected.instrument, selected.broker, selected.symbol),
         bar_times=times, bar_seconds=resolution.target_seconds,
         chart_label=f"{selected.symbol} · {selected.broker} · {resolution.target}")
@@ -437,6 +480,72 @@ def _load(state: TerminalState) -> tuple[MarketDataset, TimeframeResolution, pd.
     return selected, resolution, frame
 
 
+def live_view(book: live_model.Book, feed: live_model.FeedRead, now: float) -> tuple[pd.DataFrame, dict]:
+    """Chart frame and status for one live book (pure; no I/O)."""
+    symbol, timeframe = book.symbol, book.timeframe
+    seconds = live_model.LIVE_TIMEFRAMES[timeframe][1]
+    snapshot = book.snapshot
+    status, reason = live_model.connection_status(file_found=feed.file_found, snapshot=snapshot, error=feed.error,
+                                                  has_bars=not book.bars.empty, now=now)
+    frame = pd.DataFrame({
+        "timestamp": pd.to_datetime(book.bars["time"].astype("int64"), unit="s", utc=True),
+        "open": book.bars["open"].astype(float), "high": book.bars["high"].astype(float),
+        "low": book.bars["low"].astype(float), "close": book.bars["close"].astype(float),
+        "volume": book.bars["tick_volume"].astype(float),
+    }) if not book.bars.empty else pd.DataFrame({
+        # No feed yet: an empty, correctly typed frame (the page shows the state, not an error).
+        "timestamp": pd.Series([], dtype="datetime64[ns, UTC]"),
+        **{column: pd.Series([], dtype=float) for column in ("open", "high", "low", "close", "volume")},
+    })
+    forming = live_model.forming_bar_time(book.bars, seconds, snapshot.tick_time_ms if snapshot else None)
+    return frame, {
+        "enabled": True, "phase": "streaming", "status": status, "reason": reason, "symbol": symbol, "timeframe": timeframe,
+        "provider": live_model.LIVE_SYMBOLS[symbol]["provider"], "source": "Exness MT5 (read-only file bridge)",
+        **live_model.quote_payload(snapshot),
+        "updated_utc": snapshot.written_utc if snapshot else None,
+        "heartbeat_age_s": round(now - snapshot.written_utc, 1) if snapshot else None,
+        "tick_age_s": round(now - snapshot.tick_time_ms / 1000, 1) if snapshot else None,
+        "forming_bar_time": forming, "bar_count": int(len(book.bars)),
+        "rejected_updates": book.rejected,
+        # Convention: indicators include the forming candle and update with it.
+        "indicators_include_forming_bar": True,
+        "symbols": list(live_model.LIVE_SYMBOLS), "timeframes": list(live_model.LIVE_TIMEFRAMES),
+    }
+
+
+def live_setup_status(live: live_model.LiveState, selected: MarketDataset) -> dict:
+    """Live mode before Go Live: the chart still shows the historical dataset and
+    nothing is read from MT5."""
+    supported = selected.symbol in live_model.LIVE_SYMBOLS
+    return {
+        "enabled": True, "phase": "setup", "status": None, "symbol": live.symbol, "timeframe": live.timeframe,
+        "symbols": list(live_model.LIVE_SYMBOLS), "timeframes": list(live_model.LIVE_TIMEFRAMES),
+        "current_supported": supported,
+        "message": None if supported else
+        f"{live_model.UNSUPPORTED_MESSAGE} {selected.symbol} ({selected.broker}) has no live feed — choose a symbol.",
+    }
+
+
+def _live_frame(state: TerminalState, notices: list[dict[str, str]]):
+    symbol, timeframe = state.live.symbol, state.live.timeframe
+    books = st.session_state.setdefault(LIVE_BOOKS_KEY, {})
+    book = books.get((symbol, timeframe)) or live_model.empty_book(symbol, timeframe)
+    feed = live_model.read_feed(live_model.common_files_dir(), symbol, timeframe)
+    if feed.snapshot is not None and feed.error is None:
+        book, verdict = live_model.apply_snapshot(book, feed.snapshot, feed.seed)
+        if verdict == "out_of_order":
+            _log(LogEntry("warning", f"Live {symbol}: out-of-order MT5 update rejected (seq {feed.snapshot.seq})."))
+    books[(symbol, timeframe)] = book
+    frame, status = live_view(book, feed, time.time())
+    if status["status"] in ("ERROR", "DISCONNECTED"):
+        notices.append({"level": "error" if status["status"] == "ERROR" else "warning",
+                        "message": f"Live {symbol}: {status['status']} — {status['reason']}"})
+    selected = dataset(live_model.LIVE_SYMBOLS[symbol]["dataset_key"])
+    seconds = live_model.LIVE_TIMEFRAMES[timeframe][1]
+    resolution = TimeframeResolution(timeframe, seconds, selected, True)
+    return frame, status, selected, resolution
+
+
 def render_custom_terminal() -> None:
     state: TerminalState = st.session_state.get(STATE_KEY) or _initial_state()
     notices: list[dict[str, str]] = []
@@ -498,7 +607,16 @@ def render_custom_terminal() -> None:
             st.session_state[STATE_KEY] = state
             notices.append({"level": "error", "message": f"Replay ended: {exc}"})
             _log(LogEntry("error", f"Replay ended: {exc}"))
-    if replay_status is None and bounds is not None:
+    live_status = None
+    quotes = None
+    streaming = state.live is not None and state.live.streaming
+    if state.live is not None and not streaming:
+        live_status = live_setup_status(state.live, selected)
+    if streaming:
+        frame, live_status, selected, resolution = _live_frame(state, notices)
+        quotes = live_quotes(live_model.common_files_dir(), time.time())
+        shown = (frame["timestamp"].iloc[0].date(), frame["timestamp"].iloc[-1].date()) if len(frame) else None
+    elif replay_status is None and bounds is not None:
         start, end, range_notices = effective_range(state, bounds, resolution.target_seconds)
         notices.extend(range_notices)
         frame = filter_range(frame, start, end)
@@ -506,15 +624,15 @@ def render_custom_terminal() -> None:
         if len(frame) > MAX_BARS:
             notices.append({"level": "warning", "message": f"Showing the latest {MAX_BARS:,} of {len(frame):,} bars."})
             frame = frame.iloc[-MAX_BARS:].reset_index(drop=True)
-    elif bounds is None:
+    elif replay_status is None:
         notices.append({"level": "warning", "message": "The selected dataset contains no bars."})
 
     # 4. Build, validate, render.
     try:
         payload = build_terminal_payload(
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
-            logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected),
-            replay_status=replay_status, ack=last_id,
+            logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, quotes),
+            replay_status=replay_status, live_status=live_status, ack=last_id,
             tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
     except ValueError as exc:
         st.error(f"TradingView Mode payload rejected: {exc}")

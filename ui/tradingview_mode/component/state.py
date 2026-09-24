@@ -15,6 +15,7 @@ from ..indicators import INDICATORS
 from . import replay as replay_model
 from .protocol import FrontendEvent
 from .replay import ReplayError, ReplayState
+from .live import LIVE_SYMBOLS, LIVE_TIMEFRAMES, UNSUPPORTED_MESSAGE, LiveState
 
 
 MAX_BARS = 50_000
@@ -56,6 +57,8 @@ class TerminalState:
     next_indicator: int = 1
     # Historical when None; otherwise the session's replay (see replay.py).
     replay: ReplayState | None = None
+    # Read-only MT5 live view (see live.py). Never set together with replay.
+    live: LiveState | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +73,8 @@ class TerminalContext:
     data_bounds: tuple[date, date] | None = None
     # Open times (epoch seconds) of every bar of the resolved dataset/timeframe.
     bar_times: object = None
+    # Registry symbol of a dataset key (used to preselect a live symbol).
+    dataset_symbol: Callable[[str], str] | None = None
 
 
 def validate_indicator_params(key: str, params: dict | None) -> dict[str, float | int]:
@@ -118,6 +123,43 @@ def _replace_indicator(state: TerminalState, updated: IndicatorInstance) -> Term
 
 REPLAY_EVENTS = ("enter_replay", "set_replay_start", "step_forward", "step_backward", "play_replay",
                  "pause_replay", "set_replay_speed", "jump_replay", "exit_replay", "go_to_replay_latest")
+
+
+LIVE_EVENTS = ("enter_live", "go_live", "exit_live", "live_poll")
+
+
+def _apply_live(state: TerminalState, event: FrontendEvent, ctx: TerminalContext) -> tuple[TerminalState, LogEntry | None]:
+    """Live mode has two steps: enter (setup: choose symbol/timeframe) and
+    Go Live (start reading the MT5 feed). Entering never needs a feed."""
+    kind, data = event.type, event.data
+    if kind == "live_poll":
+        # A refresh request: nothing changes; not logged (it arrives every second).
+        return state, None
+    if kind == "exit_live":
+        if state.live is None:
+            return _reject(state, "Live mode is not active.")
+        return replace(state, live=None), LogEntry("info", "Live mode ended; historical view restored.")
+    if state.replay is not None:
+        return _reject(state, "exit Replay before entering Live.")
+    if kind == "enter_live":
+        if state.live is not None:
+            return state, LogEntry("debug", "Live mode already active.")
+        current = ctx.dataset_symbol(state.dataset_key) if ctx.dataset_symbol else None
+        symbol = current if current in LIVE_SYMBOLS else None
+        timeframe = state.timeframe if state.timeframe in LIVE_TIMEFRAMES else next(iter(LIVE_TIMEFRAMES))
+        note = "" if symbol else f" {current or state.dataset_key} has no live feed. {UNSUPPORTED_MESSAGE}"
+        return (replace(state, live=LiveState(symbol, timeframe, streaming=False)),
+                LogEntry("info", f"Live mode: choose a symbol and timeframe, then Go Live.{note}"))
+    # go_live
+    if state.live is None:
+        return _reject(state, "enter Live mode before Go Live.")
+    symbol, timeframe = data["symbol"], data["timeframe"]
+    if symbol not in LIVE_SYMBOLS:
+        return _reject(state, f"{symbol} has no live MT5 feed. {UNSUPPORTED_MESSAGE}")
+    if timeframe not in LIVE_TIMEFRAMES:
+        return _reject(state, f"{timeframe} is not a live MT5 timeframe (live: {', '.join(LIVE_TIMEFRAMES)}).")
+    return (replace(state, live=LiveState(symbol, timeframe, streaming=True)),
+            LogEntry("info", f"Go Live: Exness MT5 {symbol} {timeframe} (read-only)."))
 
 
 def _utc(epoch: int) -> str:
@@ -181,8 +223,22 @@ def apply_event(state: TerminalState, event: FrontendEvent, ctx: TerminalContext
     if kind == "frontend_error":
         return state, LogEntry("error", f"Frontend error: {data['message'][:500]}")
 
+    if kind in LIVE_EVENTS:
+        return _apply_live(state, event, ctx)
     if kind in REPLAY_EVENTS:
+        if state.live is not None:
+            return _reject(state, "exit Live before starting or using Replay.")
         return _apply_replay(state, event, ctx)
+    if state.live is not None and not state.live.streaming and kind == "select_timeframe":
+        return _reject(state, "choose the live timeframe in the Live bar, then Go Live.")
+    if state.live is not None and kind == "select_timeframe":
+        timeframe = event.data["timeframe"].strip().lower()
+        if timeframe not in LIVE_TIMEFRAMES:
+            return _reject(state, f"{timeframe} is not a live MT5 timeframe (live: {', '.join(LIVE_TIMEFRAMES)}).")
+        return (replace(state, live=replace(state.live, timeframe=timeframe)),
+                LogEntry("info", f"Live timeframe {timeframe} (MT5 native)."))
+    if state.live is not None and kind in ("select_dataset", "select_watchlist_item", "set_date_range"):
+        return _reject(state, "exit Live before changing the dataset or date range.")
     if state.replay is not None and kind in ("select_dataset", "select_watchlist_item", "select_timeframe",
                                              "set_date_range"):
         return _reject(state, "exit Replay before changing the dataset, timeframe or date range.")
