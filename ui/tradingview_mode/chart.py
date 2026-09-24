@@ -4,7 +4,7 @@ from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime
 
-def render_tradingview_chart(df: pd.DataFrame, show_volume: bool = True):
+def render_tradingview_chart(df: pd.DataFrame, show_volume: bool = True, indicators=None):
     """
     Renders a TradingView-style candlestick chart with an optional volume pane.
     Expects df with columns: [timestamp, open, high, low, close, volume]
@@ -13,15 +13,15 @@ def render_tradingview_chart(df: pd.DataFrame, show_volume: bool = True):
         st.warning("No data available for the selected range.")
         return
 
-    # Create subplots: Row 1 for candles, Row 2 for volume (if enabled)
-    rows = 2 if show_volume else 1
-    # Adjusted row heights: Volume slightly larger for visibility, but still secondary
-    row_heights = [0.75, 0.25] if show_volume else [1.0]
+    indicators = indicators or {}
+    lower = list(indicators.get("lower", []))
+    rows = 1 + int(show_volume) + len(lower)
+    row_heights = [0.62] + ([0.14] if show_volume else []) + ([0.24 / len(lower)] * len(lower) if lower else [])
     
     fig = make_subplots(
         rows=rows, cols=1, 
         shared_xaxes=True, 
-        vertical_spacing=0.05, 
+        vertical_spacing=0.04,
         row_heights=row_heights
     )
 
@@ -37,6 +37,10 @@ def render_tradingview_chart(df: pd.DataFrame, show_volume: bool = True):
         ),
         row=1, col=1
     )
+
+    for indicator in indicators.get("overlay", []):
+        for name, values in indicator["values"].items():
+            fig.add_trace(go.Scatter(x=df["timestamp"], y=values, mode="lines", name=f"{indicator['name']} {name}"), row=1, col=1)
 
     # Volume Chart
     if show_volume and 'volume' in df.columns:
@@ -54,12 +58,25 @@ def render_tradingview_chart(df: pd.DataFrame, show_volume: bool = True):
             row=2, col=1
         )
 
+    lower_start = 2 + int(show_volume)
+    for offset, indicator in enumerate(lower):
+        row = lower_start + offset
+        for name, values in indicator["values"].items():
+            if name == "histogram":
+                trace = go.Bar(x=df["timestamp"], y=values, name=f"{indicator['name']} Histogram", opacity=0.55)
+            else:
+                trace = go.Scatter(x=df["timestamp"], y=values, mode="lines", name=f"{indicator['name']} {name}")
+            fig.add_trace(trace, row=row, col=1)
+        if indicator["key"] == "rsi":
+            for level in (70, 50, 30):
+                fig.add_hline(y=level, line_dash="dot", line_color="gray", row=row, col=1)
+
     # Styling to match TradingView "Dark Mode"
     fig.update_layout(
         template="plotly_dark",
         xaxis_rangeslider_visible=False,
         margin=dict(l=10, r=10, t=20, b=10),
-        height=800, # Fixed height to better use available area
+        height=800,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     

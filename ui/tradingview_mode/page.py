@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from services.market_datasets import all_datasets, dataset
+from services.market_datasets import dataset
 from utils.data_validation import load_ohlcv_csv
 from .chart import render_tradingview_chart
 from .timeframes import (
@@ -10,46 +10,33 @@ from .timeframes import (
     load_resolution_data,
     resolve_timeframe,
 )
+from .indicators import INDICATORS, calculate_indicator
+from .workspace import render_top_toolbar, render_workspace_panels
 
 def render_tradingview_mode():
-    st.title("TradingView Mode")
-    
-    # Mode Label
+    st.markdown("### TradingView Mode")
     st.caption("Mode: Historical")
-    
-    # --- Sidebar Configuration ---
-    st.sidebar.header("Chart Settings")
-    
-    # 1. Symbol/Dataset Selector
-    datasets = all_datasets()
-    dataset_options = {d.label: d.key for d in datasets}
-    selected_label = st.sidebar.selectbox(
-        "Dataset", 
-        options=list(dataset_options.keys()), 
-        index=0
-    )
-    selected_key = dataset_options[selected_label]
-    ds = dataset(selected_key)
-
-    # 2. Timeframe Selector: native or safely derivable for this provider/symbol.
+    ds, selected_tf_label, indicator_popover, tools_popover, settings_popover = render_top_toolbar()
     timeframe_options = available_timeframes(ds)
-    default_index = timeframe_options.index(ds.timeframe)
-
-    selected_tf_label = st.sidebar.selectbox(
-        "Timeframe", 
-        options=list(timeframe_options),
-        index=default_index
-    )
+    if selected_tf_label not in timeframe_options:
+        selected_tf_label = ds.timeframe
+        st.session_state["tv_tf_selection"] = selected_tf_label
     try:
         resolution = resolve_timeframe(ds, selected_tf_label)
-        active_ds = resolution.source
     except UnsupportedTimeframeError as exc:
         st.error(str(exc))
         return
-    st.sidebar.caption(f"Source: {resolution.source_label}")
 
-    # 3. Date Range Selector
-    col1, col2 = st.sidebar.columns(2)
+    with tools_popover:
+        st.caption("Drawing tools")
+        for tool in ("Cursor / Crosshair", "Trend line", "Horizontal line", "Vertical line", "Rectangle", "Text", "Measure", "Delete drawings"):
+            if st.button(tool, key=f"tv_tool_{tool.lower().replace(' ', '_').replace('/', '')}", use_container_width=True):
+                st.info("Drawing tool coming in Phase 3B")
+    with settings_popover:
+        st.caption(f"Source: {resolution.source_label}")
+        st.caption(f"Exact timeframe: {selected_tf_label}")
+
+    # Resolve the exact selected chart data before rendering controls that depend on it.
     try:
         df_full = load_resolution_data(resolution, load_ohlcv_csv)
         min_date = df_full['timestamp'].min().date()
@@ -58,13 +45,39 @@ def render_tradingview_mode():
         min_date = datetime.now().date() - timedelta(days=365)
         max_date = datetime.now().date()
 
-    with col1:
-        start_date = st.date_input("Start Date", value=max_date - timedelta(days=30), min_value=min_date, max_value=max_date)
-    with col2:
-        end_date = st.date_input("End Date", value=max_date, min_value=min_date, max_value=max_date)
+    with settings_popover:
+        start_date = st.date_input("Start Date", value=max_date - timedelta(days=30), min_value=min_date, max_value=max_date, key="tv_chart_start")
+        end_date = st.date_input("End Date", value=max_date, min_value=min_date, max_value=max_date, key="tv_chart_end")
+        show_volume = st.checkbox("Show Volume", value=True, key="tv_show_volume")
 
-    # 4. Optional Volume
-    show_volume = st.sidebar.checkbox("Show Volume", value=True)
+    # Indicator controls remain keyed and isolated, but live in a compact toolbar popover.
+    with indicator_popover:
+        st.caption("Overlay and lower-panel indicators")
+    indicator_keys = [key for key in INDICATORS if key != "volume"]
+    selected_indicator = indicator_popover.selectbox(
+        "Add indicator", options=indicator_keys,
+        format_func=lambda key: INDICATORS[key].display_name,
+        key="tv_ind_type",
+    )
+    if indicator_popover.button("Add indicator", key="tv_ind_add"):
+        st.session_state.setdefault("tv_indicators", {})[selected_indicator] = True
+    active_indicators = st.session_state.setdefault("tv_indicators", {})
+    indicator_configs = []
+    for key in list(active_indicators):
+        definition = INDICATORS[key]
+        with indicator_popover.expander(definition.display_name, expanded=True):
+            enabled = st.checkbox("Enabled", value=True, key=f"tv_ind_{key}_enabled")
+            params = {}
+            for name, default in definition.defaults.items():
+                if isinstance(default, float):
+                    params[name] = st.number_input(name.title(), min_value=0.1, value=float(default), step=0.1, key=f"tv_ind_{key}_{name}")
+                else:
+                    params[name] = st.number_input(name.title(), min_value=1, value=int(default), step=1, key=f"tv_ind_{key}_{name}")
+            if st.button(f"Remove {definition.display_name}", key=f"tv_ind_{key}_remove"):
+                del active_indicators[key]
+                st.rerun()
+            if enabled:
+                indicator_configs.append((key, definition, params))
 
     # --- Data Loading & Processing ---
     try:
@@ -78,8 +91,15 @@ def render_tradingview_mode():
         # Preserve UTC timestamps
         df_filtered['timestamp'] = pd.to_datetime(df_filtered['timestamp'], utc=True)
 
-        # Render the chart
-        render_tradingview_chart(df_filtered, show_volume=show_volume)
+        indicator_values = {"overlay": [], "lower": []}
+        for key, definition, params in indicator_configs:
+            try:
+                values = calculate_indicator(df_filtered, key, params)
+                indicator_values[definition.pane].append({"key": key, "name": definition.display_name, "values": values})
+            except ValueError as exc:
+                st.error(str(exc))
+
+        render_workspace_panels(df_filtered, render_tradingview_chart, show_volume=show_volume, indicators=indicator_values)
 
     except Exception as e:
         st.error(f"Error loading market data: {e}")
