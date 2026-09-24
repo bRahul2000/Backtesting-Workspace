@@ -25,9 +25,13 @@ export function History({ tester }) {
                 <td>{row.instrument}</td>
                 <td className="muted nowrap">{row.dataset}</td>
                 <td className="mono nowrap">{row.start} → {row.end}</td>
-                <td className="mono num">{row.total_trades}</td>
-                <td className={`mono num ${signClass(row.pnl)}`}>{formatMoney(row.pnl)}</td>
-                <td className="mono num">{formatMetric(row.win_rate, 2, "%")}</td>
+                {"pnl" in row ? (
+                  <>
+                    <td className="mono num">{row.total_trades}</td>
+                    <td className={`mono num ${signClass(row.pnl)}`}>{formatMoney(row.pnl)}</td>
+                    <td className="mono num">{formatMetric(row.win_rate, 2, "%")}</td>
+                  </>
+                ) : <td colSpan={3} className="muted">hidden during Replay</td>}
                 <td>{active ? <span className="muted small-text">shown</span> : (
                   <button type="button" className="btn ghost small" onClick={() => sendEvent("restore_run", { history_id: row.history_id })}>Show</button>
                 )}</td>

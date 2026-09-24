@@ -72,8 +72,10 @@ function TestedConfiguration({ run, payload }) {
         ["Dataset role", c.dataset_role],
       ]} />
       <Group title="Broker / execution" rows={[
-        ["Broker profile", c.broker_profile], ["Execution", c.execution_mode], ["Adapter", run.diagnostics.execution_adapter],
-        ["Spread", c.spread_source === "BROKER_NATIVE_PER_BAR" ? `per-bar broker (median ${run.diagnostics.effective_spread_price})` : `constant ${c.spread}`],
+        ["Broker profile", c.broker_profile], ["Execution", c.execution_mode], ["Adapter", run.diagnostics?.execution_adapter ?? "research.exness_cost_calibrated.run_synthetic_segment"],
+        ["Spread", c.spread_source === "BROKER_NATIVE_PER_BAR"
+          ? (run.diagnostics ? `per-bar broker (median ${run.diagnostics.effective_spread_price})` : "per-bar broker")
+          : `constant ${c.spread}`],
         ["Spread multiplier", c.spread_multiplier], ["Commission / slippage", `${c.commission_percent}% / ${c.slippage_percent}%`],
       ]} />
       <Group title="Capital / risk" rows={[
@@ -84,7 +86,7 @@ function TestedConfiguration({ run, payload }) {
       <Group title="Parameters" rows={params.length ? params.map(([k, v]) => [k, String(v)]) : [["Overrides", "none (strategy defaults)"]]} />
       <Group title="Fingerprints" rows={Object.entries(run.fingerprints).map(([k, v]) => [k, v ? `${v.slice(0, 20)}…` : "—"])} />
       <Group title="Ledger" rows={[["Mode", run.ledger.label], ["File", run.ledger.path], ["Run id", run.run_id]]} />
-      {run.open_positions.length > 0 && (
+      {run.open_positions?.length > 0 && (
         <Group title="Open at dataset end" rows={run.open_positions.map((p) => [`${p.direction} ${p.trade_id}`, `${p.entry_price} @ ${formatUtc(p.entry_time)}`])} />
       )}
     </div>
@@ -135,8 +137,8 @@ export function Properties({ tester, formApi, payload }) {
         <div className="section-title">Tested configuration {run ? `· ${run.run_id}` : ""}</div>
         {run ? <TestedConfiguration run={run} payload={payload} />
           : <div className="empty small">Run a backtest to see the exact configuration Python executed.</div>}
-        {run?.diagnostics.forward_validation_warning && <div className="warn-text">{run.diagnostics.forward_validation_warning}</div>}
-        {run?.diagnostics.forward_exposure_warning && <div className="warn-text">{run.diagnostics.forward_exposure_warning}</div>}
+        {run?.diagnostics?.forward_validation_warning && <div className="warn-text">{run.diagnostics.forward_validation_warning}</div>}
+        {run?.diagnostics?.forward_exposure_warning && <div className="warn-text">{run.diagnostics.forward_exposure_warning}</div>}
       </section>
     </div>
   );

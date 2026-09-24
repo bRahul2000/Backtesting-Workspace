@@ -310,3 +310,30 @@ input { font: inherit; color: var(--text); }
   .trades-ws { grid-template-columns: minmax(0, 1fr) 210px; }
   .diagnostics, .prop-groups { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- replay ------------------------------------------------------------- */
+.popover-up { top: calc(100% + 4px); left: 0; }
+.mode-btn.replay.is-active { background: rgba(226, 162, 59, 0.16); color: var(--warn); }
+.tf-btn:disabled, .symbol-btn:disabled, .tool-btn:disabled { opacity: 0.4; }
+/* Docked strip above the chart while replaying, so no pane or legend is covered. */
+.replay-bar { position: absolute; left: 0; right: 0; top: 0; height: 34px; z-index: 12; display: flex; align-items: center; gap: 3px;
+  padding: 0 8px; background: var(--panel-2); border-bottom: 1px solid rgba(226, 162, 59, 0.35); white-space: nowrap; }
+.chart-panel.replaying .chart-host { top: 34px; }
+.chart-panel.replaying .legend:not(.pane-legend) { top: 40px; }
+.chart-panel.replaying .pane-legend { margin-top: 34px; }
+.chart-panel.replaying .notices { top: 92px; }
+.replay-status { font-size: 11px; color: var(--warn); padding: 0 6px; letter-spacing: 0.02em; }
+.replay-status.is-playing { color: var(--up); }
+.replay-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+.rp-btn { height: 24px; min-width: 28px; padding: 0 7px; border-radius: 4px; color: var(--text-2); font-size: 11.5px; }
+.rp-btn:not(:disabled):hover { background: var(--hover); color: var(--text); }
+.rp-btn.wide { min-width: 66px; }
+.rp-btn.is-active { background: rgba(34, 171, 148, 0.16); color: var(--up); }
+.rp-btn.exit:hover { color: var(--down); }
+.rp-speed { height: 24px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; padding: 0 4px; }
+.warn-inline { color: var(--warn); }
+@media (max-width: 1100px) { .replay-status { max-width: 260px; overflow: hidden; text-overflow: ellipsis; } }
+
+.replay-trades-note { padding: 4px 8px; font-size: 11px; color: var(--warn); border-bottom: 1px solid var(--border); flex: none; }
+.open-cell { color: var(--warn); font-size: 11px; }
+.replay-hidden { color: var(--warn); }

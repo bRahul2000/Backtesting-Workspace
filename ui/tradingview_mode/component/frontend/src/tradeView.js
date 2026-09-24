@@ -26,8 +26,15 @@ export function filterTrades(trades, filter = "all", query = "") {
 
 export function sortTrades(trades, key = "entry_time", direction = "asc") {
   const sign = direction === "desc" ? -1 : 1;
-  // Ties keep trade_log order (the unique key), so the view is deterministic.
-  return [...trades].sort((a, b) => (a[key] === b[key] ? a.key - b.key : (a[key] < b[key] ? -sign : sign)));
+  const missing = (value) => value === null || value === undefined;
+  // Rows without the value (trades still open in Replay) go last; ties keep
+  // trade_log order (the unique key), so the view is deterministic.
+  return [...trades].sort((a, b) => {
+    if (missing(a[key]) || missing(b[key])) {
+      return missing(a[key]) === missing(b[key]) ? a.key - b.key : (missing(a[key]) ? 1 : -1);
+    }
+    return a[key] === b[key] ? a.key - b.key : (a[key] < b[key] ? -sign : sign);
+  });
 }
 
 export function tradeView(trades, { filter = "all", query = "", sortKey = "entry_time", sortDir = "asc" } = {}) {

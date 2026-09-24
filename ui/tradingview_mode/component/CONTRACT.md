@@ -165,9 +165,63 @@ only drawn on the tested instrument/provider/symbol, and each exact time maps to
 the chart bar that contains it. The selected trade gets Entry, SL and TP as bounded
 segments from its entry bar to its exit bar, at the exact `trade_log` prices.
 
+## Replay (historical bar replay)
+
+Python owns the replay, which lives in `replay.py` and in `TerminalState.replay`.
+The state is `{dataset_key, timeframe, start_timestamp, cursor_timestamp, anchor_timestamp, playing, speed}`.
+All times are UTC epoch seconds for bar **open** times. It is stored per Streamlit session.
+
+**No lookahead.** Each run slices the resolved dataset/timeframe frame to
+`anchor..cursor` **before** serialization. Indicators (EMA, SMA, VWAP, Bollinger,
+RSI, MACD, ATR) and volume are calculated on that slice only. The anchor sits
+up to 1,500 bars before the start and stays fixed while stepping, so a step
+changes exactly one bar and earlier indicator values stay identical.
+`validate_payload` rejects any bar, indicator point or trade marker after the cursor.
+A test rewrites every future bar and requires the payload to be byte-identical.
+
+**Events** (exactly once, like every other event):
+- `enter_replay {start}`: `start` is UTC text `YYYY-MM-DDTHH:MM`. Replay starts at
+  the bar that opens at or before this time. A time before the first bar is rejected.
+- `set_replay_start {start}` restarts. `jump_replay {to}` moves the cursor; a jump
+  before the start also moves the start.
+- `step_forward` / `step_backward` reveal or hide exactly one bar. The bounds are
+  the start bar and the last historical bar.
+- `play_replay`, `pause_replay`, `set_replay_speed {speed ∈ 1,2,5,10}`.
+- `go_to_replay_latest` (view only) and `exit_replay`, which restores the historical view.
+- While replay is active, dataset, timeframe and date-range changes are rejected.
+  Nothing switches provider or timeframe silently.
+
+**Playback.** A browser timer requests one `step_forward` every `1000/speed` ms,
+and only when no event is waiting for Python. The real rate therefore never
+exceeds the server round trip. Measured locally with four indicators, it was
+1, 5 and about 10 bars/s at 1x, 5x and 10x. Reaching the last bar pauses playback.
+
+**Payload `replay`:** `{enabled, dataset_key, timeframe, start_timestamp, cursor_timestamp,
+cursor_index, revealed_bar_count, total_available_bars, playing, speed, speeds, at_start, at_end}`.
+It contains no timestamp after the cursor. `total_available_bars` and the date
+bounds used by the date pickers are the only information about the rest of the dataset.
+
+**Trades and the Strategy Tester.** A stored backtest result is never changed or
+rerun. During replay, anything is "knowable" if it happens before the close of
+the newest revealed bar (`cursor_timestamp + bar seconds`). Python sends
+`tester.replay_view(run)` instead of the run:
+- Trades that closed before that point are shown in full.
+- Trades entered before it but closing later are shown as `status: "open"`, with
+  entry-time fields only: entry, SL/TP levels, quantity, setup and entry model.
+- Later trades are omitted, and so is their count.
+- Every whole-run aggregate is removed: summary, curves, monthly/yearly/directional
+  statistics, Python-derived values, diagnostics and open positions. The tester
+  shows "Full backtest statistics are hidden during Replay to prevent future-data leakage."
+- Run history rows lose trades, P&L and win rate, and `export_run` is refused.
+
+`validate_payload` enforces all of this, and exiting replay sends the full run
+again. `trade_overlay` draws only trades that closed within the revealed bars,
+and the selected trade's SL/TP segments come from that overlay. The watchlist
+shows reference last closes, labelled as not replay prices.
+
 ## Reserved for later phases
 
-`capabilities`, the drawing toolbar and the disabled
+`capabilities`, the drawing toolbar, the Live mode button and the disabled
 Replay/Live mode buttons are placeholders. When those features arrive,
 Python supplies the results through new payload fields (bump `contract`) and
 the frontend only renders them.

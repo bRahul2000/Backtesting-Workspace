@@ -33,6 +33,7 @@ from ..timeframes import (
 )
 from ..workspace import watchlist_groups
 from . import render_terminal_component
+from . import replay as replay_model
 from . import tester
 from .protocol import (
     CONTRACT_VERSION,
@@ -109,7 +110,7 @@ def dataset_bounds(entry: MarketDataset) -> tuple[date, date] | None:
 # Pure payload pieces
 # ---------------------------------------------------------------------------
 
-def context_for(bounds: tuple[date, date] | None = None) -> TerminalContext:
+def context_for(bounds: tuple[date, date] | None = None, bar_times=None) -> TerminalContext:
     keys = {entry.key for entry in all_datasets()}
     return TerminalContext(
         dataset_exists=lambda key: key in keys and dataset(key).exists,
@@ -117,6 +118,7 @@ def context_for(bounds: tuple[date, date] | None = None) -> TerminalContext:
         available_timeframes=lambda key: available_timeframes(dataset(key)),
         timeframe_seconds=timeframe_seconds,
         data_bounds=bounds,
+        bar_times=bar_times,
     )
 
 
@@ -206,7 +208,7 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
                            frame: pd.DataFrame, bounds: tuple[date, date] | None, shown: tuple[date, date] | None,
                            logs: list[LogEntry], notices: list[dict[str, str]],
                            watchlist: list[dict], ack: str | None = None,
-                           tester_payload: dict | None = None) -> dict:
+                           tester_payload: dict | None = None, replay_status: dict | None = None) -> dict:
     bars = bars_from_frame(frame)
     times = [bar["time"] for bar in bars]
     overlays, panes, indicator_notices = indicator_payload(frame, times, state.indicators)
@@ -220,7 +222,9 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         "instrument": selected.instrument,
         "timeframe": resolution.target,
         "timeframes": list(available_timeframes(selected)),
-        "view_key": f"{selected.instrument}|{selected.broker}|{selected.symbol}|{resolution.target}",
+        # Replay is its own view, so entering/leaving it never reuses the other's zoom.
+        "view_key": f"{selected.instrument}|{selected.broker}|{selected.symbol}|{resolution.target}"
+                    + ("|replay" if replay_status else ""),
         "source": {
             "dataset_key": source.key, "label": source.label, "provider": source.broker, "symbol": source.symbol,
             "timeframe": source.timeframe, "native": resolution.native, "description": resolution.source_label,
@@ -261,6 +265,7 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         "max_bars": MAX_BARS,
         # Id of the last frontend event Python processed; the frontend serializes on it.
         "ack": ack,
+        "replay": replay_status or {"enabled": False},
     }
     tester_payload = tester_payload or {"status": "idle", "options": {}, "form": None, "run": None, "error": None,
                                         "history": [], "active_history_id": None, "export": None}
@@ -333,7 +338,7 @@ def _history_row(history_id: int, payload: dict) -> dict:
 
 
 def handle_tester_event(event: FrontendEvent, session: dict, runs: dict, *, registry: StrategyRegistry,
-                        lookup_dataset=dataset, bounds=dataset_bounds, runner=None):
+                        lookup_dataset=dataset, bounds=dataset_bounds, runner=None, replay_active: bool = False):
     """Handle one Strategy Tester event. Called once per event id.
 
     ``runs`` is the in-memory session history {history_id: {payload, result, run}}.
@@ -356,6 +361,10 @@ def handle_tester_event(event: FrontendEvent, session: dict, runs: dict, *, regi
             return ({**session, "status": "completed", "error": None, "run": stored["payload"],
                      "form": dict(stored["run"].request), "active_history_id": history_id}, runs,
                     LogEntry("info", f"Restored {stored['payload']['run_id']} from session history (not re-run)."), None)
+        if replay_active:
+            # An export is the full result, including everything after the replay cursor.
+            return (session, runs, LogEntry("error", "Exports are disabled during Replay (they contain the full "
+                                                     "backtest result). Exit Replay to export."), None)
         base = f"{stored['payload']['run_id']}_{stored['run'].descriptor.metadata.strategy_id}_{stored['run'].ledger_mode}"
         if event.data["kind"] == "trades_csv":
             export = {"filename": f"{base}_trades.csv", "mime": "text/csv",
@@ -401,6 +410,20 @@ def handle_tester_event(event: FrontendEvent, session: dict, runs: dict, *, regi
                              f"{result.total_trades} trades · {seconds:.1f}s"), result)
 
 
+def tester_presentation(session: dict, registry: StrategyRegistry, replay_status: dict | None,
+                        bar_seconds: int) -> dict:
+    """The Strategy Tester part of the payload. During Replay only what was
+    knowable by the close of the newest revealed bar is included."""
+    shown = {key: value for key, value in session.items() if key != "next_history_id"}
+    shown["options"] = tester.tester_options(registry, all_datasets(), dataset_bounds)
+    if replay_status:
+        knowable_until = replay_status["cursor_timestamp"] + bar_seconds
+        shown["run"] = tester.replay_view(session.get("run"), knowable_until)
+        shown["history"] = tester.replay_history(session.get("history", []))
+        shown["export"] = None
+    return shown
+
+
 def _bounds(frame: pd.DataFrame) -> tuple[date, date] | None:
     if frame.empty:
         return None
@@ -422,18 +445,20 @@ def render_custom_terminal() -> None:
     try:
         _, _, current_frame = _load(state)
         bounds = _bounds(current_frame)
-    except Exception:  # bounds only sharpen date validation
-        bounds = None
+        current_times = replay_model.frame_times(current_frame)
+    except Exception:  # bounds only sharpen validation; replay events then report no bars
+        bounds, current_times = None, None
     raw_event = st.session_state.get(COMPONENT_KEY)
     state, entry, last_id, tester_event = consume_event(
-        state, raw_event, context_for(bounds), st.session_state.get(LAST_EVENT_KEY))
+        state, raw_event, context_for(bounds, current_times), st.session_state.get(LAST_EVENT_KEY))
     tester_session = st.session_state.get(TESTER_KEY) or empty_tester_session()
     registry = discover_builtin_strategies()
     if tester_event is not None:
         # Runs synchronously inside this rerun. The event id is persisted only
         # afterwards, so an interrupted run is retried, never silently dropped.
         tester_session, runs, entry, result = handle_tester_event(
-            tester_event, tester_session, st.session_state.get(TESTER_RUNS_KEY, {}), registry=registry)
+            tester_event, tester_session, st.session_state.get(TESTER_RUNS_KEY, {}), registry=registry,
+            replay_active=state.replay is not None)
         st.session_state[TESTER_KEY] = tester_session
         st.session_state[TESTER_RUNS_KEY] = runs
         if result is not None:
@@ -459,7 +484,21 @@ def render_custom_terminal() -> None:
 
     bounds = _bounds(frame)
     shown = None
-    if bounds is not None:
+    replay_status = None
+    if state.replay is not None:
+        # Slice before serialization: bars after the cursor never leave Python,
+        # and indicators below are calculated on this revealed frame only.
+        try:
+            times = replay_model.frame_times(frame)
+            replay_status = replay_model.info(state.replay, times)
+            frame = replay_model.revealed(frame, state.replay)
+            shown = (frame["timestamp"].iloc[0].date(), frame["timestamp"].iloc[-1].date())
+        except replay_model.ReplayError as exc:
+            state = replace(state, replay=None)
+            st.session_state[STATE_KEY] = state
+            notices.append({"level": "error", "message": f"Replay ended: {exc}"})
+            _log(LogEntry("error", f"Replay ended: {exc}"))
+    if replay_status is None and bounds is not None:
         start, end, range_notices = effective_range(state, bounds, resolution.target_seconds)
         notices.extend(range_notices)
         frame = filter_range(frame, start, end)
@@ -467,7 +506,7 @@ def render_custom_terminal() -> None:
         if len(frame) > MAX_BARS:
             notices.append({"level": "warning", "message": f"Showing the latest {MAX_BARS:,} of {len(frame):,} bars."})
             frame = frame.iloc[-MAX_BARS:].reset_index(drop=True)
-    else:
+    elif bounds is None:
         notices.append({"level": "warning", "message": "The selected dataset contains no bars."})
 
     # 4. Build, validate, render.
@@ -475,10 +514,8 @@ def render_custom_terminal() -> None:
         payload = build_terminal_payload(
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
             logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected),
-            ack=last_id, tester_payload={
-                **{key: value for key, value in tester_session.items() if key != "next_history_id"},
-                "options": tester.tester_options(registry, all_datasets(), dataset_bounds),
-            })
+            replay_status=replay_status, ack=last_id,
+            tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
     except ValueError as exc:
         st.error(f"TradingView Mode payload rejected: {exc}")
         return

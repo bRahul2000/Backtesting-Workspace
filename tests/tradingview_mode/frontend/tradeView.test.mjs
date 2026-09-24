@@ -67,3 +67,12 @@ test("period filter uses Python pnl only", () => {
   assert.deepEqual(filterPeriods(rows, "losing").map((r) => r.period), ["2026-02"]);
   assert.equal(filterPeriods(rows, "all").length, 3);
 });
+
+test("rows without a value (open in Replay) sort last in both directions", () => {
+  const rows = deepFreeze([
+    { key: 0, pnl: 5, entry_time: 1 }, { key: 1, status: "open", entry_time: 2 }, { key: 2, pnl: -3, entry_time: 3 },
+  ]);
+  assert.deepEqual(sortTrades(rows, "pnl", "asc").map((t) => t.key), [2, 0, 1]);
+  assert.deepEqual(sortTrades(rows, "pnl", "desc").map((t) => t.key), [0, 2, 1]);
+  assert.deepEqual(filterTrades(rows, "winners").map((t) => t.key), [0]); // open trade has no outcome
+});

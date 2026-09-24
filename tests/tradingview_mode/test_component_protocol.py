@@ -107,6 +107,11 @@ VALID_EVENTS = {
                      "settings": {"risk_mode": "PERCENT_EQUITY", "risk_per_trade_percent": 0.5}},
     "clear_backtest": {},
     "restore_run": {"history_id": 1},
+    "enter_replay": {"start": "2026-06-10T14:30"},
+    "set_replay_start": {"start": "2026-06-10T14:30Z"},
+    "jump_replay": {"to": "2026-07-01T09:00"},
+    "step_forward": {}, "step_backward": {}, "play_replay": {}, "pause_replay": {},
+    "set_replay_speed": {"speed": 5}, "exit_replay": {}, "go_to_replay_latest": {},
     "export_run": {"history_id": 1, "kind": "trades_csv"},
 }
 

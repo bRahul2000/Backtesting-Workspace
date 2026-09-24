@@ -48,6 +48,8 @@ export function StrategyTester({ payload, pending, selectedKey, onSelectTrade, f
   const { form, strategies, datasets, options, showRejected, setShowRejected, selectStrategy, selectDataset, setField, run } = formApi;
   const [tab, setTab] = useState("overview");
   const running = pending?.type === "run_backtest";
+  // Python sends a replay view (no full-run statistics) while Replay is active.
+  const hidden = !!tester.run?.replay_view;
   const canRun = !running && form.strategy_id && form.dataset_key && form.start && form.end && form.ledger_mode;
   const researchPath = options.ledger_modes.find((m) => m.mode === "research")?.path;
 
@@ -82,6 +84,7 @@ export function StrategyTester({ payload, pending, selectedKey, onSelectTrade, f
         <div className="tester-warn">Research Ledger selected: the next run is recorded in <span className="mono">{researchPath}</span> and counts toward forward-validation exposure.</div>
       )}
       {tester.status === "failed" && !running && <div className="tester-error">{tester.error}</div>}
+      {hidden && <div className="tester-note">{tester.run.replay_view.message}</div>}
       {focusNote && <div className="tester-note">{focusNote}</div>}
       <div className="subtabs">
         {SUBTABS.map(([key, label]) => (
@@ -99,13 +102,17 @@ export function StrategyTester({ payload, pending, selectedKey, onSelectTrade, f
         )}
       </div>
       <div className="subtab-body">
-        {tab === "overview" && <Overview run={tester.run} />}
-        {tab === "performance" && <Performance run={tester.run} />}
+        {hidden && ["overview", "performance", "execution"].includes(tab) && (
+          <div className="empty replay-hidden">{tester.run.replay_view.message}<br />
+            <span className="muted">Trades shows what was known by the replay cursor. Exit Replay to see the full result.</span></div>
+        )}
+        {!hidden && tab === "overview" && <Overview run={tester.run} />}
+        {!hidden && tab === "performance" && <Performance run={tester.run} />}
         {tab === "trades" && (
           <TradesWorkspace run={tester.run} precision={tester.run?.price_precision ?? payload.price_precision}
             selectedKey={selectedKey} onSelect={onSelectTrade} />
         )}
-        {tab === "execution" && <Diagnostics run={tester.run} />}
+        {!hidden && tab === "execution" && <Diagnostics run={tester.run} />}
         {tab === "properties" && <Properties tester={tester} formApi={formApi} payload={payload} />}
         {tab === "runs" && <History tester={tester} />}
       </div>

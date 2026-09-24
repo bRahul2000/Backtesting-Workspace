@@ -17,6 +17,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .replay import SPEEDS as REPLAY_SPEEDS, is_utc_text
+
 
 CONTRACT_VERSION = 1
 MODES = ("historical",)
@@ -183,12 +185,41 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
         _require(isinstance(item, dict) and isinstance(item.get("dataset_key"), str), "watchlist item needs dataset_key.")
     _require(payload.get("ui", {}).get("bottom_panel") in BOTTOM_PANELS, "ui.bottom_panel is invalid.")
     _require(type(payload.get("price_precision")) is int, "price_precision must be an integer.")
+    _validate_replay(payload, bar_times)
     _validate_tester(payload.get("tester"), payload.get("trade_overlay"), bar_times)
     _require(payload.get("ack") is None or isinstance(payload["ack"], str), "ack must be an event id or null.")
     return payload
 
 
+def _validate_replay(payload: dict[str, Any], bar_times: set[int]) -> None:
+    """In replay, nothing after the cursor bar may be serialized."""
+    replay = payload.get("replay")
+    _require(isinstance(replay, dict) and isinstance(replay.get("enabled"), bool), "replay status is required.")
+    if not replay["enabled"]:
+        return
+    cursor = replay["cursor_timestamp"]
+    _require(type(cursor) is int, "replay.cursor_timestamp must be epoch seconds.")
+    _require(bool(bar_times) and max(bar_times) == cursor, "replay bars must end exactly at the cursor bar.")
+    for group in ("overlays", "panes"):
+        for item in payload[group]:
+            for series in item["series"]:
+                _require(all(point["time"] <= cursor for point in series["data"]),
+                         f"{group}[{item['id']}] has values after the replay cursor.")
+    for item in payload.get("trade_overlay", {}).get("trades", []):
+        _require(item["exit_bar"] <= cursor and item["entry_bar"] <= cursor, "trade marker after the replay cursor.")
+    tester_payload = payload.get("tester") or {}
+    if tester_payload.get("run") is not None:
+        _require("replay_view" in tester_payload["run"], "replay must send the replay view of a backtest, not the full run.")
+    for row in tester_payload.get("history", []):
+        _require(not {"pnl", "win_rate", "total_trades"} & set(row), "run history exposes outcomes during replay.")
+    _require(not tester_payload.get("export"), "exports are not delivered during replay.")
+
+
 _TRADE_TIMES = ("entry_time", "exit_time")
+_OUTCOME_FIELDS = ("exit_time", "exit_price", "exit_reason", "exit_label", "pnl", "pnl_percent", "r_multiple",
+                   "bars_held", "exit_commission")
+_RUN_AGGREGATES = ("summary", "curves", "periods", "directional", "python_derived", "derived_in_python",
+                   "diagnostics", "open_positions")
 _TRADE_NUMBERS = ("entry_price", "stop_loss", "take_profit", "exit_price", "pnl", "r_multiple")
 
 
@@ -199,21 +230,36 @@ def _validate_tester(tester: Any, overlay: Any, bar_times: set[int]) -> None:
     run = tester.get("run")
     keys: set = set()
     if run is not None:
-        for index, trade in enumerate(run["trades"]):
+        previous_key = -1
+        for trade in run["trades"]:
             label = f"trade {trade.get('segment')}/{trade['trade_id']}"
-            _require(trade["key"] == index, f"{label}: key must be its trade_log position.")
+            _require(type(trade["key"]) is int and trade["key"] > previous_key, f"{label}: keys must be unique trade_log positions in order.")
+            previous_key = trade["key"]
+            _require(trade["direction"] in ("LONG", "SHORT"), f"{label}: bad direction.")
+            _require(type(trade["entry_time"]) is int, f"{label}: entry_time must be epoch seconds.")
+            keys.add(trade["key"])
+            if trade.get("status") == "open":
+                # Replay: an open trade carries no outcome at all.
+                _require(not set(trade) & set(_OUTCOME_FIELDS), f"{label}: open trade exposes an outcome.")
+                continue
             for name in _TRADE_TIMES:
                 _require(type(trade[name]) is int, f"{label}: {name} must be epoch seconds.")
             _require(trade["exit_time"] >= trade["entry_time"], f"{label}: exit precedes entry.")
             for name in _TRADE_NUMBERS:
                 value = trade[name]
                 _require(isinstance(value, (int, float)) and math.isfinite(value), f"{label}: {name} must be finite.")
-            _require(trade["direction"] in ("LONG", "SHORT"), f"{label}: bad direction.")
-            keys.add(trade["key"])
-        for name in ("equity", "drawdown"):
-            times = [point["time"] for point in run["curves"][name]]
-            _require(all(type(t) is int for t in times) and times == sorted(set(times)),
-                     f"{name} curve times must be strictly increasing epoch seconds.")
+        if "replay_view" in run:
+            cutoff = run["replay_view"]["knowable_until"]
+            _require(not set(run) & set(_RUN_AGGREGATES), "replay view exposes full-run statistics.")
+            for trade in run["trades"]:
+                _require(trade["entry_time"] < cutoff, "replay view lists a trade entered after the cursor.")
+                _require(trade.get("status") == "open" or trade["exit_time"] < cutoff,
+                         "replay view shows an outcome after the cursor.")
+        else:
+            for name in ("equity", "drawdown"):
+                times = [point["time"] for point in run["curves"][name]]
+                _require(all(type(t) is int for t in times) and times == sorted(set(times)),
+                         f"{name} curve times must be strictly increasing epoch seconds.")
     _require(isinstance(tester.get("history", []), list), "tester.history must be a list.")
     _require(isinstance(overlay, dict) and isinstance(overlay.get("trades"), list), "trade_overlay is required.")
     for item in overlay["trades"]:
@@ -245,6 +291,7 @@ def _is_params(value: Any) -> bool:
 
 
 EXPORT_KINDS = ("trades_csv", "summary_json")
+_is_utc_text = is_utc_text
 
 
 def _is_int(value: Any) -> bool:
@@ -273,6 +320,17 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "set_bottom_panel": {"panel": (True, lambda v: v in BOTTOM_PANELS),
                          "open": (False, lambda v: isinstance(v, bool))},
     "set_chart_setting": {"show_volume": (True, lambda v: isinstance(v, bool))},
+    # Replay. Times are UTC 'YYYY-MM-DDTHH:MM'; bar semantics live in replay.py.
+    "enter_replay": {"start": (True, _is_utc_text)},
+    "set_replay_start": {"start": (True, _is_utc_text)},
+    "jump_replay": {"to": (True, _is_utc_text)},
+    "step_forward": {},
+    "step_backward": {},
+    "play_replay": {},
+    "pause_replay": {},
+    "set_replay_speed": {"speed": (True, lambda v: type(v) is int and v in REPLAY_SPEEDS)},
+    "exit_replay": {},
+    "go_to_replay_latest": {},
     # Strategy Tester. Semantics (registry, dataset, broker, parameters) are
     # validated in tester.py against the authoritative configuration model.
     "run_backtest": {"strategy_id": (True, _is_str), "dataset_key": (True, _is_str),

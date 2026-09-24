@@ -57,3 +57,9 @@ export function onPendingChange(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+// True when no event is waiting for Python; replay playback only steps then,
+// so it can never queue up more steps than the server has processed.
+export function isIdle() {
+  return inFlight === null && queue.length === 0;
+}

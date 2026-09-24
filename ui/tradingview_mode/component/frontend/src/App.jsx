@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamlit } from "streamlit-component-lib";
-import { acknowledge, onPendingChange, sendEvent } from "./events.js";
+import { acknowledge, isIdle, onPendingChange, sendEvent } from "./events.js";
+import { intervalMs, tickAction } from "./replayControls.js";
 import { formatUtc } from "./format.js";
 import { BottomPanel } from "./components/BottomPanel.jsx";
 import { ChartPanel } from "./components/ChartPanel.jsx";
@@ -86,6 +87,9 @@ function useTradeFocus(payload, engine) {
 
   useEffect(() => { setSelectedKey(null); setPendingFocus(null); setNote(null); }, [run?.run_id, run?.history_id]);
   useEffect(() => {
+    if (selectedKey !== null && !tradesByKey.has(selectedKey)) setSelectedKey(null);
+  }, [tradesByKey, selectedKey]);
+  useEffect(() => {
     if (pendingFocus === null) return;
     const placed = overlayByKey.get(pendingFocus);
     if (placed && engine?.focusBars(placed.entry_bar, placed.exit_bar)) {
@@ -114,6 +118,12 @@ function useTradeFocus(payload, engine) {
       setNote(null);
       return;
     }
+    if (payload.replay?.enabled) {
+      // Never move a replay chart to (or reveal) a trade after the cursor.
+      setPendingFocus(null);
+      setNote(`Trade ${label(trade)} is not drawn in Replay: markers appear only for trades that closed by the replay cursor.`);
+      return;
+    }
     if (!overlay.available) {
       setPendingFocus(null);
       setNote(
@@ -129,9 +139,26 @@ function useTradeFocus(payload, engine) {
     sendEvent("set_date_range", windowAround(trade, spanDays, payload.range.min, payload.range.max));
     setPendingFocus(trade.key);
     setNote(`Loading chart bars around trade ${label(trade)}…`);
-  }, [overlayByKey, overlay, engine, spanDays, payload.range.min, payload.range.max, run, showOnBacktestDataset]);
+  }, [overlayByKey, overlay, engine, spanDays, payload.range.min, payload.range.max, run, showOnBacktestDataset, payload.replay?.enabled]);
 
   return { selectedKey, selectTrade, tradesByKey, note };
+}
+
+// Replay playback: a local timer asks Python for one more bar per tick, but only
+// when no event is in flight, so steps can never pile up behind a slow rerun.
+function useReplayPlayback(replay) {
+  const latest = useRef(replay);
+  latest.current = replay;
+  const enabled = !!replay?.enabled;
+  const playing = enabled && replay.playing && !replay.at_end;
+  const speed = replay?.speed;
+  useEffect(() => {
+    if (!playing) return undefined;
+    const timer = setInterval(() => {
+      if (tickAction(latest.current, isIdle()) === "step") sendEvent("step_forward");
+    }, intervalMs(speed));
+    return () => clearInterval(timer);
+  }, [playing, speed]);
 }
 
 // Python-generated exports arrive once in the payload; download each id once.
@@ -178,6 +205,7 @@ function Terminal({ payload, fallbackHeight }) {
   }, [engine]);
   const focus = useTradeFocus(payload, engine);
   useExportDownload(payload.tester.export);
+  useReplayPlayback(payload.replay);
   const engineActions = useMemo(() => ({
     fit: () => engine?.fit(),
     latest: () => engine?.goToLatest(),
@@ -191,8 +219,8 @@ function Terminal({ payload, fallbackHeight }) {
       <LeftToolbar crosshairMode={crosshairMode} setCrosshairMode={setCrosshairMode}
         engineActions={engineActions} drawingsEnabled={payload.capabilities.drawings} />
       <ChartPanel payload={payload} onEngine={setEngine} onCrosshairTime={setCrosshairTime}
-        tradesByKey={focus.tradesByKey} selectedKey={focus.selectedKey} />
-      <Watchlist items={payload.watchlist} />
+        tradesByKey={focus.tradesByKey} selectedKey={focus.selectedKey} busy={!!pending} />
+      <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} />
       <BottomPanel payload={payload} clientLogs={clientLogs} pending={pending}
         selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note} />
       <StatusBar payload={payload} crosshairTime={crosshairTime} />

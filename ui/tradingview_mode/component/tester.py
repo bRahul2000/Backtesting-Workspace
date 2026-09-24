@@ -600,6 +600,56 @@ def summary_export(result: UniversalBacktestResult, run: ValidatedRun) -> dict[s
 
 
 # ---------------------------------------------------------------------------
+# Replay-safe presentation (no information after the replay cursor)
+# ---------------------------------------------------------------------------
+
+#: Trade fields known once the position is open (levels are fixed at entry).
+ENTRY_FIELDS = ("key", "segment", "trade_id", "direction", "setup_id", "signal_time", "entry_time", "entry_price",
+                "stop_loss", "take_profit", "quantity", "initial_risk", "entry_commission", "entry_model")
+#: Run fields that describe the request, not its outcome.
+_RUN_IDENTITY = ("run_id", "history_id", "ledger", "fingerprints", "strategy", "dataset", "config",
+                 "duration_seconds", "price_precision")
+HIDDEN_DURING_REPLAY = "Full backtest statistics are hidden during Replay to prevent future-data leakage."
+
+
+def replay_view(run_payload: dict[str, Any] | None, knowable_until: int) -> dict[str, Any] | None:
+    """What of a stored run was knowable before ``knowable_until`` (exclusive,
+    the close of the newest revealed bar). Returns a new dict; nothing is mutated.
+
+    Closed trades are those with exit_time < knowable_until (shown in full).
+    Trades entered before it but closing later are OPEN: only entry-time fields.
+    Later trades are omitted, and no count of them is given. Every aggregate
+    (summary, curves, periods, directional, derived, diagnostics) is dropped
+    because it is computed over the whole run.
+    """
+    if run_payload is None:
+        return None
+    trades = []
+    for trade in run_payload["trades"]:
+        if trade["entry_time"] >= knowable_until:
+            continue
+        if trade["exit_time"] < knowable_until:
+            trades.append({**trade, "status": "closed"})
+        else:
+            trades.append({**{name: trade.get(name) for name in ENTRY_FIELDS}, "status": "open"})
+    view = {name: run_payload[name] for name in _RUN_IDENTITY if name in run_payload}
+    view["trades"] = trades
+    view["replay_view"] = {
+        "knowable_until": knowable_until,
+        "closed_trades": sum(1 for trade in trades if trade["status"] == "closed"),
+        "open_trades": sum(1 for trade in trades if trade["status"] == "open"),
+        "message": HIDDEN_DURING_REPLAY,
+    }
+    return view
+
+
+def replay_history(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Session history without outcome columns (trades, P&L, win rate)."""
+    keep = ("history_id", "run_id", "ledger_mode", "strategy", "instrument", "dataset", "start", "end")
+    return [{name: row[name] for name in keep} for row in rows]
+
+
+# ---------------------------------------------------------------------------
 # Chart overlay
 # ---------------------------------------------------------------------------
 
@@ -627,6 +677,8 @@ def trade_overlay(run_payload: dict[str, Any] | None, *, chart_identity: tuple[s
     first, end = bar_times[0], bar_times[-1] + bar_seconds
     placed = []
     for trade in run_payload["trades"]:
+        if trade.get("status") == "open":  # replay: still open at the cursor, nothing to draw
+            continue
         if trade["entry_time"] < first or trade["exit_time"] >= end:
             continue
         entry_pos = index.searchsorted(trade["entry_time"], side="right") - 1

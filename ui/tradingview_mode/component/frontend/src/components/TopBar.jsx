@@ -72,6 +72,28 @@ function RangeMenu({ payload, onClose }) {
   );
 }
 
+function ReplayStartMenu({ payload, onClose }) {
+  const [date, setDate] = useState(payload.range.start || "");
+  const [time, setTime] = useState("00:00");
+  return (
+    <div className="form-menu">
+      <div className="menu-heading">Replay start (UTC)</div>
+      <label className="field"><span>Date</span>
+        <input type="date" value={date} min={payload.range.min || undefined} max={payload.range.max || undefined} onChange={(e) => setDate(e.target.value)} />
+      </label>
+      <label className="field"><span>Time</span><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+      <div className="menu-hint">
+        {payload.symbol} · {payload.timeframe} · {payload.source.description}. Replay starts at the bar opening at or before
+        this time; later bars are not sent to the chart.
+      </div>
+      <div className="button-row">
+        <button type="button" className="btn primary" disabled={!date}
+          onClick={() => { sendEvent("enter_replay", { start: `${date}T${time || "00:00"}` }); onClose(); }}>Start replay</button>
+      </div>
+    </div>
+  );
+}
+
 function SettingsMenu({ payload, crosshairMode, setCrosshairMode, engineActions }) {
   return (
     <div className="form-menu">
@@ -102,6 +124,8 @@ function SettingsMenu({ payload, crosshairMode, setCrosshairMode, engineActions 
 
 export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engineActions }) {
   const [menu, setMenu] = useState(null);
+  const replay = payload.replay?.enabled;
+  const locked = replay ? "Exit Replay to change this" : undefined;
   const close = () => setMenu(null);
   const toggle = (name) => setMenu((current) => (current === name ? null : name));
   const nativeTimeframes = useMemo(() => new Set(payload.datasets
@@ -111,7 +135,7 @@ export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engi
   return (
     <header className="topbar">
       <div className="anchor">
-        <button type="button" className="symbol-btn" onClick={() => toggle("symbol")} title={payload.source.label}>
+        <button type="button" className="symbol-btn" disabled={replay} onClick={() => toggle("symbol")} title={locked || payload.source.label}>
           <span className="symbol-name">{payload.symbol}</span>
           <span className="provider-badge">{providerShort(payload.provider)}</span>
           <Icon name="chevron" size={14} />
@@ -122,7 +146,7 @@ export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engi
       <div className="divider" />
       <div className="tf-group" role="group" aria-label="Timeframe">
         {payload.timeframes.map((tf) => (
-          <button key={tf} type="button"
+          <button key={tf} type="button" disabled={replay && tf !== payload.timeframe}
             className={`tf-btn ${tf === payload.timeframe ? "is-active" : ""} ${nativeTimeframes.has(tf) ? "is-native" : ""}`}
             title={nativeTimeframes.has(tf) ? `${tf} · native` : `${tf} · derived in Python from a lower native timeframe`}
             onClick={() => tf !== payload.timeframe && sendEvent("select_timeframe", { timeframe: tf })}>
@@ -139,8 +163,8 @@ export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engi
         <Popover open={menu === "indicators"} onClose={close} width={280}><IndicatorMenu payload={payload} onClose={close} /></Popover>
       </div>
       <div className="anchor">
-        <button type="button" className={`tool-btn ${menu === "range" ? "is-open" : ""}`} onClick={() => toggle("range")}
-          title="Date range (UTC)">
+        <button type="button" className={`tool-btn ${menu === "range" ? "is-open" : ""}`} disabled={replay} onClick={() => toggle("range")}
+          title={locked || "Date range (UTC)"}>
           <Icon name="calendar" size={16} />
           <span className="mono">{payload.range.start ? `${payload.range.start} → ${payload.range.end}` : "No data"}</span>
         </button>
@@ -159,10 +183,13 @@ export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engi
       <span className={`sync ${pending ? "is-pending" : ""}`} title={pending ? `Waiting for Python: ${pending.type}` : "In sync with Python"}>
         <span className="sync-dot" />{pending ? "Syncing" : "Synced"}
       </span>
-      <div className="mode-group" role="group" aria-label="Mode">
-        <button type="button" className="mode-btn is-active">Historical</button>
-        <button type="button" className="mode-btn" disabled title="Replay — not in this phase">Replay</button>
+      <div className="mode-group anchor" role="group" aria-label="Mode">
+        <button type="button" className={`mode-btn ${replay ? "" : "is-active"}`}
+          onClick={() => replay && sendEvent("exit_replay")} title={replay ? "Exit Replay (full historical chart)" : "Historical"}>Historical</button>
+        <button type="button" className={`mode-btn ${replay ? "is-active replay" : ""}`}
+          onClick={() => !replay && toggle("replay")} title="Historical bar replay">Replay</button>
         <button type="button" className="mode-btn" disabled title="Live MT5 feed — not in this phase">Live</button>
+        <Popover open={menu === "replay"} onClose={close} width={270} align="right"><ReplayStartMenu payload={payload} onClose={close} /></Popover>
       </div>
     </header>
   );

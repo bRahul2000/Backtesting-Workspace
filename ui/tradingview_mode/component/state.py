@@ -12,7 +12,9 @@ import math
 from typing import Callable
 
 from ..indicators import INDICATORS
+from . import replay as replay_model
 from .protocol import FrontendEvent
+from .replay import ReplayError, ReplayState
 
 
 MAX_BARS = 50_000
@@ -52,6 +54,8 @@ class TerminalState:
     bottom_panel: str = "indicators"
     bottom_open: bool = True
     next_indicator: int = 1
+    # Historical when None; otherwise the session's replay (see replay.py).
+    replay: ReplayState | None = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,8 @@ class TerminalContext:
     timeframe_seconds: Callable[[str], int]
     # Inclusive UTC date bounds of the currently resolved data, if known.
     data_bounds: tuple[date, date] | None = None
+    # Open times (epoch seconds) of every bar of the resolved dataset/timeframe.
+    bar_times: object = None
 
 
 def validate_indicator_params(key: str, params: dict | None) -> dict[str, float | int]:
@@ -110,6 +116,61 @@ def _replace_indicator(state: TerminalState, updated: IndicatorInstance) -> Term
     return replace(state, indicators=tuple(updated if item.id == updated.id else item for item in state.indicators))
 
 
+REPLAY_EVENTS = ("enter_replay", "set_replay_start", "step_forward", "step_backward", "play_replay",
+                 "pause_replay", "set_replay_speed", "jump_replay", "exit_replay", "go_to_replay_latest")
+
+
+def _utc(epoch: int) -> str:
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _apply_replay(state: TerminalState, event: FrontendEvent, ctx: TerminalContext) -> tuple[TerminalState, LogEntry]:
+    kind, data, current = event.type, event.data, state.replay
+    if kind == "enter_replay" and current is not None:
+        return _reject(state, "Replay is already active; use jump or set start.")
+    if kind not in ("enter_replay",) and current is None:
+        return _reject(state, f"{kind} requires Replay mode.")
+    if kind == "exit_replay":
+        return replace(state, replay=None), LogEntry("info", "Replay ended; full historical view restored.")
+    times = ctx.bar_times
+    if times is None or len(times) == 0:
+        return _reject(state, "no bars are available to replay.")
+    try:
+        if kind in ("enter_replay", "set_replay_start"):
+            speed = current.speed if current else replay_model.DEFAULT_SPEED
+            new = replay_model.start(times, dataset_key=state.dataset_key, timeframe=state.timeframe,
+                                     requested=replay_model.parse_utc(data["start"]), speed=speed)
+            verb = "started" if kind == "enter_replay" else "restarted"
+            return (replace(state, replay=new),
+                    LogEntry("info", f"Replay {verb} on {state.dataset_key} {state.timeframe} at bar {_utc(new.cursor_timestamp)} "
+                                     f"(bar at or before {data['start']} UTC)."))
+        if kind == "jump_replay":
+            new = replay_model.jump(current, times, replay_model.parse_utc(data["to"]))
+            return replace(state, replay=new), LogEntry("info", f"Replay jumped to {_utc(new.cursor_timestamp)}.")
+        if kind in ("step_forward", "step_backward"):
+            new = replay_model.step(current, times, 1 if kind == "step_forward" else -1)
+            if kind == "step_backward":
+                new = replace(new, playing=False)
+            return replace(state, replay=new), LogEntry("debug", f"Replay {kind}: {_utc(new.cursor_timestamp)}.")
+    except ReplayError as exc:
+        if kind == "step_forward" and current is not None and current.playing:
+            # Playing into the last bar stops playback rather than erroring on every tick.
+            return replace(state, replay=replace(current, playing=False)), LogEntry("info", f"Replay paused: {exc}")
+        return _reject(state, str(exc))
+    if kind == "play_replay":
+        if replay_model.info(current, times)["at_end"]:
+            return _reject(state, "Already at the last historical bar.")
+        return replace(state, replay=replace(current, playing=True)), LogEntry("debug", "Replay playing.")
+    if kind == "pause_replay":
+        return replace(state, replay=replace(current, playing=False)), LogEntry("debug", "Replay paused.")
+    if kind == "set_replay_speed":
+        return (replace(state, replay=replace(current, speed=data["speed"])),
+                LogEntry("debug", f"Replay speed {data['speed']}x."))
+    if kind == "go_to_replay_latest":
+        return state, LogEntry("debug", "Replay view moved to the latest revealed bar.")
+    return _reject(state, f"unhandled replay event {kind!r}.")
+
+
 def apply_event(state: TerminalState, event: FrontendEvent, ctx: TerminalContext) -> tuple[TerminalState, LogEntry]:
     """Apply one structurally valid event. Invalid requests leave state unchanged."""
     data = event.data
@@ -119,6 +180,12 @@ def apply_event(state: TerminalState, event: FrontendEvent, ctx: TerminalContext
         return state, LogEntry("info", "Custom frontend ready.")
     if kind == "frontend_error":
         return state, LogEntry("error", f"Frontend error: {data['message'][:500]}")
+
+    if kind in REPLAY_EVENTS:
+        return _apply_replay(state, event, ctx)
+    if state.replay is not None and kind in ("select_dataset", "select_watchlist_item", "select_timeframe",
+                                             "set_date_range"):
+        return _reject(state, "exit Replay before changing the dataset, timeframe or date range.")
 
     if kind in ("select_dataset", "select_watchlist_item"):
         key = data["dataset_key"]

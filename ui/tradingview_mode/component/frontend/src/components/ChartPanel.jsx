@@ -1,5 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { sendEvent } from "../events.js";
 import { ChartEngine } from "../chart/ChartEngine.js";
+import { ReplayBar } from "./ReplayBar.jsx";
 import { formatPrice, formatSigned, formatVolume, paramsLabel, providerShort, timeframeLabel } from "../format.js";
 
 function Values({ values, precision }) {
@@ -54,7 +56,7 @@ function Legend({ engine, payload }) {
   );
 }
 
-export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, selectedKey }) {
+export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, selectedKey, busy }) {
   const host = useRef(null);
   const [engine, setEngine] = useState(null);
   const [dismissed, setDismissed] = useState(() => new Set());
@@ -75,10 +77,14 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
 
   const notices = payload.notices.filter((notice) => !dismissed.has(notice.message));
   return (
-    <main className="chart-panel">
+    <main className={`chart-panel ${payload.replay?.enabled ? "replaying" : ""}`}>
       <div className="chart-host" ref={host} />
       {engine && <Legend engine={engine} payload={payload} />}
       {payload.bars.length === 0 && <div className="chart-empty">No bars in the selected range.</div>}
+      <ReplayBar replay={payload.replay} busy={busy} onLatest={() => {
+        engine?.scrollToLatest();
+        sendEvent("go_to_replay_latest");
+      }} />
       {notices.length > 0 && (
         <div className="notices">
           {notices.map((notice) => (

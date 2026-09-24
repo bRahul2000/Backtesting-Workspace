@@ -103,6 +103,11 @@ export class ChartEngine {
     const newBars = payload.bars_rev !== this.barsRev;
     const precision = payload.price_precision ?? 2;
     const keepRange = !newView && newBars ? this.chart.timeScale().getVisibleRange() : null;
+    // Replay follows the newest revealed bar while the latest bar is in view;
+    // panning away stops following until "Latest" is used. Zoom is kept.
+    const replay = !!payload.replay?.enabled;
+    const logical = this.chart.timeScale().getVisibleLogicalRange();
+    const following = replay && !newView && newBars && logical && logical.to >= this.bars.length - 1.5;
 
     if (precision !== this.precision) {
       this.precision = precision;
@@ -121,7 +126,9 @@ export class ChartEngine {
 
     this.viewKey = payload.view_key;
     this.barsRev = payload.bars_rev;
-    if (newView) this.restoreOrDefaultRange();
+    if (newView && replay) this.showLatest();
+    else if (newView) this.restoreOrDefaultRange();
+    else if (following) this.scrollToLatest();
     else if (newBars) this.applyRange(keepRange);
     this.emitSoon();
   }
@@ -210,6 +217,9 @@ export class ChartEngine {
 
   goToLatest() { this.showLatest(); }
 
+  // Keep the current zoom (bar spacing) and bring the newest bar into view.
+  scrollToLatest() { this.chart.timeScale().scrollToRealTime(); }
+
   resetPriceScale() {
     this.chart.priceScale("right").applyOptions({ autoScale: true });
   }
@@ -256,7 +266,7 @@ export class ChartEngine {
   }
 
   rememberRange(range) {
-    if (!range || !this.viewKey) return;
+    if (!range || !this.viewKey || this.viewKey.endsWith("|replay")) return;
     clearTimeout(this.saveTimer);
     const key = RANGE_STORAGE + this.viewKey;
     this.saveTimer = setTimeout(() => storageSet(key, { from: range.from, to: range.to }), 250);

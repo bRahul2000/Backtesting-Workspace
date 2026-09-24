@@ -2,7 +2,7 @@ import React from "react";
 import { sendEvent } from "../events.js";
 import { formatPrice, formatSigned, providerShort, timeframeLabel } from "../format.js";
 
-export function Watchlist({ items }) {
+export function Watchlist({ items, replay }) {
   return (
     <aside className="watchlist" aria-label="Watchlist">
       <div className="panel-head">
@@ -25,7 +25,11 @@ export function Watchlist({ items }) {
           );
         })}
       </div>
-      <div className="wl-foot">Registered local datasets · last native bar</div>
+      <div className="wl-foot">
+        {replay
+          ? <span className="warn-inline">Reference only: latest local close, not replay prices.</span>
+          : "Registered local datasets · last native bar"}
+      </div>
     </aside>
   );
 }
