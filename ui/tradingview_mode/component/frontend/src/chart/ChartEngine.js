@@ -128,30 +128,31 @@ export class ChartEngine {
 
   // ---- Strategy Tester trades (all values from Python) -------------------
 
-  // overlay: [{trade_id, entry_bar, exit_bar}] (Python-placed chart bars)
-  // tradesById: Map of Python trade objects; selectedId: highlighted trade or null
-  setTrades(overlay, tradesById, selectedId) {
-    const sig = `${this.barsRev}|${overlay.map((o) => o.trade_id).join(",")}|${selectedId ?? ""}|${tradesById.size}`;
+  // overlay: [{key, entry_bar, exit_bar}] (Python-placed chart bars)
+  // tradesByKey: Map of Python trade objects by unique key; selectedKey: highlighted trade or null
+  setTrades(overlay, tradesByKey, selectedKey) {
+    const sig = `${this.barsRev}|${overlay.map((o) => o.key).join(",")}|${selectedKey ?? ""}|${tradesByKey.size}|${tradesByKey.values().next().value?.entry_time ?? ""}`;
     if (sig === this.tradeSig) return;
     this.tradeSig = sig;
     const markers = [];
     let selected = null;
     for (const item of overlay) {
-      const trade = tradesById.get(item.trade_id);
+      const trade = tradesByKey.get(item.key);
       if (!trade) continue;
-      const isSelected = trade.trade_id === selectedId;
+      const isSelected = trade.key === selectedKey;
       const long = trade.direction === "LONG";
       const win = trade.pnl > 0;
       const size = isSelected ? 2 : 1;
+      const label = trade.segment ? `${trade.segment}/${trade.trade_id}` : `#${trade.trade_id}`;
       markers.push({
         time: item.entry_bar, position: long ? "belowBar" : "aboveBar", shape: long ? "arrowUp" : "arrowDown",
         color: isSelected ? "#ffffff" : long ? COLORS.up : COLORS.down, size,
-        text: `${long ? "L" : "S"}${isSelected ? ` #${trade.trade_id}` : ""}`,
+        text: `${long ? "L" : "S"}${isSelected ? ` ${label}` : ""}`,
       });
       markers.push({
         time: item.exit_bar, position: long ? "aboveBar" : "belowBar", shape: "circle",
         color: isSelected ? "#ffffff" : win ? COLORS.target : COLORS.stop, size,
-        text: trade.exit_label === "Exit" ? "Exit" : trade.exit_label,
+        text: trade.exit_label,
       });
       if (isSelected) selected = { trade, item };
     }

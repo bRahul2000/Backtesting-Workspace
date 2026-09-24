@@ -1,21 +1,17 @@
-# TradingView Mode custom terminal
+# TradingView Mode terminal
 
 This is a React + Lightweight Charts (v5) terminal served as a Streamlit custom
 component. Python stays authoritative for data, timeframes, indicators and
 (later) strategy results. See [CONTRACT.md](CONTRACT.md).
 
-## Enabling it
+## Running it
 
-Turn on the **Custom Chart Prototype** toggle at the top of TradingView Mode,
-or set it on by default:
+TradingView Mode always renders this terminal; there is no renderer toggle.
+If the build is missing or cannot be served, the page shows an `st.error`.
 
 ```bash
-TV_CUSTOM_FRONTEND=1 ./venv/bin/python -m streamlit run app.py
+./venv/bin/python -m streamlit run app.py
 ```
-
-- **ON**: only the React terminal renders. If the build is missing or can't be
-  served, you get a visible `st.error`. Plotly is never substituted.
-- **OFF**: the original Streamlit + Plotly workspace (the fallback).
 
 ## Build (macOS)
 

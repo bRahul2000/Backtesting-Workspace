@@ -16,8 +16,8 @@ from __future__ import annotations
 from dataclasses import MISSING, asdict, dataclass, fields
 from datetime import date, timedelta
 import math
-import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -33,10 +33,14 @@ from strategies.base_strategy import ParameterType, StrategyDescriptor
 from strategies.registry import StrategyRegistry
 
 ROOT = Path(__file__).resolve().parents[3]
-#: Same ledger the Universal Workspace records into, so runs stay comparable.
-#: TV_TESTER_LEDGER redirects it (e.g. for manual UI checks that must not add
-#: rows to the research ledger's exposure counts).
-LEDGER_PATH = Path(os.environ.get("TV_TESTER_LEDGER") or ROOT / "experiments" / "experiments.sqlite3")
+#: Ledger modes. Every audited run is recorded in an experiment ledger; the
+#: mode decides which one. Scratch is the default so UI work never adds rows
+#: (or forward-exposure counts) to the research ledger. Research is an explicit
+#: per-run choice. Paths are read at call time (tests redirect them).
+RESEARCH_LEDGER_PATH = ROOT / "experiments" / "experiments.sqlite3"
+SCRATCH_LEDGER_PATH = ROOT / "experiments" / "scratch" / "tradingview_mode.sqlite3"
+LEDGER_MODES = {"scratch": "Development / Scratch", "research": "Research Ledger"}
+DEFAULT_LEDGER_MODE = "scratch"
 #: Brokers the audited adapter accepts (it rejects every other profile).
 BROKER_PROFILES = {EXNESS.broker_id: EXNESS}
 #: BacktestConfig fields the audited adapter actually reads. Fields it ignores
@@ -120,6 +124,9 @@ def tester_options(registry: StrategyRegistry, datasets: tuple[MarketDataset, ..
         "dataset_roles": [role.value for role in DatasetRole],
         "risk_modes": list(RISK_MODES),
         "defaults": config_defaults(),
+        "ledger_modes": [{"mode": mode, "label": label, "path": _relative(ledger_path_for(mode))}
+                         for mode, label in LEDGER_MODES.items()],
+        "default_ledger_mode": DEFAULT_LEDGER_MODE,
     }
 
 
@@ -134,6 +141,7 @@ class ValidatedRun:
     descriptor: StrategyDescriptor
     parameter_overrides: dict[str, Any]
     request: dict[str, Any]
+    ledger_mode: str
 
 
 def _coerce_parameter(parameter, value: Any) -> Any:
@@ -232,6 +240,9 @@ def validate_run_request(data: dict[str, Any], *, registry: StrategyRegistry,
     if data["broker_profile"] not in BROKER_PROFILES:
         raise TesterValidationError(f"Unsupported broker profile {data['broker_profile']!r}; "
                                     f"the audited adapter accepts {', '.join(BROKER_PROFILES)}.")
+    ledger_mode = data.get("ledger_mode")
+    if ledger_mode not in LEDGER_MODES:
+        raise TesterValidationError(f"ledger_mode must be one of {list(LEDGER_MODES)}; got {ledger_mode!r}.")
     try:
         role = DatasetRole(data["dataset_role"])
     except ValueError as exc:
@@ -263,15 +274,34 @@ def validate_run_request(data: dict[str, Any], *, registry: StrategyRegistry,
         )
     except ValueError as exc:
         raise TesterValidationError(str(exc)) from exc
-    return ValidatedRun(config, entry, descriptor, overrides, dict(data))
+    return ValidatedRun(config, entry, descriptor, overrides, dict(data), ledger_mode)
 
 
-def execute_run(run: ValidatedRun, *, runner: Callable[..., UniversalBacktestResult] | None = None,
-                ledger_path: Path = LEDGER_PATH) -> UniversalBacktestResult:
+def _relative(path: Path) -> str:
+    try:
+        return str(Path(path).resolve().relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def ledger_path_for(mode: str) -> Path:
+    """Ledger file for a mode. Scratch can never resolve to the research ledger."""
+    if mode == "research":
+        return Path(RESEARCH_LEDGER_PATH)
+    if mode == "scratch":
+        path = Path(SCRATCH_LEDGER_PATH)
+        if path.resolve() == Path(RESEARCH_LEDGER_PATH).resolve():
+            raise TesterValidationError("Scratch ledger path must differ from the research ledger.")
+        return path
+    raise TesterValidationError(f"Unknown ledger mode {mode!r}.")
+
+
+def execute_run(run: ValidatedRun, *, runner: Callable[..., UniversalBacktestResult] | None = None
+                ) -> UniversalBacktestResult:
     """Call the existing audited adapter. No other execution path exists here."""
     if runner is None:
         from core.adapters.audited_engine import run_universal_backtest as runner
-    return runner(run.dataset.path, run.config, ledger_path=ledger_path)
+    return runner(run.dataset.path, run.config, ledger_path=ledger_path_for(run.ledger_mode))
 
 
 # ---------------------------------------------------------------------------
@@ -294,6 +324,25 @@ def json_number(value: Any) -> float | int | str | None:
     return value
 
 
+def jsonable(value: Any) -> Any:
+    """Deep JSON-safe copy (UTC ISO timestamps, enum values, "inf" for infinities)."""
+    if isinstance(value, dict):
+        return {str(key): jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [jsonable(item) for item in value]
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return to_timestamp(value).isoformat()
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)):
+        return json_number(value)
+    if hasattr(value, "__dataclass_fields__"):
+        return jsonable(asdict(value))
+    if hasattr(value, "value"):
+        return jsonable(value.value)
+    return str(value)
+
+
 def epoch(value: Any) -> int | None:
     return None if value is None else int(to_timestamp(value).timestamp())
 
@@ -313,9 +362,30 @@ def _stats(stats: Any) -> dict[str, Any]:
     return {key: json_number(value) for key, value in values.items()}
 
 
-def serialize_trade(row: dict[str, Any]) -> dict[str, Any]:
-    """One trade_log row -> chart/table trade. Prices and P&L are copied unchanged."""
+def trade_segments(result: UniversalBacktestResult) -> list[int | None]:
+    """Continuous-data segment of each trade_log row.
+
+    The engine restarts trade_id in every continuous segment, so trade_id alone
+    is not unique. equity_curve records (segment, trade_id) for every closed
+    trade in the same order as trade_log; if that ever disagrees, segments are
+    reported as unknown rather than guessed.
+    """
+    closed = [(point["segment"], point["trade_id"]) for point in result.equity_curve
+              if point.get("trade_id") is not None]
+    if len(closed) != len(result.trade_log) or any(
+            trade_id != row["trade_id"] for (_, trade_id), row in zip(closed, result.trade_log)):
+        return [None] * len(result.trade_log)
+    return [segment for segment, _ in closed]
+
+
+def serialize_trade(row: dict[str, Any], key: int = 0, segment: int | None = None) -> dict[str, Any]:
+    """One trade_log row -> chart/table trade. Prices and P&L are copied unchanged.
+
+    ``key`` is the row's position in trade_log: the unique handle used for
+    selection and chart markers (trade_id repeats across segments).
+    """
     return {
+        "key": key, "segment": segment,
         "trade_id": row["trade_id"], "direction": row["direction"], "setup_id": row.get("setup_id"),
         "signal_time": epoch(row.get("signal_time")), "entry_time": epoch(row["entry_time"]),
         "exit_time": epoch(row["exit_time"]),
@@ -359,25 +429,80 @@ def _periods(stats: dict[str, Any]) -> list[dict[str, Any]]:
             for period, row in stats.items()]
 
 
+def max_streak(trade_log: list[dict[str, Any]], segments: list[int | None], *, winning: bool) -> int:
+    """Longest run of winning (or losing) trades within a continuous segment.
+
+    Mirrors the audited adapter's max_losing_streak rule: ±1e-9 thresholds, a
+    breakeven trade does not reset the streak, and streaks never span segments.
+    """
+    worst = current = 0
+    previous: object = object()
+    for row, segment in zip(trade_log, segments):
+        if segment != previous:
+            current, previous = 0, segment
+        hit = row["pnl"] > _WIN if winning else row["pnl"] < -_WIN
+        opposite = row["pnl"] < -_WIN if winning else row["pnl"] > _WIN
+        if hit:
+            current += 1
+            worst = max(worst, current)
+        elif opposite:
+            current = 0
+    return worst
+
+
+def python_derived(result: UniversalBacktestResult, config: BacktestConfig, segments: list[int | None]) -> dict[str, Any]:
+    """Values the result does not carry, derived here from the result itself."""
+    log = result.trade_log
+    return {
+        "winning_trades": sum(1 for row in log if row["pnl"] > _WIN),
+        "losing_trades": sum(1 for row in log if row["pnl"] < -_WIN),
+        "pnl_percent": json_number(result.pnl / config.initial_capital * 100),
+        "max_winning_streak": max_streak(log, segments, winning=True),
+        "gap_through_fills": sum(1 for row in log if row.get("gap_through_trigger")),
+        "leverage_capped_trades": sum(1 for row in log if row.get("leverage_capped")),
+        "entry_models": dict(sorted(_count(row.get("entry_model") for row in log).items())),
+        "total_entry_commission": json_number(sum(row["entry_commission"] for row in log)),
+        "total_exit_commission": json_number(sum(row["exit_commission"] for row in log)),
+        "note": "Derived in Python from UniversalBacktestResult.trade_log with the audited adapter's "
+                "±1e-9 win/loss thresholds; not fields of the result itself.",
+    }
+
+
+def _count(values) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[str(value)] = counts.get(str(value), 0) + 1
+    return counts
+
+
+def _config_dict(config: BacktestConfig) -> dict[str, Any]:
+    return jsonable({f.name: getattr(config, f.name) for f in fields(BacktestConfig)})
+
+
 def build_run_payload(result: UniversalBacktestResult, run: ValidatedRun, *, duration_seconds: float) -> dict[str, Any]:
     """Presentation of an authoritative result. ``result`` is read, never modified."""
     config = run.config
-    trades = [serialize_trade(row) for row in result.trade_log]
-    wins = sum(1 for row in result.trade_log if row["pnl"] > _WIN)
-    losses = sum(1 for row in result.trade_log if row["pnl"] < -_WIN)
+    segments = trade_segments(result)
+    trades = [serialize_trade(row, index, segment)
+              for index, (row, segment) in enumerate(zip(result.trade_log, segments))]
+    derived = python_derived(result, config, segments)
     diagnostics = result.execution_diagnostics
     return {
         "run_id": result.run_id,
+        "ledger": {"mode": run.ledger_mode, "label": LEDGER_MODES[run.ledger_mode],
+                   "path": _relative(ledger_path_for(run.ledger_mode))},
         "fingerprints": {
             "strategy": result.strategy_fingerprint, "parameter": result.parameter_fingerprint,
             "dataset": result.dataset_fingerprint, "broker": result.broker_fingerprint,
             "instrument": result.instrument_fingerprint,
         },
         "strategy": {"strategy_id": run.descriptor.metadata.strategy_id, "name": run.descriptor.metadata.name,
-                     "version": run.descriptor.metadata.version, "status": run.descriptor.metadata.status.value},
+                     "version": run.descriptor.metadata.version, "status": run.descriptor.metadata.status.value,
+                     "frozen": run.descriptor.parameterized_factory is None},
         "dataset": {"dataset_key": run.dataset.key, "label": run.dataset.label, "provider": run.dataset.broker,
                     "symbol": run.dataset.symbol, "instrument": run.dataset.instrument,
-                    "timeframe": run.dataset.timeframe, "spread_source": run.dataset.spread_source},
+                    "timeframe": run.dataset.timeframe, "spread_source": run.dataset.spread_source,
+                    "read_only": run.dataset.read_only},
         "config": {
             "instrument": config.instrument, "broker_profile": config.broker_profile,
             "strategy_id": config.strategy_id, "timeframe": config.timeframe,
@@ -390,17 +515,19 @@ def build_run_payload(result: UniversalBacktestResult, run: ValidatedRun, *, dur
         },
         "summary": {
             "pnl": json_number(result.pnl),
-            "pnl_percent": json_number(result.pnl / config.initial_capital * 100),
             "total_trades": result.total_trades, "total_entries": result.total_entries,
-            "winning_trades": wins, "losing_trades": losses,
             "trades_per_month": json_number(result.trades_per_month),
             "win_rate": json_number(result.win_rate), "profit_factor": json_number(result.profit_factor),
             "average_r": json_number(result.average_r),
             "max_drawdown_percent": json_number(result.max_drawdown_percent),
             "max_losing_streak": result.max_losing_streak,
             "open_positions_at_end": len(result.open_positions_at_end),
+            # Python-derived (see python_derived); kept here for the metric row.
+            "pnl_percent": derived["pnl_percent"],
+            "winning_trades": derived["winning_trades"], "losing_trades": derived["losing_trades"],
         },
-        "derived_in_python": ["winning_trades", "losing_trades", "pnl_percent"],
+        "derived_in_python": ["winning_trades", "losing_trades", "pnl_percent", "max_winning_streak"],
+        "python_derived": derived,
         "directional": {"long": _stats(result.long_statistics), "short": _stats(result.short_statistics)},
         "periods": {"yearly": _periods(result.yearly_statistics), "monthly": _periods(result.monthly_statistics)},
         "trades": trades,
@@ -409,17 +536,72 @@ def build_run_payload(result: UniversalBacktestResult, run: ValidatedRun, *, dur
         "diagnostics": {
             "segments": diagnostics.get("segments"), "order_events": diagnostics.get("order_events", {}),
             "execution_adapter": diagnostics.get("execution_adapter"),
+            "spread_price": json_number(diagnostics.get("spread_price")),
             "effective_spread_price": json_number(diagnostics.get("effective_spread_price")),
             "spread_multiplier": json_number(diagnostics.get("spread_multiplier")),
             "commission_percent": json_number(diagnostics.get("commission_percent")),
+            "slippage_percent": json_number(config.slippage_percent),
+            "forward_runs_for_strategy": diagnostics.get("forward_runs_for_strategy"),
             "forward_validation_warning": diagnostics.get("forward_validation_warning"),
             "forward_exposure_warning": diagnostics.get("forward_exposure_warning"),
             "execution_ambiguities": len(result.execution_ambiguities),
+            "ambiguities": jsonable(result.execution_ambiguities[:200]),
             "excursion_model": result.excursion_model,
         },
         "duration_seconds": round(duration_seconds, 2),
     }
 
+
+# ---------------------------------------------------------------------------
+# Exports (authoritative content, generated in Python)
+# ---------------------------------------------------------------------------
+
+def trades_csv(result: UniversalBacktestResult) -> str:
+    """The complete trade_log, every field unchanged, plus a leading ``segment``
+    column because trade_id repeats across continuous segments."""
+    frame = pd.DataFrame(result.trade_log)
+    frame.insert(0, "segment", trade_segments(result))
+    return frame.to_csv(index=False)
+
+
+def summary_export(result: UniversalBacktestResult, run: ValidatedRun) -> dict[str, Any]:
+    """Run metadata, fingerprints, properties and every statistic of the result.
+
+    Values the result does not carry are kept apart under ``python_derived``.
+    """
+    segments = trade_segments(result)
+    return jsonable({
+        "export": {"kind": "tradingview_mode_strategy_tester_summary", "source": "UniversalBacktestResult",
+                   "generated_at": datetime.now(timezone.utc).isoformat()},
+        "run": {"run_id": result.run_id, "ledger_mode": run.ledger_mode,
+                "ledger_path": _relative(ledger_path_for(run.ledger_mode)),
+                "strategy_id": run.descriptor.metadata.strategy_id, "strategy_name": run.descriptor.metadata.name,
+                "strategy_version": run.descriptor.metadata.version,
+                "strategy_status": run.descriptor.metadata.status.value,
+                "dataset_key": run.dataset.key, "dataset_label": run.dataset.label,
+                "market_data_provider": run.dataset.broker, "instrument": result.instrument,
+                "period": result.period, "dataset_role": result.dataset_role},
+        "fingerprints": {"strategy": result.strategy_fingerprint, "parameter": result.parameter_fingerprint,
+                         "dataset": result.dataset_fingerprint, "broker": result.broker_fingerprint,
+                         "instrument": result.instrument_fingerprint},
+        "properties": _config_dict(run.config),
+        "summary": {name: getattr(result, name) for name in (
+            "total_trades", "total_entries", "trades_per_month", "win_rate", "profit_factor", "average_r",
+            "pnl", "max_drawdown_percent", "drawdown_duration", "max_losing_streak")}
+                   | {"open_positions_at_end": result.open_positions_at_end},
+        "directional": {"long": result.long_statistics, "short": result.short_statistics},
+        "yearly_statistics": result.yearly_statistics,
+        "monthly_statistics": result.monthly_statistics,
+        "execution_diagnostics": result.execution_diagnostics,
+        "execution_ambiguities": result.execution_ambiguities,
+        "excursion_model": result.excursion_model,
+        "python_derived": python_derived(result, run.config, segments),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Chart overlay
+# ---------------------------------------------------------------------------
 
 def trade_overlay(run_payload: dict[str, Any] | None, *, chart_identity: tuple[str, str, str],
                   bar_times: list[int], bar_seconds: int, chart_label: str) -> dict[str, Any]:
@@ -429,7 +611,8 @@ def trade_overlay(run_payload: dict[str, Any] | None, *, chart_identity: tuple[s
     chart bar that contains it (the bar opening at or before it). The exact
     times and prices are unchanged in the trade itself. Only a chart of the
     same instrument/provider/symbol as the backtest dataset gets markers, and
-    only trades fully inside the loaded bars are placed.
+    only trades fully inside the loaded bars are placed. Items reference
+    trades by their unique ``key``.
     """
     if not run_payload:
         return {"available": False, "reason": None, "trades": []}
@@ -448,7 +631,7 @@ def trade_overlay(run_payload: dict[str, Any] | None, *, chart_identity: tuple[s
             continue
         entry_pos = index.searchsorted(trade["entry_time"], side="right") - 1
         exit_pos = index.searchsorted(trade["exit_time"], side="right") - 1
-        placed.append({"trade_id": trade["trade_id"], "entry_bar": int(bar_times[entry_pos]),
+        placed.append({"key": trade["key"], "entry_bar": int(bar_times[entry_pos]),
                        "exit_bar": int(bar_times[exit_pos])})
     return {"available": True, "reason": None, "trades": placed}
 
@@ -457,4 +640,3 @@ def timed_run(run: ValidatedRun, **kwargs) -> tuple[UniversalBacktestResult, flo
     started = time.perf_counter()
     result = execute_run(run, **kwargs)
     return result, time.perf_counter() - started
-

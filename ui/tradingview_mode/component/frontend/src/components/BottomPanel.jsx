@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { sendEvent } from "../events.js";
 import { Icon } from "./icons.jsx";
 import { StrategyTester } from "./tester/StrategyTester.jsx";
-import { TradesTable } from "./tester/TradesTable.jsx";
+import { TradesWorkspace } from "./tester/TradesTable.jsx";
 
 const DEFAULT_HEIGHT = { strategy_tester: 330, trades: 260 };
 const HEIGHT_STORAGE = "tvterm:bottom-height:";
@@ -114,7 +114,7 @@ function useResizableHeight(tab) {
   return { height, handlers: { onPointerDown, onPointerMove, onPointerUp } };
 }
 
-export function BottomPanel({ payload, clientLogs, pending, selectedTradeId, onSelectTrade, focusNote }) {
+export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelectTrade, focusNote }) {
   // Optimistic echo of the Python-owned panel state; Python's value wins on the next payload.
   const [tab, setTab] = useState(payload.ui.bottom_panel);
   const [open, setOpen] = useState(payload.ui.bottom_open);
@@ -152,14 +152,14 @@ export function BottomPanel({ payload, clientLogs, pending, selectedTradeId, onS
         <div className="bottom-body">
           {tab === "indicators" && <IndicatorsTab indicators={payload.indicators} revision={payload.ack} />}
           {tab === "strategy_tester" && (
-            <StrategyTester payload={payload} pending={pending} selectedTradeId={selectedTradeId}
+            <StrategyTester payload={payload} pending={pending} selectedKey={selectedKey}
               onSelectTrade={onSelectTrade} focusNote={focusNote} />
           )}
           {tab === "trades" && (
             <div className="trades-tab">
               {focusNote && <div className="tester-note">{focusNote}</div>}
-              <TradesTable run={payload.tester.run} precision={payload.tester.run?.price_precision ?? payload.price_precision}
-                selectedId={selectedTradeId} onSelect={onSelectTrade} />
+              <TradesWorkspace run={payload.tester.run} precision={payload.tester.run?.price_precision ?? payload.price_precision}
+                selectedKey={selectedKey} onSelect={onSelectTrade} />
             </div>
           )}
           {tab === "logs" && <LogsTab logs={payload.logs} clientLogs={clientLogs} />}

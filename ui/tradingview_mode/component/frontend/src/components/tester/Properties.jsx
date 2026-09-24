@@ -42,12 +42,51 @@ function ParameterField({ spec, value, onChange, locked }) {
   );
 }
 
-function Readout({ rows }) {
+function Group({ title, rows }) {
   return (
-    <div className="readout">
+    <div className="prop-group">
+      <div className="group-title">{title}</div>
       {rows.map(([label, value]) => (
         <div key={label} className="kv"><span>{label}</span><span className="mono">{value ?? "—"}</span></div>
       ))}
+    </div>
+  );
+}
+
+// Exact configuration Python executed for the shown run.
+function TestedConfiguration({ run, payload }) {
+  const c = run.config;
+  const params = Object.entries(c.strategy_parameters);
+  return (
+    <div className="prop-groups">
+      <Group title="Strategy" rows={[
+        ["Name", run.strategy.name], ["Id", run.strategy.strategy_id], ["Version", run.strategy.version],
+        ["Status", `${run.strategy.status}${run.strategy.frozen ? " · read-only" : ""}`],
+      ]} />
+      <Group title="Market data" rows={[
+        ["Dataset", run.dataset.label], ["Key", run.dataset.dataset_key], ["Provider", run.dataset.provider],
+        ["Symbol / instrument", `${run.dataset.symbol} / ${c.instrument}`],
+        ["Backtest timeframe", `${c.timeframe}${c.higher_timeframes.length ? ` (+ ${c.higher_timeframes.join(", ")} derived by the engine)` : ""}`],
+        ["Chart timeframe", `${payload.timeframe} · ${payload.source.description}`],
+        ["Range (UTC)", `${c.start.slice(0, 16)} → ${c.end.slice(0, 16)}`],
+        ["Dataset role", c.dataset_role],
+      ]} />
+      <Group title="Broker / execution" rows={[
+        ["Broker profile", c.broker_profile], ["Execution", c.execution_mode], ["Adapter", run.diagnostics.execution_adapter],
+        ["Spread", c.spread_source === "BROKER_NATIVE_PER_BAR" ? `per-bar broker (median ${run.diagnostics.effective_spread_price})` : `constant ${c.spread}`],
+        ["Spread multiplier", c.spread_multiplier], ["Commission / slippage", `${c.commission_percent}% / ${c.slippage_percent}%`],
+      ]} />
+      <Group title="Capital / risk" rows={[
+        ["Initial capital", c.initial_capital],
+        ["Risk", c.risk_mode === "PERCENT_EQUITY" ? `${c.risk_per_trade_percent}% of equity` : `$${c.fixed_risk_dollars} fixed`],
+        ["Reward : risk", c.risk_reward_ratio], ["Leverage cap", c.leverage],
+      ]} />
+      <Group title="Parameters" rows={params.length ? params.map(([k, v]) => [k, String(v)]) : [["Overrides", "none (strategy defaults)"]]} />
+      <Group title="Fingerprints" rows={Object.entries(run.fingerprints).map(([k, v]) => [k, v ? `${v.slice(0, 20)}…` : "—"])} />
+      <Group title="Ledger" rows={[["Mode", run.ledger.label], ["File", run.ledger.path], ["Run id", run.run_id]]} />
+      {run.open_positions.length > 0 && (
+        <Group title="Open at dataset end" rows={run.open_positions.map((p) => [`${p.direction} ${p.trade_id}`, `${p.entry_price} @ ${formatUtc(p.entry_time)}`])} />
+      )}
     </div>
   );
 }
@@ -66,7 +105,7 @@ export function Properties({ tester, formApi, payload }) {
             {" "}(uses {strategy.required_timeframes.join(" + ")})
           </div>
         )}
-        {locked && <div className="muted small-text">This strategy exposes no constructor overrides; inputs are shown read-only.</div>}
+        {locked && <div className="muted small-text">Frozen strategy: it exposes no parameter overrides, so inputs are read-only.</div>}
         {strategy?.parameters.length === 0 && <div className="empty small">No editable parameters.</div>}
         {strategy?.parameters.map((spec) => (
           <ParameterField key={spec.name} spec={spec} value={form.parameters[spec.name]} locked={locked}
@@ -92,35 +131,10 @@ export function Properties({ tester, formApi, payload }) {
           );
         })}
       </section>
-      <section className="prop-col">
+      <section className="prop-col wide">
         <div className="section-title">Tested configuration {run ? `· ${run.run_id}` : ""}</div>
-        {run ? (
-          <Readout rows={[
-            ["Strategy", `${run.strategy.name} (${run.strategy.version})`],
-            ["Dataset", run.dataset.label],
-            ["Market data provider", run.dataset.provider],
-            ["Broker profile", run.config.broker_profile],
-            ["Instrument", run.config.instrument],
-            ["Backtest timeframe", `${run.config.timeframe}${run.config.higher_timeframes.length ? ` (+ ${run.config.higher_timeframes.join(", ")} derived by the engine)` : ""}`],
-            ["Chart timeframe", `${payload.timeframe} · ${payload.source.description}`],
-            ["Range (UTC)", `${run.config.start.slice(0, 16)} → ${run.config.end.slice(0, 16)}`],
-            ["Dataset role", run.config.dataset_role],
-            ["Execution", `${run.config.execution_mode} · ${run.diagnostics.execution_adapter}`],
-            ["Spread", run.config.spread_source === "BROKER_NATIVE_PER_BAR" ? `per-bar broker (median ${run.diagnostics.effective_spread_price})` : `constant ${run.config.spread}`],
-            ["Initial capital", run.config.initial_capital],
-            ["Risk", run.config.risk_mode === "PERCENT_EQUITY" ? `${run.config.risk_per_trade_percent}% equity` : `$${run.config.fixed_risk_dollars} fixed`],
-            ["Reward : risk", run.config.risk_reward_ratio],
-            ["Commission / slippage", `${run.config.commission_percent}% / ${run.config.slippage_percent}%`],
-            ["Leverage cap", run.config.leverage],
-            ["Parameter overrides", Object.keys(run.config.strategy_parameters).length ? JSON.stringify(run.config.strategy_parameters) : "none (defaults)"],
-            ["Strategy fingerprint", run.fingerprints.strategy.slice(0, 16)],
-            ["Parameter fingerprint", run.fingerprints.parameter.slice(0, 16)],
-            ["Dataset fingerprint", run.fingerprints.dataset.slice(0, 16)],
-            ["Broker fingerprint", run.fingerprints.broker.slice(0, 16)],
-            ["Ambiguous executions", run.diagnostics.execution_ambiguities],
-            ["Open at end", run.open_positions.length ? run.open_positions.map((p) => `#${p.trade_id} ${p.direction} @ ${p.entry_price} (${formatUtc(p.entry_time)})`).join("; ") : "none"],
-          ]} />
-        ) : <div className="empty small">Run a backtest to see the exact configuration Python executed.</div>}
+        {run ? <TestedConfiguration run={run} payload={payload} />
+          : <div className="empty small">Run a backtest to see the exact configuration Python executed.</div>}
         {run?.diagnostics.forward_validation_warning && <div className="warn-text">{run.diagnostics.forward_validation_warning}</div>}
         {run?.diagnostics.forward_exposure_warning && <div className="warn-text">{run.diagnostics.forward_exposure_warning}</div>}
       </section>

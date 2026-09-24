@@ -102,9 +102,12 @@ VALID_EVENTS = {
     "set_chart_setting": {"show_volume": False},
     "run_backtest": {"strategy_id": "BTC_V3_CORE_V1_FROZEN", "dataset_key": "EXNESS_BTCUSDM_M15",
                      "broker_profile": "EXNESS_STANDARD", "dataset_role": "DEVELOPMENT",
-                     "start": "2026-06-01", "end": "2026-06-30", "parameters": {"reward_multiple": 3.0},
+                     "start": "2026-06-01", "end": "2026-06-30", "ledger_mode": "scratch",
+                     "parameters": {"reward_multiple": 3.0},
                      "settings": {"risk_mode": "PERCENT_EQUITY", "risk_per_trade_percent": 0.5}},
     "clear_backtest": {},
+    "restore_run": {"history_id": 1},
+    "export_run": {"history_id": 1, "kind": "trades_csv"},
 }
 
 
@@ -131,6 +134,8 @@ def test_valid_events_parse(event_type):
     ({"id": "x", "type": "add_indicator", "data": {"key": "ema", "params": {"length": True}}}, "invalid params"),
     ({"id": "x", "type": "set_bottom_panel", "data": {"panel": "orders"}}, "invalid panel"),
     ({"id": "x", "type": "toggle_indicator", "data": {"id": "ema-1", "enabled": "yes"}}, "invalid enabled"),
+    ({"id": "x", "type": "export_run", "data": {"history_id": 1, "kind": "trades_xlsx"}}, "invalid kind"),
+    ({"id": "x", "type": "restore_run", "data": {"history_id": "1"}}, "invalid history_id"),
 ])
 def test_invalid_events_are_rejected(raw, message):
     with pytest.raises(EventValidationError, match=message):

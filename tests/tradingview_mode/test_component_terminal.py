@@ -165,25 +165,3 @@ def test_build_problems_detects_absolute_asset_paths(tmp_path):
 def test_shipped_build_is_servable():
     assert build_problems() == []
 
-
-# ---- renderer flag -------------------------------------------------------------
-
-def _page_script():
-    import ui.tradingview_mode.component as component
-    from ui.tradingview_mode.page import render_tradingview_mode
-
-    component._component = None  # simulate an unbuilt / unservable frontend
-    render_tradingview_mode()
-
-
-def test_flag_on_with_unavailable_frontend_shows_error_not_plotly(monkeypatch):
-    from streamlit.testing.v1 import AppTest
-    import ui.tradingview_mode.component as component
-
-    monkeypatch.setattr(component, "_component", component._component)  # restored after the test
-    app = AppTest.from_function(_page_script, default_timeout=60)
-    app.session_state["tv_custom_chart_prototype_enabled"] = True
-    app.run()
-    assert not app.exception
-    assert any("Custom frontend is unavailable" in error.value for error in app.error)
-    assert not app.get("plotly_chart")

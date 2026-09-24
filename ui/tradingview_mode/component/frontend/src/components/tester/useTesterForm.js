@@ -21,6 +21,8 @@ function initialForm(options, lastRequest, chartDatasetKey) {
       ...lastRequest,
       parameters: { ...strategyDefaults(strategy), ...(lastRequest.parameters || {}) },
       settings: { ...options.defaults, ...(lastRequest.settings || {}) },
+      // The mode is always the one Python recorded for that request.
+      ledger_mode: lastRequest.ledger_mode,
     };
   }
   const selectable = options.strategies.filter((s) => s.status !== "REJECTED" && s.datasets.length);
@@ -35,6 +37,7 @@ function initialForm(options, lastRequest, chartDatasetKey) {
     end: dataset?.max || "",
     parameters: strategyDefaults(strategy),
     settings: { ...options.defaults },
+    ledger_mode: options.default_ledger_mode,
   };
 }
 
@@ -82,7 +85,7 @@ export function useTesterForm(tester, chartDatasetKey) {
     const toValue = (value) => (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : value);
     sendEvent("run_backtest", {
       strategy_id: form.strategy_id, dataset_key: form.dataset_key, broker_profile: form.broker_profile,
-      dataset_role: form.dataset_role, start: form.start, end: form.end,
+      dataset_role: form.dataset_role, start: form.start, end: form.end, ledger_mode: form.ledger_mode,
       parameters: Object.fromEntries(Object.entries(form.parameters).map(([k, v]) => [k, toValue(v)])),
       settings: Object.fromEntries(Object.entries(settings).map(([k, v]) => [k, toValue(v)])),
     });

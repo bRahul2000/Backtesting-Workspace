@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamlit } from "streamlit-component-lib";
 import { acknowledge, onPendingChange, sendEvent } from "./events.js";
 import { formatUtc } from "./format.js";
@@ -71,26 +71,28 @@ function windowAround(trade, spanDays, min, max) {
   };
 }
 
-// Trade selection / chart focus. Purely client-side: it never asks Python to
-// rerun a backtest; at most it requests chart bars around the trade.
+// Trade selection / chart focus, by the trade's unique key (trade_id repeats
+// across data segments). Purely client-side: it never asks Python to rerun a
+// backtest; at most it requests chart bars around the trade.
 function useTradeFocus(payload, engine) {
   const run = payload.tester.run;
   const overlay = payload.trade_overlay;
-  const [selectedTradeId, setSelectedTradeId] = useState(null);
+  const [selectedKey, setSelectedKey] = useState(null);
   const [pendingFocus, setPendingFocus] = useState(null);
   const [note, setNote] = useState(null);
-  const tradesById = useMemo(() => new Map((run?.trades || []).map((t) => [t.trade_id, t])), [run]);
-  const overlayById = useMemo(() => new Map(overlay.trades.map((o) => [o.trade_id, o])), [overlay]);
+  const tradesByKey = useMemo(() => new Map((run?.trades || []).map((t) => [t.key, t])), [run]);
+  const overlayByKey = useMemo(() => new Map(overlay.trades.map((o) => [o.key, o])), [overlay]);
+  const label = (t) => (t.segment ? `${t.segment}/${t.trade_id}` : `#${t.trade_id}`);
 
-  useEffect(() => { setSelectedTradeId(null); setPendingFocus(null); setNote(null); }, [run?.run_id]);
+  useEffect(() => { setSelectedKey(null); setPendingFocus(null); setNote(null); }, [run?.run_id, run?.history_id]);
   useEffect(() => {
     if (pendingFocus === null) return;
-    const placed = overlayById.get(pendingFocus);
+    const placed = overlayByKey.get(pendingFocus);
     if (placed && engine?.focusBars(placed.entry_bar, placed.exit_bar)) {
       setPendingFocus(null);
       setNote(null);
     }
-  }, [overlayById, pendingFocus, engine]);
+  }, [overlayByKey, pendingFocus, engine]);
 
   const spanDays = payload.range.start
     ? (Date.parse(payload.range.end) - Date.parse(payload.range.start)) / 86400000 + 1 : 30;
@@ -99,13 +101,13 @@ function useTradeFocus(payload, engine) {
     const tested = payload.tester.options.datasets.find((d) => d.dataset_key === run.dataset.dataset_key);
     sendEvent("select_dataset", { dataset_key: run.dataset.dataset_key });
     sendEvent("set_date_range", windowAround(trade, Math.min(spanDays, 30), tested?.min, tested?.max));
-    setPendingFocus(trade.trade_id);
-    setNote(`Switching chart to ${run.dataset.label} around trade #${trade.trade_id}…`);
+    setPendingFocus(trade.key);
+    setNote(`Switching chart to ${run.dataset.label} around trade ${label(trade)}…`);
   }, [payload.tester.options.datasets, run, spanDays]);
 
   const selectTrade = useCallback((trade) => {
-    setSelectedTradeId(trade.trade_id);
-    const placed = overlayById.get(trade.trade_id);
+    setSelectedKey(trade.key);
+    const placed = overlayByKey.get(trade.key);
     if (placed) {
       engine?.focusBars(placed.entry_bar, placed.exit_bar);
       setPendingFocus(null);
@@ -118,18 +120,36 @@ function useTradeFocus(payload, engine) {
         <>
           {overlay.reason} Markers are only drawn on the tested market data.{" "}
           <button type="button" className="link-btn" onClick={() => showOnBacktestDataset(trade)}>
-            Show trade #{trade.trade_id} on {run.dataset.symbol} · {run.dataset.timeframe}
+            Show trade {label(trade)} on {run.dataset.symbol} · {run.dataset.timeframe}
           </button>
         </>,
       );
       return;
     }
     sendEvent("set_date_range", windowAround(trade, spanDays, payload.range.min, payload.range.max));
-    setPendingFocus(trade.trade_id);
-    setNote(`Loading chart bars around trade #${trade.trade_id}…`);
-  }, [overlayById, overlay, engine, spanDays, payload.range.min, payload.range.max, run, showOnBacktestDataset]);
+    setPendingFocus(trade.key);
+    setNote(`Loading chart bars around trade ${label(trade)}…`);
+  }, [overlayByKey, overlay, engine, spanDays, payload.range.min, payload.range.max, run, showOnBacktestDataset]);
 
-  return { selectedTradeId, selectTrade, tradesById, note };
+  return { selectedKey, selectTrade, tradesByKey, note };
+}
+
+// Python-generated exports arrive once in the payload; download each id once.
+function useExportDownload(exportFile) {
+  const seen = useRef(new Set());
+  useEffect(() => {
+    if (!exportFile || seen.current.has(exportFile.id)) return;
+    seen.current.add(exportFile.id);
+    const url = URL.createObjectURL(new Blob([exportFile.content], { type: exportFile.mime }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = exportFile.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    clientLog("info", `Downloaded ${exportFile.filename}`);
+  }, [exportFile]);
 }
 
 function Terminal({ payload, fallbackHeight }) {
@@ -157,6 +177,7 @@ function Terminal({ payload, fallbackHeight }) {
     engine?.setCrosshairMode(mode);
   }, [engine]);
   const focus = useTradeFocus(payload, engine);
+  useExportDownload(payload.tester.export);
   const engineActions = useMemo(() => ({
     fit: () => engine?.fit(),
     latest: () => engine?.goToLatest(),
@@ -170,10 +191,10 @@ function Terminal({ payload, fallbackHeight }) {
       <LeftToolbar crosshairMode={crosshairMode} setCrosshairMode={setCrosshairMode}
         engineActions={engineActions} drawingsEnabled={payload.capabilities.drawings} />
       <ChartPanel payload={payload} onEngine={setEngine} onCrosshairTime={setCrosshairTime}
-        tradesById={focus.tradesById} selectedTradeId={focus.selectedTradeId} />
+        tradesByKey={focus.tradesByKey} selectedKey={focus.selectedKey} />
       <Watchlist items={payload.watchlist} />
       <BottomPanel payload={payload} clientLogs={clientLogs} pending={pending}
-        selectedTradeId={focus.selectedTradeId} onSelectTrade={focus.selectTrade} focusNote={focus.note} />
+        selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note} />
       <StatusBar payload={payload} crosshairTime={crosshairTime} />
     </div>
   );

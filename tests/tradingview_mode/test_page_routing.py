@@ -1,11 +1,26 @@
-"""TradingView Mode renders exactly one workspace: React terminal or legacy Plotly."""
-import pytest
+"""TradingView Mode is the React + Lightweight Charts terminal only."""
+import ast
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
 
 import ui.tradingview_mode.page as page
+import ui.tradingview_mode.workspace as workspace
 
-FLAG = page.CUSTOM_FRONTEND_FLAG
-CALLS: list[str] = []
+PAGE_SOURCE = Path(page.__file__).read_text()
+
+
+def _code_identifiers_and_strings(source: str) -> tuple[set[str], list[str]]:
+    """Names used by the page's code and its string literals, excluding docstrings."""
+    tree = ast.parse(source)
+    docstrings = {id(node.body[0].value) for node in ast.walk(tree)
+                  if isinstance(node, (ast.Module, ast.FunctionDef)) and ast.get_docstring(node)}
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    names |= {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+    names |= {alias.name for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom)) for alias in node.names}
+    strings = [node.value for node in ast.walk(tree)
+               if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings]
+    return names, strings
 
 
 def _script():
@@ -14,76 +29,63 @@ def _script():
     render_tradingview_mode()
 
 
-@pytest.fixture
-def recorded(monkeypatch):
-    """Replace both workspace bodies with recorders (restored after the test)."""
-    import streamlit as st
-
-    CALLS.clear()
-
-    def custom():
-        CALLS.append("custom")
-        st.caption("custom terminal")
-
-    def legacy():
-        CALLS.append("legacy")
-        st.caption("legacy workspace")
-
-    monkeypatch.setattr(page, "render_custom_workspace", custom)
-    monkeypatch.setattr(page, "render_legacy_workspace", legacy)
-    return CALLS
-
-
-def run(enabled: bool) -> AppTest:
+def run() -> AppTest:
     app = AppTest.from_function(_script, default_timeout=60)
-    app.session_state[FLAG] = enabled
     app.run()
     assert not app.exception
     return app
 
 
-def test_custom_on_never_executes_the_legacy_workspace(recorded):
-    app = run(True)
-    assert recorded == ["custom"]
-    assert [c.value for c in app.caption] == ["custom terminal"]
+def test_page_has_no_renderer_toggle_or_legacy_routing():
+    names, strings = _code_identifiers_and_strings(PAGE_SOURCE)
+    for forbidden in ("toggle", "render_workspace_panels", "render_top_toolbar", "render_tradingview_chart",
+                      "render_legacy_workspace", "plotly_chart"):
+        assert forbidden not in names
+    for label in ("Prototype", "Legacy", "Plotly", "Custom"):
+        assert not [text for text in strings if label in text]
 
 
-def test_custom_off_renders_only_the_legacy_workspace(recorded):
-    app = run(False)
-    assert recorded == ["legacy"]
-    assert [c.value for c in app.caption] == ["legacy workspace"]
+def test_only_the_terminal_renders(monkeypatch):
+    calls = []
+
+    def forbidden(*args, **kwargs):
+        calls.append("legacy")
+        raise AssertionError("legacy workspace must not be reached")
+
+    monkeypatch.setattr(workspace, "render_top_toolbar", forbidden)
+    monkeypatch.setattr(workspace, "render_workspace_panels", forbidden)
+    app = run()
+    assert not calls
+    assert not app.get("toggle") and not app.get("plotly_chart")
+    assert not app.get("popover") and not app.get("expander") and not app.get("date_input")
+    assert not [m for m in app.markdown if "### TradingView Mode" in m.value]
 
 
-@pytest.mark.parametrize("enabled", [True, False])
-def test_inactive_workspace_slot_is_emptied_at_run_start(recorded, enabled):
-    # Toggle, custom slot, legacy slot. The inactive slot is an empty element,
-    # which is what removes the other mode's previous elements immediately
-    # instead of at the end of the run.
-    app = run(enabled)
-    toggle, custom_slot, legacy_slot = (app.main.children[i] for i in range(3))
-    assert len(app.main.children) == 3 and toggle.type == "toggle"
-    active, inactive = (custom_slot, legacy_slot) if enabled else (legacy_slot, custom_slot)
-    assert inactive.type == "empty"
-    assert active.type != "empty" and len(active.children) == 1
-
-
-def test_custom_failure_shows_error_and_does_not_fall_back(monkeypatch):
+def test_terminal_failure_shows_error_and_nothing_else(monkeypatch):
     import ui.tradingview_mode.component.terminal as terminal
 
     def broken():
         raise RuntimeError("component exploded")
 
-    legacy_calls = []
     monkeypatch.setattr(terminal, "render_custom_terminal", broken)
-    monkeypatch.setattr(page, "render_legacy_workspace", lambda: legacy_calls.append(1))
-    app = run(True)
-    assert any("component exploded" in error.value for error in app.error)
-    assert not legacy_calls
+    app = run()
+    assert any("TradingView Mode failed to load" in e.value and "component exploded" in e.value for e in app.error)
+    assert not app.get("plotly_chart") and not app.get("toggle")
+
+
+def test_unbuilt_frontend_shows_error_not_another_renderer(monkeypatch):
+    import ui.tradingview_mode.component as component
+
+    monkeypatch.setattr(component, "_component", None)
+    app = run()
+    assert any("TradingView Mode frontend is unavailable" in e.value for e in app.error)
     assert not app.get("plotly_chart")
 
 
-def test_real_custom_mode_renders_no_legacy_controls():
-    app = run(True)
-    assert not app.get("plotly_chart")
-    assert not app.get("popover") and not app.get("expander") and not app.get("date_input")
-    assert not [m for m in app.markdown if "### TradingView Mode" in m.value]
+def test_no_prototype_language_in_user_facing_sources():
+    root = Path(page.__file__).parent / "component"
+    sources = [root / "__init__.py", root / "terminal.py"] + list((root / "frontend" / "src").rglob("*.js*"))
+    for path in sources:
+        text = path.read_text()
+        for label in ("Prototype", "prototype", "Legacy Plotly", "Custom Chart", "Custom Terminal"):
+            assert label not in text, f"{label!r} in {path.name}"

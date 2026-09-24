@@ -94,14 +94,14 @@ Zoom, pan and the visible range (stored in `sessionStorage` per `view_key`),
 crosshair mode, open menus and legend values. The frontend never calls
 `fitContent` on rerun. It fits only on the explicit "Fit" action.
 
-## Strategy Tester (Phase 1)
+## Strategy Tester
 
 Pipeline: `run_backtest` event → `tester.validate_run_request` → `core.config.BacktestConfig`
 → `core.adapters.audited_engine.run_universal_backtest` → `UniversalBacktestResult`
 → `tester.build_run_payload`, which only reshapes the result for display. There is no
 second engine, and results are not cached.
 
-**`run_backtest`** takes `{strategy_id, dataset_key, broker_profile, dataset_role, start, end, parameters?, settings?}`.
+**`run_backtest`** takes `{strategy_id, dataset_key, broker_profile, dataset_role, start, end, ledger_mode, parameters?, settings?}`.
 - **Strategy:** must come from `discover_builtin_strategies()`.
 - **Dataset:** must be registered and exist. Its instrument must be in the strategy's
   `supported_instruments` and its timeframe in `supported_timeframes`. A backtest
@@ -110,48 +110,60 @@ second engine, and results are not cached.
 - **Parameters:** typed per `StrategyParameter` and checked with `validate()` and
   `descriptor.create()`. Frozen parameters can't change, and only values that
   differ from the defaults are passed as overrides.
-- **Settings:** limited to the `BacktestConfig` fields the adapter reads:
-  `initial_capital, risk_mode, risk_per_trade_percent, fixed_risk_dollars, risk_reward_ratio, spread,
-  spread_multiplier, commission_percent, slippage_percent, leverage`. `risk_mode` takes the `RiskMode` names.
-- **Spread:** a dataset with a per-bar broker spread rejects a typed spread.
+- **Settings:** limited to the `BacktestConfig` fields the adapter reads.
 - **Range:** `end` includes the last bar of that UTC date. Dates outside the
   dataset are rejected, not clipped.
 
-`clear_backtest` clears the displayed result.
+**Ledger mode (required, never inferred).** `scratch` is the UI default and records
+into `experiments/scratch/tradingview_mode.sqlite3` (git-ignored). It can never
+resolve to the research ledger. `research` records into `experiments/experiments.sqlite3`
+and must be chosen explicitly for each run. The mode appears in the status, the
+Properties tab and the exports.
+
+**Other events:**
+- `clear_backtest`: hides the displayed result.
+- `restore_run {history_id}`: shows a result from the in-memory session history
+  (the last 10 runs) without executing anything.
+- `export_run {history_id, kind: trades_csv|summary_json}`: Python generates the
+  file and puts it in the payload once as `tester.export {id, filename, mime, content}`.
+  The frontend downloads it by `id`.
+- `trades_csv` is the complete `trade_log` with every field unchanged, plus a
+  leading `segment` column.
+- `summary_json` contains run metadata, ledger, fingerprints, all `BacktestConfig`
+  properties, the result's summary, directional, yearly, monthly, diagnostics and
+  ambiguity data, and a separate `python_derived` block.
 
 **Exactly once.** A run executes synchronously inside the rerun that consumes its
-event id. The id is persisted after the run finishes, so an interrupted run is
-retried, never dropped, and later reruns never execute it again. Each run is
-recorded in the experiment ledger, as the Universal Workspace does.
-`TV_TESTER_LEDGER` redirects the ledger, for example for manual UI checks.
+event id, and the id is persisted afterwards. Selecting a trade, filtering,
+searching, sorting and Previous/Next are frontend-only and send no event.
 
-**Payload `tester`:** `{status: idle|completed|failed, error, form, options, run}`.
-The frontend shows "Running backtest…" while its `run_backtest` event is unacknowledged.
-`run` contains:
-- `run_id` and `fingerprints`
-- `strategy`, `dataset` and the exact executed `config`
-- `summary`, which uses the result's values. `winning_trades`, `losing_trades` and
-  `pnl_percent` are counted or derived in Python and listed in `derived_in_python`.
-- `directional`, `periods`
-- `trades`: every trade from `trade_log`. Prices and P&L are copied unchanged,
-  times are epoch seconds UTC, and `exit_label` (TP/SL/Exit) comes from the
-  engine's exit reason text.
-- `curves`: equity and drawdown from `equity_curve`. Downsampling above 4,000
-  points affects drawing only.
-- `open_positions`, `diagnostics`, `price_precision`
+**Trade identity.** The engine restarts `trade_id` in every continuous data segment.
+Each trade therefore carries `key`, its position in `trade_log` (unique), and
+`segment`, taken from `equity_curve`. Selection, chart markers and `trade_overlay`
+items all use `key`. The UI labels trades `segment/trade_id`.
 
-Infinite values are sent as `"inf"`/`"-inf"`.
+**Payload `tester`:** `{status, error, form, options, run, history, active_history_id, export}`. `run` contains:
+- `run_id`, `ledger`, `fingerprints`, `strategy` (with `frozen`), `dataset`, and the
+  exact executed `config`
+- `summary` (the result's values) and `directional`
+- `periods.monthly` / `periods.yearly`: exactly the result's per-period fields, which
+  are trades, win_rate, profit_factor, average_r and pnl. There is no per-period
+  drawdown.
+- `trades`, `curves`, `open_positions`
+- `diagnostics`: `execution_diagnostics` fields, slippage from the config, the
+  ambiguity count, and the first 200 ambiguities
+- `python_derived`: values the result does not carry, derived in Python from it and
+  labelled as such. These are winning/losing counts, P&L %, max winning streak
+  (the adapter's per-segment rule), gap-through fills, leverage-capped trades,
+  entry models and commission totals.
 
-**Payload `trade_overlay`:** `{available, reason, trades: [{trade_id, entry_bar, exit_bar}]}`.
-- Markers are only drawn when the chart shows the same instrument, provider and
-  symbol as the tested dataset.
-- Each exact time maps to the chart bar that contains it. Only trades that lie
-  entirely inside the loaded bars are included.
+React may filter, search, sort and select these rows. It never computes P&L, win
+rate, profit factor or trade outcomes; `tests/tradingview_mode` guards this.
 
-Selecting a trade is client-side. The chart centers on it and draws Entry, SL
-and TP as limited segments from the entry bar to the exit bar. When the trade is
-outside the loaded bars, the frontend sends only a `set_date_range` around it;
-it never reruns the backtest.
+**Payload `trade_overlay`:** `{available, reason, trades: [{key, entry_bar, exit_bar}]}`. Markers are
+only drawn on the tested instrument/provider/symbol, and each exact time maps to
+the chart bar that contains it. The selected trade gets Entry, SL and TP as bounded
+segments from its entry bar to its exit bar, at the exact `trade_log` prices.
 
 ## Reserved for later phases
 

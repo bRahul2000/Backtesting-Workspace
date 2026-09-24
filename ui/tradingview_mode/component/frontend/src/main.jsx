@@ -36,10 +36,9 @@ class ErrorBoundary extends React.Component {
     if (!this.state.error) return this.props.children;
     return (
       <div className="fatal">
-        <b>Custom terminal failed to render.</b>
+        <b>TradingView Mode failed to render.</b>
         <pre>{String(this.state.error.stack || this.state.error.message).slice(0, 1200)}</pre>
         <button type="button" className="btn primary" onClick={() => this.setState({ error: null })}>Retry</button>
-        <p>Turn off “Custom Chart Prototype” to use the Plotly fallback.</p>
       </div>
     );
   }

@@ -10,8 +10,10 @@ Python owns every value in the payload. The frontend only renders it.
 """
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import asdict, replace
 from datetime import date, timedelta
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -62,6 +64,7 @@ LAST_EVENT_KEY = "tv_terminal_last_event_id"
 READY_KEY = "tv_terminal_ready"
 TESTER_KEY = "tv_terminal_tester"
 TESTER_RESULT_KEY = "tv_terminal_tester_result"
+TESTER_RUNS_KEY = "tv_terminal_tester_runs"
 MAX_LOGS = 200
 _RSI_LEVELS = (70.0, 50.0, 30.0)
 _SECONDARY_COLORS = {"signal": "#f5a623", "histogram": "#7d8799"}
@@ -259,7 +262,8 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         # Id of the last frontend event Python processed; the frontend serializes on it.
         "ack": ack,
     }
-    tester_payload = tester_payload or {"status": "idle", "options": {}, "form": None, "run": None, "error": None}
+    tester_payload = tester_payload or {"status": "idle", "options": {}, "form": None, "run": None, "error": None,
+                                        "history": [], "active_history_id": None, "export": None}
     payload["tester"] = tester_payload
     payload["trade_overlay"] = tester.trade_overlay(
         tester_payload.get("run"), chart_identity=(selected.instrument, selected.broker, selected.symbol),
@@ -273,7 +277,7 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
 # ---------------------------------------------------------------------------
 
 def _initial_state() -> TerminalState:
-    """Seed from the shared Plotly-path selection so switching renderers keeps context."""
+    """Seed from any earlier TradingView Mode selection kept in the session."""
     datasets = [entry for entry in all_datasets() if entry.exists] or list(all_datasets())
     key = st.session_state.get("tv_dataset_selection", datasets[0].key)
     if key not in {entry.key for entry in datasets}:
@@ -312,36 +316,87 @@ def consume_event(state: TerminalState, raw, ctx: TerminalContext, last_id: str 
     return new_state, entry, event.id, None
 
 
+MAX_HISTORY = 10
+
+
 def empty_tester_session() -> dict:
-    return {"status": "idle", "error": None, "form": None, "run": None}
+    return {"status": "idle", "error": None, "form": None, "run": None,
+            "history": [], "active_history_id": None, "next_history_id": 1, "export": None}
 
 
-def handle_tester_event(event: FrontendEvent, session: dict, *, registry: StrategyRegistry,
-                        lookup_dataset=dataset, bounds=dataset_bounds, runner=None,
-                        ledger_path: Path = tester.LEDGER_PATH):
-    """Validate and execute one Strategy Tester event through the audited adapter.
+def _history_row(history_id: int, payload: dict) -> dict:
+    return {"history_id": history_id, "run_id": payload["run_id"], "ledger_mode": payload["ledger"]["mode"],
+            "strategy": payload["strategy"]["name"], "instrument": payload["config"]["instrument"],
+            "dataset": payload["dataset"]["label"], "start": payload["config"]["start"][:10],
+            "end": payload["config"]["end"][:10], "total_trades": payload["summary"]["total_trades"],
+            "pnl": payload["summary"]["pnl"], "win_rate": payload["summary"]["win_rate"]}
 
-    Returns (new_session, log_entry, result_or_None). Called once per event id.
+
+def handle_tester_event(event: FrontendEvent, session: dict, runs: dict, *, registry: StrategyRegistry,
+                        lookup_dataset=dataset, bounds=dataset_bounds, runner=None):
+    """Handle one Strategy Tester event. Called once per event id.
+
+    ``runs`` is the in-memory session history {history_id: {payload, result, run}}.
+    Only ``run_backtest`` executes anything, through the audited adapter;
+    ``restore_run`` and ``export_run`` read results already returned.
+    Returns (new_session, new_runs, log_entry, result_or_None).
     """
-    if event.type == "clear_backtest":
-        return empty_tester_session(), LogEntry("info", "Strategy Tester result cleared."), None
+    session = {**empty_tester_session(), **session, "export": None}
+    kind = event.type
+    if kind == "clear_backtest":
+        return ({**session, "status": "idle", "error": None, "run": None, "active_history_id": None}, runs,
+                LogEntry("info", "Strategy Tester result cleared (session history kept)."), None)
+    if kind in ("restore_run", "export_run"):
+        history_id = event.data["history_id"]
+        stored = runs.get(history_id)
+        if stored is None:
+            return ({**session, "status": "failed", "error": f"Session run {history_id} is no longer available."},
+                    runs, LogEntry("error", f"{kind}: unknown session run {history_id}."), None)
+        if kind == "restore_run":
+            return ({**session, "status": "completed", "error": None, "run": stored["payload"],
+                     "form": dict(stored["run"].request), "active_history_id": history_id}, runs,
+                    LogEntry("info", f"Restored {stored['payload']['run_id']} from session history (not re-run)."), None)
+        base = f"{stored['payload']['run_id']}_{stored['run'].descriptor.metadata.strategy_id}_{stored['run'].ledger_mode}"
+        if event.data["kind"] == "trades_csv":
+            export = {"filename": f"{base}_trades.csv", "mime": "text/csv",
+                      "content": tester.trades_csv(stored["result"])}
+        else:
+            export = {"filename": f"{base}_summary.json", "mime": "application/json",
+                      "content": json.dumps(tester.summary_export(stored["result"], stored["run"]),
+                                            indent=2, allow_nan=False)}
+        return ({**session, "export": {"id": event.id, **export}}, runs,
+                LogEntry("info", f"Exported {export['filename']} (generated in Python)."), None)
+
     form = dict(event.data)
     try:
         validated = tester.validate_run_request(event.data, registry=registry, lookup_dataset=lookup_dataset,
                                                 bounds=bounds)
     except tester.TesterValidationError as exc:
-        return ({**session, "status": "failed", "error": f"Invalid configuration: {exc}", "form": form},
+        return ({**session, "status": "failed", "error": f"Invalid configuration: {exc}", "form": form}, runs,
                 LogEntry("error", f"Backtest rejected: {exc}"), None)
-    label = f"{validated.descriptor.metadata.name} on {validated.dataset.key} ({event.data['start']}..{event.data['end']})"
+    label = (f"{validated.descriptor.metadata.name} on {validated.dataset.key} "
+             f"({event.data['start']}..{event.data['end']}) · {tester.LEDGER_MODES[validated.ledger_mode]}")
     try:
-        result, seconds = tester.timed_run(validated, runner=runner, ledger_path=ledger_path)
+        result, seconds = tester.timed_run(validated, runner=runner)
         run_payload = tester.build_run_payload(result, validated, duration_seconds=seconds)
         # Display decimals of the tested dataset (the chart may show another market).
         run_payload["price_precision"] = _last_closes(str(validated.dataset.path), _mtime(validated.dataset.path))[2]
     except Exception as exc:  # the audited adapter's own refusal or failure, shown verbatim
-        return ({**session, "status": "failed", "error": f"{type(exc).__name__}: {exc}", "form": form},
+        return ({**session, "status": "failed", "error": f"{type(exc).__name__}: {exc}", "form": form}, runs,
                 LogEntry("error", f"Backtest failed: {label}: {exc}"), None)
-    return ({"status": "completed", "error": None, "form": form, "run": run_payload},
+    history_id = session["next_history_id"]
+    run_payload["history_id"] = history_id
+    # Session history keeps a slim copy (without the engine's per-segment objects);
+    # the returned ``result`` itself is untouched.
+    slim = dataclasses.replace(result, legacy_segment_results=[])
+    runs = {history_id: {"payload": run_payload, "result": slim, "run": validated}, **runs}
+    history = [_history_row(history_id, run_payload), *session["history"]]
+    for dropped in history[MAX_HISTORY:]:
+        runs.pop(dropped["history_id"], None)
+    session = {**session, "status": "completed", "error": None, "form": form, "run": run_payload,
+               "history": history[:MAX_HISTORY], "active_history_id": history_id,
+               "next_history_id": history_id + 1}
+    return (session, runs,
             LogEntry("info", f"Backtest completed: {label} · run {result.run_id} · "
                              f"{result.total_trades} trades · {seconds:.1f}s"), result)
 
@@ -377,8 +432,10 @@ def render_custom_terminal() -> None:
     if tester_event is not None:
         # Runs synchronously inside this rerun. The event id is persisted only
         # afterwards, so an interrupted run is retried, never silently dropped.
-        tester_session, entry, result = handle_tester_event(tester_event, tester_session, registry=registry)
+        tester_session, runs, entry, result = handle_tester_event(
+            tester_event, tester_session, st.session_state.get(TESTER_RUNS_KEY, {}), registry=registry)
         st.session_state[TESTER_KEY] = tester_session
+        st.session_state[TESTER_RUNS_KEY] = runs
         if result is not None:
             st.session_state[TESTER_RESULT_KEY] = result  # full authoritative result, untruncated
         state = replace(state, bottom_panel="strategy_tester", bottom_open=True)
@@ -394,7 +451,7 @@ def render_custom_terminal() -> None:
     try:
         selected, resolution, frame = _load(state)
     except (UnsupportedTimeframeError, KeyError, FileNotFoundError, ValueError) as exc:
-        st.error(f"Custom terminal could not load {state.dataset_key} @ {state.timeframe}: {exc}")
+        st.error(f"TradingView Mode could not load {state.dataset_key} @ {state.timeframe}: {exc}")
         return
     st.session_state[STATE_KEY] = state
     st.session_state["tv_dataset_selection"] = state.dataset_key
@@ -419,14 +476,17 @@ def render_custom_terminal() -> None:
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
             logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected),
             ack=last_id, tester_payload={
-                **tester_session,
+                **{key: value for key, value in tester_session.items() if key != "next_history_id"},
                 "options": tester.tester_options(registry, all_datasets(), dataset_bounds),
             })
     except ValueError as exc:
-        st.error(f"Custom terminal payload rejected: {exc}")
+        st.error(f"TradingView Mode payload rejected: {exc}")
         return
     if not st.session_state.get(READY_KEY):
-        st.caption("Waiting for the custom frontend handshake… If this persists, the component failed to load "
-                   "(check the browser console) — Plotly is not being substituted.")
+        st.caption("Waiting for the TradingView Mode frontend… If this persists, the component failed to load "
+                   "(check the browser console).")
     render_terminal_component(payload, key=COMPONENT_KEY)
+    if tester_session.get("export"):
+        # Delivered once; the frontend downloads it by event id.
+        st.session_state[TESTER_KEY] = {**tester_session, "export": None}
 

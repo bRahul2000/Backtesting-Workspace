@@ -197,24 +197,27 @@ def _validate_tester(tester: Any, overlay: Any, bar_times: set[int]) -> None:
     _require(tester.get("status") in TESTER_STATUSES, f"tester.status {tester.get('status')!r} is invalid.")
     _require(isinstance(tester.get("options"), dict), "tester.options is required.")
     run = tester.get("run")
-    trade_ids: set = set()
+    keys: set = set()
     if run is not None:
-        for trade in run["trades"]:
+        for index, trade in enumerate(run["trades"]):
+            label = f"trade {trade.get('segment')}/{trade['trade_id']}"
+            _require(trade["key"] == index, f"{label}: key must be its trade_log position.")
             for name in _TRADE_TIMES:
-                _require(type(trade[name]) is int, f"trade {trade['trade_id']}: {name} must be epoch seconds.")
-            _require(trade["exit_time"] >= trade["entry_time"], f"trade {trade['trade_id']}: exit precedes entry.")
+                _require(type(trade[name]) is int, f"{label}: {name} must be epoch seconds.")
+            _require(trade["exit_time"] >= trade["entry_time"], f"{label}: exit precedes entry.")
             for name in _TRADE_NUMBERS:
                 value = trade[name]
-                _require(isinstance(value, (int, float)) and math.isfinite(value), f"trade {trade['trade_id']}: {name} must be finite.")
-            _require(trade["direction"] in ("LONG", "SHORT"), f"trade {trade['trade_id']}: bad direction.")
-            trade_ids.add(trade["trade_id"])
+                _require(isinstance(value, (int, float)) and math.isfinite(value), f"{label}: {name} must be finite.")
+            _require(trade["direction"] in ("LONG", "SHORT"), f"{label}: bad direction.")
+            keys.add(trade["key"])
         for name in ("equity", "drawdown"):
             times = [point["time"] for point in run["curves"][name]]
             _require(all(type(t) is int for t in times) and times == sorted(set(times)),
                      f"{name} curve times must be strictly increasing epoch seconds.")
+    _require(isinstance(tester.get("history", []), list), "tester.history must be a list.")
     _require(isinstance(overlay, dict) and isinstance(overlay.get("trades"), list), "trade_overlay is required.")
     for item in overlay["trades"]:
-        _require(item["trade_id"] in trade_ids, f"trade_overlay references unknown trade {item['trade_id']!r}.")
+        _require(item["key"] in keys, f"trade_overlay references unknown trade key {item['key']!r}.")
         _require(item["entry_bar"] in bar_times and item["exit_bar"] in bar_times, "trade_overlay bars must be chart bars.")
 
 
@@ -239,6 +242,13 @@ def _is_iso_date(value: Any) -> bool:
 def _is_params(value: Any) -> bool:
     return isinstance(value, dict) and len(value) <= 8 and all(
         _is_str(k) and isinstance(v, (int, float)) and not isinstance(v, bool) for k, v in value.items())
+
+
+EXPORT_KINDS = ("trades_csv", "summary_json")
+
+
+def _is_int(value: Any) -> bool:
+    return type(value) is int and value >= 0
 
 
 def _is_scalar_map(value: Any, limit: int) -> bool:
@@ -268,11 +278,16 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "run_backtest": {"strategy_id": (True, _is_str), "dataset_key": (True, _is_str),
                      "broker_profile": (True, _is_str), "dataset_role": (True, _is_str),
                      "start": (True, _is_iso_date), "end": (True, _is_iso_date),
+                     "ledger_mode": (True, _is_str),
                      "parameters": (False, lambda v: _is_scalar_map(v, 64)),
                      "settings": (False, lambda v: _is_scalar_map(v, 16))},
     "clear_backtest": {},
+    # Session run history: restore an already-returned result (never re-executes).
+    "restore_run": {"history_id": (True, _is_int)},
+    # Python-generated authoritative export of a session run.
+    "export_run": {"history_id": (True, _is_int), "kind": (True, lambda v: v in EXPORT_KINDS)},
 }
-TESTER_EVENTS = ("run_backtest", "clear_backtest")
+TESTER_EVENTS = ("run_backtest", "clear_backtest", "restore_run", "export_run")
 TESTER_STATUSES = ("idle", "completed", "failed")
 
 

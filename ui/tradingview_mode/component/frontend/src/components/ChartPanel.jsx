@@ -54,7 +54,7 @@ function Legend({ engine, payload }) {
   );
 }
 
-export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesById, selectedTradeId }) {
+export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, selectedKey }) {
   const host = useRef(null);
   const [engine, setEngine] = useState(null);
   const [dismissed, setDismissed] = useState(() => new Set());
@@ -69,8 +69,8 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesById, sel
   useEffect(() => {
     if (!engine) return;
     engine.update(payload);
-    engine.setTrades(payload.trade_overlay.trades, tradesById, selectedTradeId);
-  }, [engine, payload, tradesById, selectedTradeId]);
+    engine.setTrades(payload.trade_overlay.trades, tradesByKey, selectedKey);
+  }, [engine, payload, tradesByKey, selectedKey]);
   useEffect(() => engine?.onCrosshair((legend) => onCrosshairTime(legend.time)), [engine, onCrosshairTime]);
 
   const notices = payload.notices.filter((notice) => !dismissed.has(notice.message));

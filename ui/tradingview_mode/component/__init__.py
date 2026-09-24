@@ -45,9 +45,9 @@ def component_available() -> bool:
 
 
 def render_terminal_component(payload: dict, *, key: str, height: int = DEFAULT_HEIGHT):
-    """Render the terminal. Never falls back to Plotly: problems are shown as errors."""
+    """Render the terminal. Problems are shown as errors; there is no other renderer."""
     if _component is None:
         problems = build_problems() or ["The component was not registered at import; restart Streamlit after building."]
-        st.error("Custom frontend is unavailable:\n\n" + "\n".join(f"- {problem}" for problem in problems))
+        st.error("TradingView Mode frontend is unavailable:\n\n" + "\n".join(f"- {problem}" for problem in problems))
         return None
     return _component(payload=payload, key=key, default=None, height=height)

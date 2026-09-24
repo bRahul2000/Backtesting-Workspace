@@ -265,3 +265,48 @@ input { font: inherit; color: var(--text); }
   .properties { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tested-on { display: none; }
 }
+
+/* ---- strategy tester phase 2 ------------------------------------------ */
+.trades-ws { display: grid; grid-template-columns: minmax(0, 1fr) 250px; height: 100%; min-height: 0; }
+.trades-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.trades-toolbar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--border); flex: none; flex-wrap: wrap; }
+.trades-toolbar .segmented { margin: 0; }
+.trades-toolbar select, .trades-toolbar .search { height: 22px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0 6px; font-size: 11px; }
+.trades-toolbar .search { width: 190px; }
+.trades-toolbar .search:focus, .trades-toolbar select:focus { outline: none; border-color: var(--accent); }
+.trade-details { border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
+.trade-details.empty { padding: 12px; color: var(--muted); font-size: 11.5px; }
+.details-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--border); flex: none; font-size: 11px; }
+.details-body { overflow: auto; padding: 4px 10px; font-size: 11px; }
+.details-body .kv { padding: 2px 0; border-bottom: 1px solid #161b24; }
+.details-body .kv span:last-child { text-align: right; overflow-wrap: anywhere; max-width: 62%; }
+.section-title.spaced { margin-top: 10px; }
+.period-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.period-head .segmented { margin: 0; }
+.period-scroll { max-height: 100%; overflow: auto; }
+.performance { height: 100%; min-height: 0; }
+.performance .perf-col { overflow: auto; min-height: 0; }
+.grid-table .source { font-size: 10px; text-align: right; }
+.diagnostics { padding: 6px 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; align-items: start; }
+.diag-section { border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); min-width: 0; }
+.diag-section summary { cursor: pointer; padding: 5px 8px; font-size: 11px; font-weight: 600; color: var(--text-2); display: flex; gap: 6px; align-items: center; }
+.diag-body { padding: 2px 8px 6px; font-size: 11px; }
+.diag-body .kv { padding: 2px 0; border-bottom: 1px solid #161b24; }
+.ledger-control { display: inline-flex; align-items: center; gap: 5px; padding: 0 4px; border-radius: 4px; }
+.ledger-control .segmented { margin: 0; }
+.ledger-control.is-research { background: rgba(226, 162, 59, 0.12); }
+.ledger-control.is-research .segmented button.is-active { background: rgba(226, 162, 59, 0.25); color: var(--warn); }
+.ledger-badge { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0 5px; border-radius: 3px; margin-left: 6px; }
+.ledger-badge.scratch { color: var(--text-2); background: var(--hover); }
+.ledger-badge.research { color: var(--warn); background: rgba(226, 162, 59, 0.15); }
+.tester-warn { margin: 6px 8px 0; padding: 5px 8px; border-left: 3px solid var(--warn); background: rgba(226, 162, 59, 0.08); font-size: 11.5px; flex: none; }
+.properties { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr); }
+.prop-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+.prop-group .kv { padding: 2px 0; border-bottom: 1px solid #161b24; font-size: 11px; }
+.prop-group .kv span:last-child { text-align: right; overflow-wrap: anywhere; max-width: 64%; }
+.group-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); padding: 4px 0 2px; }
+.history-table td { white-space: nowrap; }
+@media (max-width: 1100px) {
+  .trades-ws { grid-template-columns: minmax(0, 1fr) 210px; }
+  .diagnostics, .prop-groups { grid-template-columns: minmax(0, 1fr); }
+}
