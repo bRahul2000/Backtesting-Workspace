@@ -1,6 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { sendEvent } from "../events.js";
 import { Icon } from "./icons.jsx";
+import { StrategyTester } from "./tester/StrategyTester.jsx";
+import { TradesTable } from "./tester/TradesTable.jsx";
+
+const DEFAULT_HEIGHT = { strategy_tester: 330, trades: 260 };
+const HEIGHT_STORAGE = "tvterm:bottom-height:";
+
+function storedHeight(tab) {
+  try { return Number(window.sessionStorage.getItem(HEIGHT_STORAGE + tab)) || DEFAULT_HEIGHT[tab] || 176; } catch { return DEFAULT_HEIGHT[tab] || 176; }
+}
 
 const TABS = [
   ["indicators", "Indicators"],
@@ -61,26 +70,6 @@ function IndicatorsTab({ indicators, revision }) {
   );
 }
 
-function StrategyTab() {
-  return (
-    <div className="empty">
-      <b>Strategy Tester</b> is not connected in this phase. When it is, the Python backtester computes every
-      result (entries, stops, targets, metrics) and this panel only renders them.
-    </div>
-  );
-}
-
-function TradesTab({ trades }) {
-  return (
-    <table className="grid-table">
-      <thead><tr><th>#</th><th>Side</th><th>Entry (UTC)</th><th>Entry</th><th>Exit (UTC)</th><th>Exit</th><th>P&amp;L</th></tr></thead>
-      <tbody>
-        {trades.length === 0 && <tr><td colSpan={7} className="empty-cell">No trades. Trade results will come from the Python execution engine.</td></tr>}
-      </tbody>
-    </table>
-  );
-}
-
 function LogsTab({ logs, clientLogs }) {
   const [showDebug, setShowDebug] = useState(false);
   const merged = [
@@ -103,11 +92,34 @@ function LogsTab({ logs, clientLogs }) {
   );
 }
 
-export function BottomPanel({ payload, clientLogs }) {
+// Drag the top edge to resize; the height is remembered per tab for this browser tab.
+function useResizableHeight(tab) {
+  const [height, setHeight] = useState(() => storedHeight(tab));
+  useEffect(() => setHeight(storedHeight(tab)), [tab]);
+  const drag = useRef(null);
+  const onPointerDown = (event) => {
+    drag.current = { y: event.clientY, height };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const onPointerMove = (event) => {
+    if (!drag.current) return;
+    const next = Math.round(Math.min(620, Math.max(120, drag.current.height + drag.current.y - event.clientY)));
+    setHeight(next);
+  };
+  const onPointerUp = () => {
+    if (!drag.current) return;
+    drag.current = null;
+    try { window.sessionStorage.setItem(HEIGHT_STORAGE + tab, String(height)); } catch { /* ignore */ }
+  };
+  return { height, handlers: { onPointerDown, onPointerMove, onPointerUp } };
+}
+
+export function BottomPanel({ payload, clientLogs, pending, selectedTradeId, onSelectTrade, focusNote }) {
   // Optimistic echo of the Python-owned panel state; Python's value wins on the next payload.
   const [tab, setTab] = useState(payload.ui.bottom_panel);
   const [open, setOpen] = useState(payload.ui.bottom_open);
   useEffect(() => { setTab(payload.ui.bottom_panel); setOpen(payload.ui.bottom_open); }, [payload.ui.bottom_panel, payload.ui.bottom_open]);
+  const { height, handlers } = useResizableHeight(tab);
   const errorCount = payload.logs.filter((entry) => entry.level === "error").length + clientLogs.filter((e) => e.level === "error").length;
 
   const select = (next, nextOpen = true) => {
@@ -117,7 +129,8 @@ export function BottomPanel({ payload, clientLogs }) {
   };
 
   return (
-    <section className={`bottom ${open ? "is-open" : "is-collapsed"}`}>
+    <section className={`bottom ${open ? "is-open" : "is-collapsed"}`} style={open ? { height } : undefined}>
+      {open && <div className="bottom-resize" title="Drag to resize" {...handlers} />}
       <div className="bottom-tabs" role="tablist">
         {TABS.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={open && tab === key}
@@ -126,6 +139,8 @@ export function BottomPanel({ payload, clientLogs }) {
             {label}
             {key === "indicators" && payload.indicators.length > 0 && <span className="count">{payload.indicators.length}</span>}
             {key === "logs" && errorCount > 0 && <span className="count error">{errorCount}</span>}
+            {key === "strategy_tester" && pending?.type === "run_backtest" && <span className="spinner" />}
+            {key === "trades" && payload.tester.run && <span className="count">{payload.tester.run.trades.length}</span>}
           </button>
         ))}
         <div className="spacer" />
@@ -136,8 +151,17 @@ export function BottomPanel({ payload, clientLogs }) {
       {open && (
         <div className="bottom-body">
           {tab === "indicators" && <IndicatorsTab indicators={payload.indicators} revision={payload.ack} />}
-          {tab === "strategy_tester" && <StrategyTab />}
-          {tab === "trades" && <TradesTab trades={payload.trades} />}
+          {tab === "strategy_tester" && (
+            <StrategyTester payload={payload} pending={pending} selectedTradeId={selectedTradeId}
+              onSelectTrade={onSelectTrade} focusNote={focusNote} />
+          )}
+          {tab === "trades" && (
+            <div className="trades-tab">
+              {focusNote && <div className="tester-note">{focusNote}</div>}
+              <TradesTable run={payload.tester.run} precision={payload.tester.run?.price_precision ?? payload.price_precision}
+                selectedId={selectedTradeId} onSelect={onSelectTrade} />
+            </div>
+          )}
           {tab === "logs" && <LogsTab logs={payload.logs} clientLogs={clientLogs} />}
         </div>
       )}

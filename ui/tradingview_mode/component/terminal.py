@@ -10,7 +10,7 @@ Python owns every value in the payload. The frontend only renders it.
 """
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -18,6 +18,7 @@ import pandas as pd
 import streamlit as st
 
 from services.market_datasets import MarketDataset, all_datasets, dataset
+from strategies.registry import StrategyRegistry, discover_builtin_strategies
 from utils.data_validation import load_ohlcv_csv
 from ..indicators import INDICATORS, calculate_indicator
 from ..timeframes import (
@@ -30,9 +31,12 @@ from ..timeframes import (
 )
 from ..workspace import watchlist_groups
 from . import render_terminal_component
+from . import tester
 from .protocol import (
     CONTRACT_VERSION,
+    TESTER_EVENTS,
     EventValidationError,
+    FrontendEvent,
     bars_from_frame,
     bars_revision,
     parse_event,
@@ -56,6 +60,8 @@ STATE_KEY = "tv_terminal_state"
 LOGS_KEY = "tv_terminal_logs"
 LAST_EVENT_KEY = "tv_terminal_last_event_id"
 READY_KEY = "tv_terminal_ready"
+TESTER_KEY = "tv_terminal_tester"
+TESTER_RESULT_KEY = "tv_terminal_tester_result"
 MAX_LOGS = 200
 _RSI_LEVELS = (70.0, 50.0, 30.0)
 _SECONDARY_COLORS = {"signal": "#f5a623", "histogram": "#7d8799"}
@@ -84,6 +90,16 @@ def _last_closes(path_text: str, _mtime_marker: float) -> tuple[float | None, fl
     last = float(closes.iloc[-1]) if len(closes) else None
     previous = float(closes.iloc[-2]) if len(closes) > 1 else None
     return last, previous, price_precision(closes)
+
+
+@st.cache_data(show_spinner=False, max_entries=32)
+def _file_bounds(path_text: str, _mtime_marker: float) -> tuple[date, date] | None:
+    stamps = load_ohlcv_csv(Path(path_text))["timestamp"]
+    return (stamps.iloc[0].date(), stamps.iloc[-1].date()) if len(stamps) else None
+
+
+def dataset_bounds(entry: MarketDataset) -> tuple[date, date] | None:
+    return _file_bounds(str(entry.path), _mtime(entry.path)) if entry.exists else None
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +202,8 @@ def watchlist_payload(selected: MarketDataset) -> list[dict]:
 def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, resolution: TimeframeResolution,
                            frame: pd.DataFrame, bounds: tuple[date, date] | None, shown: tuple[date, date] | None,
                            logs: list[LogEntry], notices: list[dict[str, str]],
-                           watchlist: list[dict], ack: str | None = None) -> dict:
+                           watchlist: list[dict], ack: str | None = None,
+                           tester_payload: dict | None = None) -> dict:
     bars = bars_from_frame(frame)
     times = [bar["time"] for bar in bars]
     overlays, panes, indicator_notices = indicator_payload(frame, times, state.indicators)
@@ -237,13 +254,17 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         "notices": notices + indicator_notices,
         # Declared so the frontend can show honest placeholders; Python will
         # own all of these results when they are built.
-        "capabilities": {"drawings": False, "strategy_tester": False, "trades": False, "replay": False, "live": False},
-        "strategy": None,
-        "trades": [],
+        "capabilities": {"drawings": False, "strategy_tester": True, "trades": True, "replay": False, "live": False},
         "max_bars": MAX_BARS,
         # Id of the last frontend event Python processed; the frontend serializes on it.
         "ack": ack,
     }
+    tester_payload = tester_payload or {"status": "idle", "options": {}, "form": None, "run": None, "error": None}
+    payload["tester"] = tester_payload
+    payload["trade_overlay"] = tester.trade_overlay(
+        tester_payload.get("run"), chart_identity=(selected.instrument, selected.broker, selected.symbol),
+        bar_times=times, bar_seconds=resolution.target_seconds,
+        chart_label=f"{selected.symbol} · {selected.broker} · {resolution.target}")
     return validate_payload(payload)
 
 
@@ -270,20 +291,59 @@ def _log(entry: LogEntry) -> None:
 
 
 def consume_event(state: TerminalState, raw, ctx: TerminalContext, last_id: str | None
-                  ) -> tuple[TerminalState, LogEntry | None, str | None]:
+                  ) -> tuple[TerminalState, LogEntry | None, str | None, FrontendEvent | None]:
     """Apply ``raw`` exactly once. Streamlit keeps a component's last value across
-    reruns, so an event already processed (same id) is ignored."""
+    reruns, so an event already processed (same id) is ignored.
+
+    Strategy Tester events are returned (not applied) for ``handle_tester_event``.
+    """
     if not raw:
-        return state, None, last_id
+        return state, None, last_id, None
     event_id = raw.get("id") if isinstance(raw, dict) else None
     if event_id is not None and event_id == last_id:
-        return state, None, last_id
+        return state, None, last_id, None
     try:
         event = parse_event(raw)
     except EventValidationError as exc:
-        return state, LogEntry("error", f"Rejected malformed event: {exc}"), event_id
+        return state, LogEntry("error", f"Rejected malformed event: {exc}"), event_id, None
+    if event.type in TESTER_EVENTS:
+        return state, None, event.id, event
     new_state, entry = apply_event(state, event, ctx)
-    return new_state, entry, event.id
+    return new_state, entry, event.id, None
+
+
+def empty_tester_session() -> dict:
+    return {"status": "idle", "error": None, "form": None, "run": None}
+
+
+def handle_tester_event(event: FrontendEvent, session: dict, *, registry: StrategyRegistry,
+                        lookup_dataset=dataset, bounds=dataset_bounds, runner=None,
+                        ledger_path: Path = tester.LEDGER_PATH):
+    """Validate and execute one Strategy Tester event through the audited adapter.
+
+    Returns (new_session, log_entry, result_or_None). Called once per event id.
+    """
+    if event.type == "clear_backtest":
+        return empty_tester_session(), LogEntry("info", "Strategy Tester result cleared."), None
+    form = dict(event.data)
+    try:
+        validated = tester.validate_run_request(event.data, registry=registry, lookup_dataset=lookup_dataset,
+                                                bounds=bounds)
+    except tester.TesterValidationError as exc:
+        return ({**session, "status": "failed", "error": f"Invalid configuration: {exc}", "form": form},
+                LogEntry("error", f"Backtest rejected: {exc}"), None)
+    label = f"{validated.descriptor.metadata.name} on {validated.dataset.key} ({event.data['start']}..{event.data['end']})"
+    try:
+        result, seconds = tester.timed_run(validated, runner=runner, ledger_path=ledger_path)
+        run_payload = tester.build_run_payload(result, validated, duration_seconds=seconds)
+        # Display decimals of the tested dataset (the chart may show another market).
+        run_payload["price_precision"] = _last_closes(str(validated.dataset.path), _mtime(validated.dataset.path))[2]
+    except Exception as exc:  # the audited adapter's own refusal or failure, shown verbatim
+        return ({**session, "status": "failed", "error": f"{type(exc).__name__}: {exc}", "form": form},
+                LogEntry("error", f"Backtest failed: {label}: {exc}"), None)
+    return ({"status": "completed", "error": None, "form": form, "run": run_payload},
+            LogEntry("info", f"Backtest completed: {label} · run {result.run_id} · "
+                             f"{result.total_trades} trades · {seconds:.1f}s"), result)
 
 
 def _bounds(frame: pd.DataFrame) -> tuple[date, date] | None:
@@ -310,8 +370,18 @@ def render_custom_terminal() -> None:
     except Exception:  # bounds only sharpen date validation
         bounds = None
     raw_event = st.session_state.get(COMPONENT_KEY)
-    state, entry, last_id = consume_event(
+    state, entry, last_id, tester_event = consume_event(
         state, raw_event, context_for(bounds), st.session_state.get(LAST_EVENT_KEY))
+    tester_session = st.session_state.get(TESTER_KEY) or empty_tester_session()
+    registry = discover_builtin_strategies()
+    if tester_event is not None:
+        # Runs synchronously inside this rerun. The event id is persisted only
+        # afterwards, so an interrupted run is retried, never silently dropped.
+        tester_session, entry, result = handle_tester_event(tester_event, tester_session, registry=registry)
+        st.session_state[TESTER_KEY] = tester_session
+        if result is not None:
+            st.session_state[TESTER_RESULT_KEY] = result  # full authoritative result, untruncated
+        state = replace(state, bottom_panel="strategy_tester", bottom_open=True)
     st.session_state[LAST_EVENT_KEY] = last_id
     if entry is not None:
         _log(entry)
@@ -348,7 +418,10 @@ def render_custom_terminal() -> None:
         payload = build_terminal_payload(
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
             logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected),
-            ack=last_id)
+            ack=last_id, tester_payload={
+                **tester_session,
+                "options": tester.tester_options(registry, all_datasets(), dataset_bounds),
+            })
     except ValueError as exc:
         st.error(f"Custom terminal payload rejected: {exc}")
         return

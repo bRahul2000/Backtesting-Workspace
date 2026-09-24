@@ -109,23 +109,23 @@ def test_validate_payload_rejects_contract_violations(tamper, message):
 def test_consume_event_applies_each_event_id_exactly_once():
     state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m")
     raw = {"id": "n-1", "type": "add_indicator", "data": {"key": "ema"}}
-    state, entry, last = consume_event(state, raw, context_for(), None)
+    state, entry, last, _ = consume_event(state, raw, context_for(), None)
     assert len(state.indicators) == 1 and entry.level == "info" and last == "n-1"
     # Streamlit re-delivers the same component value on unrelated reruns.
-    again, entry, last = consume_event(state, raw, context_for(), last)
+    again, entry, last, _ = consume_event(state, raw, context_for(), last)
     assert again == state and entry is None and last == "n-1"
 
 
 def test_consume_event_logs_malformed_events_and_acknowledges_them():
     state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m")
-    new, entry, last = consume_event(state, {"id": "n-2", "type": "place_order", "data": {}}, context_for(), None)
+    new, entry, last, _ = consume_event(state, {"id": "n-2", "type": "place_order", "data": {}}, context_for(), None)
     assert new == state and entry.level == "error" and last == "n-2"
 
 
 def test_real_registry_timeframe_rejection_keeps_provider():
     state = TerminalState(dataset_key="EXNESS_XAUUSDM_M15", timeframe="15m")
     raw = {"id": "n-3", "type": "select_timeframe", "data": {"timeframe": "1m"}}
-    new, entry, _ = consume_event(state, raw, context_for(), None)
+    new, entry, _, _ = consume_event(state, raw, context_for(), None)
     assert new == state and entry.level == "error"
 
 

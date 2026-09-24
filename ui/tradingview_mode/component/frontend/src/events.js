@@ -11,6 +11,9 @@ let inFlight = null;
 let inFlightTimer = null;
 const queue = [];
 const listeners = new Set();
+// A backtest runs synchronously in one Streamlit rerun and can take minutes.
+const TIMEOUT_MS = { run_backtest: 30 * 60 * 1000 };
+const DEFAULT_TIMEOUT_MS = 60 * 1000;
 
 function notify() {
   listeners.forEach((listener) => listener(inFlight));
@@ -19,15 +22,16 @@ function notify() {
 function dispatch(event) {
   inFlight = event;
   clearTimeout(inFlightTimer);
-  // Safety valve only: a slow first load (uncached aggregation) can take
-  // seconds, and sending the next event early would make Streamlit restart
-  // the run and drop this one. Unblock after 60s and say so.
+  // Safety valve only: a slow first load (uncached aggregation) or a backtest
+  // can take a while, and sending the next event early would make Streamlit
+  // restart the run and drop this one. Unblock after the timeout and say so.
+  const timeout = TIMEOUT_MS[event.type] ?? DEFAULT_TIMEOUT_MS;
   inFlightTimer = setTimeout(() => {
     window.dispatchEvent(new CustomEvent("tvterm:log", {
-      detail: { level: "warning", message: `No acknowledgement from Python for ${event.type} (${event.id}) after 60s.` },
+      detail: { level: "warning", message: `No acknowledgement from Python for ${event.type} (${event.id}) after ${timeout / 1000}s.` },
     }));
     acknowledge(event.id, true);
-  }, 60000);
+  }, timeout);
   Streamlit.setComponentValue(event);
   notify();
 }

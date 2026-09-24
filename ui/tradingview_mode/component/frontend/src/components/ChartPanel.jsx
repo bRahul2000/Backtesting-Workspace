@@ -54,7 +54,7 @@ function Legend({ engine, payload }) {
   );
 }
 
-export function ChartPanel({ payload, onEngine, onCrosshairTime }) {
+export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesById, selectedTradeId }) {
   const host = useRef(null);
   const [engine, setEngine] = useState(null);
   const [dismissed, setDismissed] = useState(() => new Set());
@@ -66,7 +66,11 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime }) {
     return () => { onEngine(null); instance.destroy(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { engine?.update(payload); }, [engine, payload]);
+  useEffect(() => {
+    if (!engine) return;
+    engine.update(payload);
+    engine.setTrades(payload.trade_overlay.trades, tradesById, selectedTradeId);
+  }, [engine, payload, tradesById, selectedTradeId]);
   useEffect(() => engine?.onCrosshair((legend) => onCrosshairTime(legend.time)), [engine, onCrosshairTime]);
 
   const notices = payload.notices.filter((notice) => !dismissed.has(notice.message));

@@ -8,6 +8,7 @@ import {
   LineSeries,
   LineStyle,
   createChart,
+  createSeriesMarkers,
 } from "lightweight-charts";
 
 export const COLORS = {
@@ -18,6 +19,9 @@ export const COLORS = {
   up: "#22ab94",
   down: "#f23645",
   crosshair: "#5d6778",
+  entry: "#4aa3ff",
+  stop: "#f23645",
+  target: "#22ab94",
 };
 
 const DEFAULT_VISIBLE_BARS = 180;
@@ -81,6 +85,10 @@ export class ChartEngine {
     }, 0);
     this.volume.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
 
+    this.markers = createSeriesMarkers(this.candles, []);
+    this.tradeSig = null;
+    this.tradeLines = null; // lazily created entry / SL / TP segments
+
     this.chart.subscribeCrosshairMove((param) => this.emitCrosshair(param));
     this.chart.timeScale().subscribeVisibleTimeRangeChange((range) => this.rememberRange(range));
     // Pane legends are positioned from the laid-out pane elements.
@@ -116,6 +124,81 @@ export class ChartEngine {
     if (newView) this.restoreOrDefaultRange();
     else if (newBars) this.applyRange(keepRange);
     this.emitSoon();
+  }
+
+  // ---- Strategy Tester trades (all values from Python) -------------------
+
+  // overlay: [{trade_id, entry_bar, exit_bar}] (Python-placed chart bars)
+  // tradesById: Map of Python trade objects; selectedId: highlighted trade or null
+  setTrades(overlay, tradesById, selectedId) {
+    const sig = `${this.barsRev}|${overlay.map((o) => o.trade_id).join(",")}|${selectedId ?? ""}|${tradesById.size}`;
+    if (sig === this.tradeSig) return;
+    this.tradeSig = sig;
+    const markers = [];
+    let selected = null;
+    for (const item of overlay) {
+      const trade = tradesById.get(item.trade_id);
+      if (!trade) continue;
+      const isSelected = trade.trade_id === selectedId;
+      const long = trade.direction === "LONG";
+      const win = trade.pnl > 0;
+      const size = isSelected ? 2 : 1;
+      markers.push({
+        time: item.entry_bar, position: long ? "belowBar" : "aboveBar", shape: long ? "arrowUp" : "arrowDown",
+        color: isSelected ? "#ffffff" : long ? COLORS.up : COLORS.down, size,
+        text: `${long ? "L" : "S"}${isSelected ? ` #${trade.trade_id}` : ""}`,
+      });
+      markers.push({
+        time: item.exit_bar, position: long ? "aboveBar" : "belowBar", shape: "circle",
+        color: isSelected ? "#ffffff" : win ? COLORS.target : COLORS.stop, size,
+        text: trade.exit_label === "Exit" ? "Exit" : trade.exit_label,
+      });
+      if (isSelected) selected = { trade, item };
+    }
+    markers.sort((a, b) => a.time - b.time);
+    this.markers.setMarkers(markers);
+    this.drawSelectedTrade(selected);
+  }
+
+  drawSelectedTrade(selected) {
+    if (!this.tradeLines) {
+      const line = (color, title, style) => this.chart.addSeries(LineSeries, {
+        color, lineWidth: 2, lineStyle: style, title, priceLineVisible: false, lastValueVisible: true,
+        crosshairMarkerVisible: false, pointMarkersVisible: true, pointMarkersRadius: 2,
+      }, 0);
+      this.tradeLines = {
+        entry: line(COLORS.entry, "Entry", LineStyle.Solid),
+        stop: line(COLORS.stop, "SL", LineStyle.Dashed),
+        target: line(COLORS.target, "TP", LineStyle.Dashed),
+      };
+    }
+    const precision = this.precision ?? 2;
+    Object.values(this.tradeLines).forEach((series) => series.applyOptions({
+      priceFormat: { type: "price", precision, minMove: 10 ** -precision },
+    }));
+    if (!selected) {
+      Object.values(this.tradeLines).forEach((series) => series.setData([]));
+      return;
+    }
+    // Limited segments from the entry bar to the exit bar at the exact trade prices.
+    const { trade, item } = selected;
+    const points = (value) => (item.entry_bar === item.exit_bar
+      ? [{ time: item.entry_bar, value }]
+      : [{ time: item.entry_bar, value }, { time: item.exit_bar, value }]);
+    this.tradeLines.entry.setData(points(trade.entry_price));
+    this.tradeLines.stop.setData(points(trade.stop_loss));
+    this.tradeLines.target.setData(points(trade.take_profit));
+  }
+
+  // Centre the view on a trade that is placed on this chart.
+  focusBars(entryBar, exitBar) {
+    const entryIndex = this.findIndex(entryBar);
+    const exitIndex = this.findIndex(exitBar);
+    if (entryIndex < 0 || exitIndex < 0) return false;
+    const span = Math.max(exitIndex - entryIndex, 1);
+    const pad = Math.max(40, span);
+    this.chart.timeScale().setVisibleLogicalRange({ from: entryIndex - pad, to: exitIndex + pad });
+    return true;
   }
 
   setCrosshairMode(mode) {

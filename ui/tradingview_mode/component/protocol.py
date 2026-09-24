@@ -183,8 +183,39 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
         _require(isinstance(item, dict) and isinstance(item.get("dataset_key"), str), "watchlist item needs dataset_key.")
     _require(payload.get("ui", {}).get("bottom_panel") in BOTTOM_PANELS, "ui.bottom_panel is invalid.")
     _require(type(payload.get("price_precision")) is int, "price_precision must be an integer.")
+    _validate_tester(payload.get("tester"), payload.get("trade_overlay"), bar_times)
     _require(payload.get("ack") is None or isinstance(payload["ack"], str), "ack must be an event id or null.")
     return payload
+
+
+_TRADE_TIMES = ("entry_time", "exit_time")
+_TRADE_NUMBERS = ("entry_price", "stop_loss", "take_profit", "exit_price", "pnl", "r_multiple")
+
+
+def _validate_tester(tester: Any, overlay: Any, bar_times: set[int]) -> None:
+    _require(isinstance(tester, dict), "tester is required.")
+    _require(tester.get("status") in TESTER_STATUSES, f"tester.status {tester.get('status')!r} is invalid.")
+    _require(isinstance(tester.get("options"), dict), "tester.options is required.")
+    run = tester.get("run")
+    trade_ids: set = set()
+    if run is not None:
+        for trade in run["trades"]:
+            for name in _TRADE_TIMES:
+                _require(type(trade[name]) is int, f"trade {trade['trade_id']}: {name} must be epoch seconds.")
+            _require(trade["exit_time"] >= trade["entry_time"], f"trade {trade['trade_id']}: exit precedes entry.")
+            for name in _TRADE_NUMBERS:
+                value = trade[name]
+                _require(isinstance(value, (int, float)) and math.isfinite(value), f"trade {trade['trade_id']}: {name} must be finite.")
+            _require(trade["direction"] in ("LONG", "SHORT"), f"trade {trade['trade_id']}: bad direction.")
+            trade_ids.add(trade["trade_id"])
+        for name in ("equity", "drawdown"):
+            times = [point["time"] for point in run["curves"][name]]
+            _require(all(type(t) is int for t in times) and times == sorted(set(times)),
+                     f"{name} curve times must be strictly increasing epoch seconds.")
+    _require(isinstance(overlay, dict) and isinstance(overlay.get("trades"), list), "trade_overlay is required.")
+    for item in overlay["trades"]:
+        _require(item["trade_id"] in trade_ids, f"trade_overlay references unknown trade {item['trade_id']!r}.")
+        _require(item["entry_bar"] in bar_times and item["exit_bar"] in bar_times, "trade_overlay bars must be chart bars.")
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +241,12 @@ def _is_params(value: Any) -> bool:
         _is_str(k) and isinstance(v, (int, float)) and not isinstance(v, bool) for k, v in value.items())
 
 
+def _is_scalar_map(value: Any, limit: int) -> bool:
+    return isinstance(value, dict) and len(value) <= limit and all(
+        _is_str(k) and (isinstance(v, (bool, str)) or (isinstance(v, (int, float)) and math.isfinite(v)))
+        for k, v in value.items())
+
+
 # field -> (required, validator). Unknown fields are rejected.
 EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "chart_ready": {},
@@ -226,7 +263,17 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "set_bottom_panel": {"panel": (True, lambda v: v in BOTTOM_PANELS),
                          "open": (False, lambda v: isinstance(v, bool))},
     "set_chart_setting": {"show_volume": (True, lambda v: isinstance(v, bool))},
+    # Strategy Tester. Semantics (registry, dataset, broker, parameters) are
+    # validated in tester.py against the authoritative configuration model.
+    "run_backtest": {"strategy_id": (True, _is_str), "dataset_key": (True, _is_str),
+                     "broker_profile": (True, _is_str), "dataset_role": (True, _is_str),
+                     "start": (True, _is_iso_date), "end": (True, _is_iso_date),
+                     "parameters": (False, lambda v: _is_scalar_map(v, 64)),
+                     "settings": (False, lambda v: _is_scalar_map(v, 16))},
+    "clear_backtest": {},
 }
+TESTER_EVENTS = ("run_backtest", "clear_backtest")
+TESTER_STATUSES = ("idle", "completed", "failed")
 
 
 @dataclass(frozen=True)

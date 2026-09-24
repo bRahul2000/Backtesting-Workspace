@@ -45,3 +45,22 @@ export function paramsLabel(params) {
   const values = Object.values(params || {});
   return values.length ? values.join(", ") : "";
 }
+
+// Python sends infinities as "inf"/"-inf" (e.g. a loss-free profit factor).
+export function formatMetric(value, digits = 2, suffix = "") {
+  if (value === "inf") return "∞";
+  if (value === "-inf") return "−∞";
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  return `${Number(value).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}${suffix}`;
+}
+
+export function formatMoney(value, digits = 2) {
+  if (value === null || value === undefined) return "—";
+  const sign = value < 0 ? "−" : "";
+  return `${sign}$${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+
+export function signClass(value) {
+  if (typeof value !== "number" || value === 0) return "";
+  return value > 0 ? "up" : "down";
+}

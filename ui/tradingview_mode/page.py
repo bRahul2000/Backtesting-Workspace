@@ -28,16 +28,40 @@ def _custom_frontend_default() -> bool:
 
 def render_tradingview_mode():
     # Development renderer flag. ON renders only the React terminal (never Plotly);
-    # OFF keeps the proven Streamlit + Plotly workspace as the fallback.
+    # OFF renders only the proven Streamlit + Plotly workspace (the fallback).
     custom = st.toggle("Custom Chart Prototype", value=_custom_frontend_default(), key=CUSTOM_FRONTEND_FLAG,
                        help="Render TradingView Mode with the React + Lightweight Charts terminal. "
                             "Default can be set with TV_CUSTOM_FRONTEND=1.")
+    # One slot per workspace, both written at the start of every run. The
+    # inactive slot becomes an empty element immediately, which removes the
+    # other workspace's elements from the previous run right away. Streamlit
+    # otherwise keeps a previous run's elements (and a reused container's old
+    # children) on screen until the new run finishes, which showed the legacy
+    # workspace under the React terminal for the whole of a slow run.
+    custom_slot, legacy_slot = st.empty(), st.empty()
     if custom:
-        from .component.terminal import render_custom_terminal
-        st.markdown(_TERMINAL_CSS, unsafe_allow_html=True)
-        render_custom_terminal()
+        with custom_slot.container():
+            render_custom_workspace()
         return
+    with legacy_slot.container():
+        render_legacy_workspace()
 
+
+def render_custom_workspace():
+    """React + Lightweight Charts terminal only. Failures are shown here, never
+    replaced by the legacy workspace; turn the toggle off to use Plotly."""
+    from .component.terminal import render_custom_terminal
+
+    st.markdown(_TERMINAL_CSS, unsafe_allow_html=True)
+    try:
+        render_custom_terminal()
+    except Exception as exc:  # Streamlit's rerun/stop signals are BaseException and pass through
+        st.error(f"Custom frontend failed: {type(exc).__name__}: {exc}\n\n"
+                 "Turn off “Custom Chart Prototype” to use the Plotly workspace.")
+
+
+def render_legacy_workspace():
+    """The original Streamlit + Plotly TradingView workspace (unchanged)."""
     st.markdown("### TradingView Mode")
     st.caption("Mode: Historical")
     ds, selected_tf_label, indicator_popover, tools_popover, settings_popover = render_top_toolbar()
