@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -13,7 +15,29 @@ from .timeframes import (
 from .indicators import INDICATORS, calculate_indicator
 from .workspace import render_top_toolbar, render_workspace_panels
 
+CUSTOM_FRONTEND_FLAG = "tv_custom_chart_prototype_enabled"
+_TERMINAL_CSS = """<style>
+[data-testid="stMainBlockContainer"] { padding-top: 3.4rem; padding-bottom: 0; padding-left: 1rem; padding-right: 1rem; max-width: 100%; }
+[data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"] { gap: 0.25rem; }
+</style>"""
+
+
+def _custom_frontend_default() -> bool:
+    return os.environ.get("TV_CUSTOM_FRONTEND", "").strip().lower() in {"1", "true", "on", "yes"}
+
+
 def render_tradingview_mode():
+    # Development renderer flag. ON renders only the React terminal (never Plotly);
+    # OFF keeps the proven Streamlit + Plotly workspace as the fallback.
+    custom = st.toggle("Custom Chart Prototype", value=_custom_frontend_default(), key=CUSTOM_FRONTEND_FLAG,
+                       help="Render TradingView Mode with the React + Lightweight Charts terminal. "
+                            "Default can be set with TV_CUSTOM_FRONTEND=1.")
+    if custom:
+        from .component.terminal import render_custom_terminal
+        st.markdown(_TERMINAL_CSS, unsafe_allow_html=True)
+        render_custom_terminal()
+        return
+
     st.markdown("### TradingView Mode")
     st.caption("Mode: Historical")
     ds, selected_tf_label, indicator_popover, tools_popover, settings_popover = render_top_toolbar()

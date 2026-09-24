@@ -1,0 +1,264 @@
+"""Validated Python <-> frontend contract for the custom TradingView Mode terminal.
+
+Python is authoritative. The frontend receives a JSON-compatible payload that
+it only renders, and sends back small explicit events that Python validates
+before anything changes. See ``CONTRACT.md`` beside this file.
+
+Canonical time: every chart time is an integer Unix epoch in seconds, UTC.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+import hashlib
+import math
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+
+CONTRACT_VERSION = 1
+MODES = ("historical",)
+BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs")
+_BAR_FIELDS = ("time", "open", "high", "low", "close", "volume")
+_REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+
+
+class PayloadValidationError(ValueError):
+    """The payload Python is about to send violates the contract."""
+
+
+class EventValidationError(ValueError):
+    """A frontend event is malformed or not part of the contract."""
+
+
+# ---------------------------------------------------------------------------
+# Bars and series
+# ---------------------------------------------------------------------------
+
+def epoch_seconds(timestamps: pd.Series) -> np.ndarray:
+    """Convert a UTC timestamp column to integer epoch seconds.
+
+    Naive or non-UTC timestamps are rejected rather than reinterpreted.
+    """
+    if not pd.api.types.is_datetime64_any_dtype(timestamps):
+        raise ValueError("Chart timestamps must be datetimes.")
+    if timestamps.dt.tz is None or str(timestamps.dt.tz) != "UTC":
+        raise ValueError("Chart timestamps must be UTC.")
+    utc = timestamps.dt.tz_convert("UTC").dt.tz_localize(None)
+    return utc.to_numpy(dtype="datetime64[s]").astype(np.int64)
+
+
+def bars_from_frame(data: pd.DataFrame) -> list[dict[str, float | int]]:
+    """Convert an exact UTC OHLCV dataframe to epoch-second bar records."""
+    missing = [column for column in _REQUIRED_COLUMNS if column not in data.columns]
+    if missing:
+        raise ValueError(f"Missing chart column(s): {', '.join(missing)}")
+    timestamps = data["timestamp"]
+    times = epoch_seconds(timestamps)
+    if timestamps.duplicated().any():
+        raise ValueError("Chart timestamps must not contain duplicates.")
+    if len(times) > 1 and not bool(np.all(np.diff(times) > 0)):
+        raise ValueError("Chart timestamps must be chronological.")
+    values = {}
+    for column in ("open", "high", "low", "close", "volume"):
+        array = data[column].to_numpy(dtype=float)
+        if not np.all(np.isfinite(array)):
+            raise ValueError(f"{column} must be finite.")
+        values[column] = array.tolist()
+    time_list = times.tolist()
+    return [
+        {"time": int(time_list[i]), "open": values["open"][i], "high": values["high"][i],
+         "low": values["low"][i], "close": values["close"][i], "volume": values["volume"][i]}
+        for i in range(len(time_list))
+    ]
+
+
+def series_points(times: list[int], values: pd.Series) -> list[dict[str, float | int]]:
+    """Pair indicator values with bar times, omitting warm-up NaNs."""
+    array = values.to_numpy(dtype=float)
+    if len(array) != len(times):
+        raise ValueError("Indicator series length does not match bars.")
+    if np.isinf(array).any():
+        raise ValueError("Indicator values must be finite.")
+    return [{"time": int(times[i]), "value": float(array[i])}
+            for i in range(len(times)) if not math.isnan(array[i])]
+
+
+def price_precision(values: pd.Series | list[float], *, minimum: int = 2, maximum: int = 6) -> int:
+    """Smallest decimal count that represents recent prices exactly (display only)."""
+    array = np.asarray(values, dtype=float)[-500:]
+    array = array[np.isfinite(array)]
+    for digits in range(minimum, maximum + 1):
+        scaled = array * 10 ** digits
+        # Tolerance covers float representation error only (~1e-16 relative).
+        if np.all(np.abs(scaled - np.round(scaled)) < np.maximum(1e-6, np.abs(scaled) * 1e-10)):
+            return digits
+    return maximum
+
+
+def bars_revision(bars: list[dict[str, Any]], *identity: object) -> str:
+    """Stable fingerprint so the frontend can skip unchanged data."""
+    digest = hashlib.sha1(repr(identity).encode())
+    if bars:
+        digest.update(np.array([[bar[f] for f in _BAR_FIELDS] for bar in bars], dtype=float).tobytes())
+    return digest.hexdigest()[:16]
+
+
+# ---------------------------------------------------------------------------
+# Payload
+# ---------------------------------------------------------------------------
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise PayloadValidationError(message)
+
+
+def _validate_points(points: Any, where: str, bar_times: set[int]) -> None:
+    _require(isinstance(points, list), f"{where}.data must be a list.")
+    previous = None
+    for point in points:
+        _require(isinstance(point, dict) and set(point) == {"time", "value"}, f"{where}: bad point {point!r}.")
+        _require(type(point["time"]) is int and point["time"] in bar_times, f"{where}: time {point['time']!r} is not a bar time.")
+        _require(isinstance(point["value"], float) and math.isfinite(point["value"]), f"{where}: value must be a finite float.")
+        _require(previous is None or point["time"] > previous, f"{where}: times must increase.")
+        previous = point["time"]
+
+
+def _validate_series_list(series_list: Any, where: str, bar_times: set[int]) -> None:
+    _require(isinstance(series_list, list) and series_list, f"{where}.series must be a non-empty list.")
+    for index, series in enumerate(series_list):
+        label = f"{where}.series[{index}]"
+        _require(isinstance(series, dict), f"{label} must be an object.")
+        _require(series.get("type") in ("line", "histogram"), f"{label}.type must be line or histogram.")
+        _require(isinstance(series.get("name"), str) and series["name"], f"{label}.name is required.")
+        _require(isinstance(series.get("color"), str), f"{label}.color is required.")
+        _validate_points(series.get("data"), label, bar_times)
+
+
+def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate a complete payload before it is sent. Returns it unchanged."""
+    _require(isinstance(payload, dict), "Payload must be an object.")
+    _require(payload.get("contract") == CONTRACT_VERSION, "Unsupported contract version.")
+    _require(payload.get("mode") in MODES, f"Unsupported mode {payload.get('mode')!r}.")
+    for key in ("symbol", "provider", "dataset_key", "timeframe", "bars_rev"):
+        _require(isinstance(payload.get(key), str) and payload[key], f"{key} is required.")
+    timeframes = payload.get("timeframes")
+    _require(isinstance(timeframes, list) and payload["timeframe"] in timeframes,
+             "timeframe must be one of the Python-resolved timeframes.")
+
+    source = payload.get("source")
+    _require(isinstance(source, dict), "source is required.")
+    _require(source.get("provider") == payload["provider"], "source provider must match payload provider.")
+    _require(source.get("symbol") == payload["symbol"], "source symbol must match payload symbol.")
+    _require(isinstance(source.get("native"), bool), "source.native must be a boolean.")
+    _require(isinstance(source.get("dataset_key"), str), "source.dataset_key is required.")
+
+    bars = payload.get("bars")
+    _require(isinstance(bars, list), "bars must be a list.")
+    previous = None
+    for bar in bars:
+        _require(isinstance(bar, dict) and tuple(bar) == _BAR_FIELDS, f"Bad bar fields: {bar!r}.")
+        _require(type(bar["time"]) is int, "bar.time must be integer epoch seconds.")
+        _require(previous is None or bar["time"] > previous, "bars must be strictly increasing.")
+        previous = bar["time"]
+        for field in _BAR_FIELDS[1:]:
+            _require(isinstance(bar[field], float) and math.isfinite(bar[field]), f"bar.{field} must be a finite float.")
+    bar_times = {bar["time"] for bar in bars}
+
+    ids = set()
+    for group in ("overlays", "panes"):
+        items = payload.get(group)
+        _require(isinstance(items, list), f"{group} must be a list.")
+        for item in items:
+            _require(isinstance(item, dict) and isinstance(item.get("id"), str), f"{group} item needs an id.")
+            _require(item["id"] not in ids, f"Duplicate indicator id {item['id']!r}.")
+            ids.add(item["id"])
+            _validate_series_list(item.get("series"), f"{group}[{item['id']}]", bar_times)
+
+    watchlist = payload.get("watchlist")
+    _require(isinstance(watchlist, list), "watchlist must be a list.")
+    for item in watchlist:
+        _require(isinstance(item, dict) and isinstance(item.get("dataset_key"), str), "watchlist item needs dataset_key.")
+    _require(payload.get("ui", {}).get("bottom_panel") in BOTTOM_PANELS, "ui.bottom_panel is invalid.")
+    _require(type(payload.get("price_precision")) is int, "price_precision must be an integer.")
+    _require(payload.get("ack") is None or isinstance(payload["ack"], str), "ack must be an event id or null.")
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# Events
+# ---------------------------------------------------------------------------
+
+def _is_str(value: Any) -> bool:
+    return isinstance(value, str) and 0 < len(value) <= 128
+
+
+def _is_iso_date(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return len(value) == 10
+
+
+def _is_params(value: Any) -> bool:
+    return isinstance(value, dict) and len(value) <= 8 and all(
+        _is_str(k) and isinstance(v, (int, float)) and not isinstance(v, bool) for k, v in value.items())
+
+
+# field -> (required, validator). Unknown fields are rejected.
+EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
+    "chart_ready": {},
+    "frontend_error": {"message": (True, lambda v: isinstance(v, str))},
+    "select_dataset": {"dataset_key": (True, _is_str)},
+    "select_watchlist_item": {"dataset_key": (True, _is_str)},
+    "select_timeframe": {"timeframe": (True, _is_str)},
+    "set_date_range": {"start": (True, lambda v: v is None or _is_iso_date(v)),
+                       "end": (True, lambda v: v is None or _is_iso_date(v))},
+    "add_indicator": {"key": (True, _is_str), "params": (False, _is_params)},
+    "update_indicator": {"id": (True, _is_str), "params": (True, _is_params)},
+    "toggle_indicator": {"id": (True, _is_str), "enabled": (True, lambda v: isinstance(v, bool))},
+    "remove_indicator": {"id": (True, _is_str)},
+    "set_bottom_panel": {"panel": (True, lambda v: v in BOTTOM_PANELS),
+                         "open": (False, lambda v: isinstance(v, bool))},
+    "set_chart_setting": {"show_volume": (True, lambda v: isinstance(v, bool))},
+}
+
+
+@dataclass(frozen=True)
+class FrontendEvent:
+    id: str
+    type: str
+    data: dict[str, Any]
+
+
+def parse_event(raw: Any) -> FrontendEvent:
+    """Structurally validate one frontend event. Semantic checks live in state.py."""
+    if not isinstance(raw, dict):
+        raise EventValidationError("Event must be an object.")
+    unexpected = set(raw) - {"id", "type", "data"}
+    if unexpected:
+        raise EventValidationError(f"Unexpected event field(s): {', '.join(sorted(unexpected))}")
+    event_id, event_type, data = raw.get("id"), raw.get("type"), raw.get("data", {})
+    if not _is_str(event_id):
+        raise EventValidationError("Event id is required.")
+    if event_type not in EVENT_SCHEMAS:
+        raise EventValidationError(f"Unknown event type {event_type!r}.")
+    if not isinstance(data, dict):
+        raise EventValidationError("Event data must be an object.")
+    schema = EVENT_SCHEMAS[event_type]
+    unknown = set(data) - set(schema)
+    if unknown:
+        raise EventValidationError(f"{event_type}: unexpected field(s) {', '.join(sorted(unknown))}.")
+    for field, (required, check) in schema.items():
+        if field not in data:
+            if required:
+                raise EventValidationError(f"{event_type}: missing field {field!r}.")
+            continue
+        if not check(data[field]):
+            raise EventValidationError(f"{event_type}: invalid {field} {data[field]!r}.")
+    return FrontendEvent(event_id, event_type, dict(data))
