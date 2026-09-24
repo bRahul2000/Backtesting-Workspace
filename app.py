@@ -37,6 +37,7 @@ from ui.setup_a_v1_candidate import render_setup_a_v1_candidate
 from ui.setup_a_diagnostics import render_setup_a_diagnostics
 from ui.exness_broker_data import render_exness_broker_data
 from ui.live_chart import render_live_chart
+from ui.tradingview_mode.page import render_tradingview_mode
 from ui.research_lab import render_research_lab
 from ui.universal_workspace import render_experiment_comparison, render_experiment_history, render_universal_workspace
 
@@ -420,6 +421,7 @@ navigation = st.navigation([
     st.Page(_backtest_page, title="Backtest"),
     st.Page(render_long_history_research, title="Long-History Research"),
     st.Page(_diagnostics_page, title="Diagnostics"),
+    st.Page(render_tradingview_mode, title="TradingView Mode"),
     st.Page(render_live_chart, title="Live Chart"),
 ])
 navigation.run()
