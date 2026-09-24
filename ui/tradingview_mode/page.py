@@ -1,9 +1,15 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from services.market_datasets import all_datasets, dataset, datasets_for_instrument
+from services.market_datasets import all_datasets, dataset
 from utils.data_validation import load_ohlcv_csv
 from .chart import render_tradingview_chart
+from .timeframes import (
+    UnsupportedTimeframeError,
+    available_timeframes,
+    load_resolution_data,
+    resolve_timeframe,
+)
 
 def render_tradingview_mode():
     st.title("TradingView Mode")
@@ -25,44 +31,27 @@ def render_tradingview_mode():
     selected_key = dataset_options[selected_label]
     ds = dataset(selected_key)
 
-    # 2. Timeframe Selector (Filtered by instrument)
-    # Only show timeframes available for this specific instrument
-    instrument_datasets = datasets_for_instrument(ds.instrument)
-    
-    # Create a mapping of purely the timeframe label (e.g., '15m') to the dataset key
-    # We use a list of tuples to maintain order and handle potential duplicate labels
-    tf_options_list = []
-    for d in instrument_datasets:
-        # Ensure we only use the timeframe part of the label
-        tf_label = d.timeframe
-        tf_options_list.append((tf_label, d.key))
-    
-    # For the selectbox, we use the labels. We must handle cases where multiple datasets 
-    # have the same timeframe label (though rare in Phase 1).
-    unique_tf_labels = [opt[0] for opt in tf_options_list]
-    
-    # Find current index
-    try:
-        current_tf_label = ds.timeframe
-        default_index = unique_tf_labels.index(current_tf_label)
-    except ValueError:
-        default_index = 0
+    # 2. Timeframe Selector: native or safely derivable for this provider/symbol.
+    timeframe_options = available_timeframes(ds)
+    default_index = timeframe_options.index(ds.timeframe)
 
     selected_tf_label = st.sidebar.selectbox(
         "Timeframe", 
-        options=unique_tf_labels, 
+        options=list(timeframe_options),
         index=default_index
     )
-    
-    # Map selected label back to the correct dataset key
-    # In Phase 1, we assume 1:1 mapping for the selected instrument's TFs
-    selected_key_tf = next(key for label, key in tf_options_list if label == selected_tf_label)
-    active_ds = dataset(selected_key_tf)
+    try:
+        resolution = resolve_timeframe(ds, selected_tf_label)
+        active_ds = resolution.source
+    except UnsupportedTimeframeError as exc:
+        st.error(str(exc))
+        return
+    st.sidebar.caption(f"Source: {resolution.source_label}")
 
     # 3. Date Range Selector
     col1, col2 = st.sidebar.columns(2)
     try:
-        df_full = load_ohlcv_csv(active_ds.path)
+        df_full = load_resolution_data(resolution, load_ohlcv_csv)
         min_date = df_full['timestamp'].min().date()
         max_date = df_full['timestamp'].max().date()
     except Exception:
@@ -80,7 +69,7 @@ def render_tradingview_mode():
     # --- Data Loading & Processing ---
     try:
         # Load data
-        df = load_ohlcv_csv(active_ds.path)
+        df = load_resolution_data(resolution, load_ohlcv_csv)
         
         # Filter by date range
         mask = (df['timestamp'].dt.date >= start_date) & (df['timestamp'].dt.date <= end_date)
