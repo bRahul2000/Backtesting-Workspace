@@ -24,7 +24,7 @@ def test_real_rest_contract_and_history(symbol, contract_type):
     assert (spec.symbol, spec.contract_type, spec.status) == (symbol, contract_type, "TRADING")
     for interval, seconds in B.INTERVALS.items():
         server_ms = rest.server_time_ms()
-        bars = B.parse_rest_klines(rest.klines(symbol, interval, B.SEED_BARS), interval, server_ms)
+        bars = B.fetch_history(rest, symbol, interval, B.SEED_BARS, server_ms)  # paged: > 1 request
         assert len(bars) == B.SEED_BARS
         assert all(b.time - a.time == seconds for a, b in zip(bars, bars[1:]))
         assert all(bar.final for bar in bars[:-1]) and not bars[-1].final

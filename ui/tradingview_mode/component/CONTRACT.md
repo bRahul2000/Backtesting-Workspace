@@ -258,6 +258,10 @@ LiveView(frame, status, identity)`. React only renders what a view contains.
 - `exit_live` leaves Live from either step.
 - `live_poll`: the browser sends it about once a second while streaming, only when
   no event is in flight. It changes no state and is not logged.
+- `load_live_history {}`: the chart sends it when the view reaches the left edge,
+  once per edge and only when idle. Binance prepends up to 1,000 older completed
+  candles. Exness answers that the MT5 bridge has only its last 500 bars. Outside
+  streaming the event is rejected.
 - While Live is on, dataset and date-range changes are rejected, and Replay can't
   start. While streaming, `select_timeframe` changes only the live timeframe. Live
   can't start during Replay. The historical selection is restored unchanged on exit.
@@ -286,7 +290,15 @@ when its last lease is released, or by itself when no rerun has touched it for 1
   filled, and a candle that closed while disconnected finalizes exactly once.
 
 **Kline merge (Binance):**
-- A 500-bar REST seed; a REST bar is final once its close time passed on the server clock.
+- A 2,000-bar REST seed (15m ≈ 21 days), paged backwards 1,000 bars per request with
+  `endTime`. Pages must not run past their end time; the result is de-duplicated,
+  sorted and validated. A REST bar is final once its close time has passed on the
+  server clock.
+- Older history (`load_live_history`) is prepended: only completed candles strictly
+  older than the first loaded one, and loaded candles never change. The window is capped
+  at 5,000 bars (15m ≈ 52 days, 1h ≈ 208 days) because the whole window is re-sent
+  every poll (about 1.9 MB with four indicators). `live.more_history` is false at the cap
+  or at the start of Binance's history.
 - WebSocket kline updates replace the forming candle in place. `x: true` finalizes it
   exactly once; a finalized candle never changes again.
 - Identical updates are duplicates. An older event time, or an update to an older
@@ -342,9 +354,38 @@ a new sequence.
   - CONNECTING when the terminal isn't connected, or there is no history yet.
   - ERROR for an invalid file, or a server clock that isn't UTC+0.
 
-**Updates:** each poll is a normal rerun with the full window of about 500 bars. The
-chart updates the forming candle in place, or appends at rollover, whenever the window
-did not slide, and resets otherwise.
+**Updates:** each poll is a normal rerun with the full window (`live.bar_count`,
+`live.more_history`, `live.history_limit`).
+
+## Chart view (all modes)
+
+`chart/ChartEngine.js` compares each payload with what is drawn, using
+`chart/chartView.js` (tested in Node):
+- **Tail update:** when every candle but the last is identical and the last changed
+  and/or one was appended, `series.update()` is called; this covers the forming
+  candle and rollover.
+- **Anything else** (a corrected completed candle, prepended history, a replay jump)
+  uses `setData()`. The exact visible logical range is then restored, shifted by the
+  number of prepended candles, so the same candles stay on screen at the same zoom.
+- Indicator series are updated the same way and rebuilt only when the indicator
+  itself changes. Lower panes are never rebuilt by a data update.
+- `fitContent` is never called and price-scale options are never re-applied on
+  a data update. Autoscale only sees the visible candles, so an off-screen tick
+  cannot rescale the view.
+
+**Follow latest:**
+- While the newest candle is in view, updates move the view with it
+  (`shiftVisibleRangeOnNewBar`).
+- Panning back turns following off and shows **Go to latest**, which scrolls to the
+  newest candle at the current zoom and follows again.
+- A new `view_key` (market, source, timeframe or dataset) resets to the latest candles.
+
+**Time:**
+- The legend shows the hovered candle's open time as "YYYY-MM-DD HH:mm UTC" and its
+  OHLC and volume, looked up in Python's bars by time. It keeps showing the hovered
+  candle across live updates and shows the newest candle when the pointer leaves.
+- The crosshair axis label is the same UTC string.
+- Axis ticks are UTC: HH:mm intraday, "Sep 25" at a day change, and month/year beyond.
 
 ## Reserved for later phases
 

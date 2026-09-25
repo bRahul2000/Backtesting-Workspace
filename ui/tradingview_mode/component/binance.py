@@ -55,7 +55,10 @@ CONTRACTS: dict[str, dict[str, str]] = {
 }
 #: Native Binance kline intervals used by Live mode.
 INTERVALS: dict[str, int] = {"15m": 900, "30m": 1800, "1h": 3600}
-SEED_BARS = 500
+SEED_BARS = 2000               # initial history (15m: ~21 days), fetched in pages
+KLINES_PAGE = 1000             # bars per REST request (Binance allows up to 1500)
+HISTORY_PAGE = 1000            # older bars fetched per "load older history" request
+MAX_LIVE_BARS = 5000           # cap per stream (15m: ~52 days, 1h: ~208 days); the whole window is re-sent each poll (~1.9 MB with 4 indicators)
 MAX_CONNECTION_AGE_S = 23 * 3600 + 30 * 60   # recycle 30 min before Binance's 24 h cut-off
 STALE_S = 5.0                 # markPrice@1s arrives every second
 SILENCE_RECONNECT_S = 20.0    # an open socket that stays silent this long is dead
@@ -269,7 +272,7 @@ class KlineBook:
     Not thread-safe on its own; :class:`KlineStream` guards it with a lock.
     """
 
-    def __init__(self, symbol: str, interval: str, limit: int = SEED_BARS):
+    def __init__(self, symbol: str, interval: str, limit: int = MAX_LIVE_BARS):
         self.symbol, self.interval, self.limit = symbol, interval, limit
         self.seconds = INTERVALS[interval]
         self.bars: list[Bar] = []
@@ -281,12 +284,33 @@ class KlineBook:
         self.out_of_order = 0
         self.malformed = 0
         self.needs_reconcile = False
+        self.oldest_reached = False   # Binance has no older candles than bars[0]
 
     # -- seeding / reconciliation ------------------------------------------------
-    def seed(self, bars: list[Bar], asof_ms: int) -> None:
+    def seed(self, bars: list[Bar], asof_ms: int, oldest_reached: bool = False) -> None:
         self.bars = list(bars[-self.limit:])
         self.forming_asof_ms = asof_ms
         self.needs_reconcile = False
+        self.oldest_reached = oldest_reached
+
+    def prepend(self, older: list[Bar], exhausted: bool) -> int:
+        """Add completed history strictly before the first bar. Never touches
+        existing bars; returns how many were added (0 at the cap)."""
+        if not self.bars:
+            return 0
+        first = self.bars[0].time
+        room = self.limit - len(self.bars)
+        add = [bar for bar in older if bar.time < first and bar.final][-max(room, 0):] if room > 0 else []
+        times = [bar.time for bar in add]
+        if any(b <= a for a, b in zip(times, times[1:])):
+            raise BinanceDataError("older history is not strictly increasing.")
+        self.bars[:0] = add
+        if exhausted and len(add) == len([bar for bar in older if bar.time < first]):
+            self.oldest_reached = True
+        return len(add)
+
+    def more_history(self) -> bool:
+        return bool(self.bars) and not self.oldest_reached and len(self.bars) < self.limit
 
     def reconcile(self, bars: list[Bar], asof_ms: int) -> int:
         """Merge REST bars (authoritative for what they cover). Returns bars changed."""
@@ -414,8 +438,33 @@ class BinanceRest:
     def contract(self, symbol: str) -> ContractSpec:
         return parse_contract(self._get("/fapi/v1/exchangeInfo"), symbol)
 
-    def klines(self, symbol: str, interval: str, limit: int) -> Any:
-        return self._get("/fapi/v1/klines", {"symbol": symbol, "interval": interval, "limit": int(limit)})
+    def klines(self, symbol: str, interval: str, limit: int, end_ms: int | None = None) -> Any:
+        params = {"symbol": symbol, "interval": interval, "limit": int(limit)}
+        if end_ms is not None:
+            params["endTime"] = int(end_ms)
+        return self._get("/fapi/v1/klines", params)
+
+
+def fetch_history(rest, symbol: str, interval: str, count: int, server_ms: int, end_ms: int | None = None) -> list[Bar]:
+    """Up to ``count`` bars ending at ``end_ms`` (or now), paging backwards with endTime.
+
+    Pages never overlap (each ends 1 ms before the previous page's first open) and
+    the result is de-duplicated, sorted and validated. Fewer bars than asked means
+    Binance has no older history."""
+    by_time: dict[int, Bar] = {}
+    end = end_ms
+    while len(by_time) < count:
+        want = min(KLINES_PAGE, count - len(by_time))
+        page = parse_rest_klines(rest.klines(symbol, interval, want, end), interval, server_ms)
+        if end is not None and any(bar.time * 1000 > end for bar in page):
+            raise BinanceDataError("klines page extends past the requested end time.")
+        fresh = [bar for bar in page if bar.time not in by_time]
+        for bar in fresh:
+            by_time[bar.time] = bar
+        if len(page) < want or not fresh:
+            break  # the start of Binance's history
+        end = page[0].time * 1000 - 1
+    return [by_time[t] for t in sorted(by_time)][-count:]
 
 
 # ---------------------------------------------------------------------------
@@ -603,16 +652,34 @@ class KlineStream(_Worker):
         server_ms = self.rest.server_time_ms()
         with self.lock:
             last = self.book.bars[-1].time if self.book.bars else None
-        missing = SEED_BARS if full or last is None else int((server_ms / 1000 - last) // self.book.seconds) + 2
-        rows = self.rest.klines(self.symbol, self.interval, min(SEED_BARS, max(2, missing)))
-        bars = parse_rest_klines(rows, self.interval, server_ms)
-        with self.lock:
-            if full or last is None or missing >= SEED_BARS:
-                self.book.seed(bars, server_ms)   # too far behind to stitch: reload the window
-            else:
+        missing = None if full or last is None else int((server_ms / 1000 - last) // self.book.seconds) + 2
+        if missing is None or missing > KLINES_PAGE:
+            # First load, or too far behind to stitch: reload the window.
+            bars = fetch_history(self.rest, self.symbol, self.interval, SEED_BARS, server_ms)
+            with self.lock:
+                self.book.seed(bars, server_ms, oldest_reached=len(bars) < SEED_BARS)
+                self.reconciles += 1
+        else:
+            bars = parse_rest_klines(self.rest.klines(self.symbol, self.interval, max(2, missing)), self.interval, server_ms)
+            with self.lock:
                 self.book.reconcile(bars, server_ms)
-            self.reconciles += 1
+                self.reconciles += 1
         self.last_reconcile_at = self.clock()
+
+    def load_older(self, count: int = HISTORY_PAGE) -> int:
+        """Prepend up to ``count`` completed candles older than the first loaded one
+        (called from a rerun on the user's request). Returns bars added."""
+        with self.lock:
+            if not self.book.more_history():
+                return 0
+            first = self.book.bars[0].time
+            count = min(count, self.book.limit - len(self.book.bars))
+        server_ms = self.rest.server_time_ms()
+        older = fetch_history(self.rest, self.symbol, self.interval, count, server_ms, end_ms=first * 1000 - 1)
+        with self.lock:
+            if not self.book.bars or self.book.bars[0].time != first:
+                return 0  # reseeded meanwhile; the next request starts from the new window
+            return self.book.prepend(older, exhausted=len(older) < count)
 
     # -- stream side --------------------------------------------------------------------
     def _on_message(self, message: Any) -> None:
@@ -674,7 +741,8 @@ class KlineStream(_Worker):
         status, reason = self.status(now)
         stats = self.channel.stats
         return {"frame": frame, "status": status, "reason": reason, "spec": self.spec, "mark": mark,
-                "last_price": last.close if last else None,
+                "last_price": last.close if last else None, "more_history": self.book.more_history(),
+                "history_limit": self.book.limit,
                 "forming_bar_time": last.time if last is not None and not last.final else None,
                 "updated_at": stats.last_message_at, "book": book, "reconciles": self.reconciles,
                 "connections": stats.connections, "recycles": stats.recycles,

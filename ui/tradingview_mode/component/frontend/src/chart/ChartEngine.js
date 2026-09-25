@@ -1,5 +1,12 @@
-// Imperative Lightweight Charts wrapper. It only renders Python-provided data
-// and diffs by revision so reruns never reset the user's zoom/pan.
+// Imperative Lightweight Charts wrapper. It only renders Python-provided data.
+//
+// View stability (live and replay): a payload is diffed against what is drawn.
+// An unchanged history with a changed/appended last bar is applied with
+// series.update(); anything else is setData() followed by restoring the exact
+// logical range (shifted by any prepended history). Nothing here calls
+// fitContent or re-applies price-scale options on a data update. The view only
+// follows the newest bar while it is in view (follow mode); "Go to latest"
+// re-enables following. A new market/source/timeframe (view_key) resets.
 import {
   CandlestickSeries,
   ColorType,
@@ -10,7 +17,9 @@ import {
   createChart,
   createSeriesMarkers,
 } from "lightweight-charts";
-import { tailUpdate } from "../liveControls.js";
+import {
+  diffSeries, indexOfTime, isAtLatest, samePoint, shiftedRange, tickLabel, utcLabel, wantsOlderHistory,
+} from "./chartView.js";
 
 export const COLORS = {
   bg: "#0b0e14",
@@ -36,9 +45,13 @@ function storageSet(key, value) {
   try { window.sessionStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
 }
 
-function seriesSignature(item, barsRev) {
-  return `${barsRev}|${JSON.stringify(item.params)}|${item.series.map((s) => `${s.name}:${s.color}:${s.data.length}`).join(",")}`;
+// What an indicator *is* (not its values): only a change here rebuilds its series.
+function structureSignature(item, precision) {
+  return `${precision}|${JSON.stringify(item.params)}|${item.series.map((s) => `${s.name}:${s.type}:${s.color}`).join(",")}`;
 }
+
+const candle = (b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close });
+const volumeBar = (b) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? `${COLORS.up}55` : `${COLORS.down}55` });
 
 function histogramData(points) {
   return points.map((p) => ({ time: p.time, value: p.value, color: p.value >= 0 ? `${COLORS.up}99` : `${COLORS.down}99` }));
@@ -54,7 +67,15 @@ export class ChartEngine {
     this.paneSig = null;
     this.panes = []; // [{ id, name, series: [{name, api, color}] }]
     this.crosshairListeners = new Set();
+    this.followListeners = new Set();
     this.saveTimer = null;
+    this.follow = true;        // newest bar in view: live/replay updates may move the view with it
+    this.hoverTime = null;     // bar time under the crosshair (null: none)
+    this.historyRequestedFor = null;
+    this.moreHistory = false;
+    this.onNeedHistory = null; // set by the React panel (sends load_live_history)
+    this.volumeVisible = null;
+    this.stats = { updates: 0, setData: 0, incremental: 0 }; // for browser regression tests
 
     this.chart = createChart(container, {
       autoSize: true,
@@ -73,8 +94,12 @@ export class ChartEngine {
         horzLine: { color: COLORS.crosshair, labelBackgroundColor: "#2a3140" },
       },
       rightPriceScale: { borderColor: COLORS.border, scaleMargins: { top: 0.08, bottom: 0.2 } },
-      timeScale: { borderColor: COLORS.border, timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7 },
-      localization: { dateFormat: "yyyy-MM-dd" },
+      // All times are UTC epoch seconds; labels never use the browser time zone.
+      timeScale: {
+        borderColor: COLORS.border, timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7,
+        shiftVisibleRangeOnNewBar: true, tickMarkFormatter: (time, type) => tickLabel(time, type),
+      },
+      localization: { dateFormat: "yyyy-MM-dd", timeFormatter: (time) => utcLabel(time) },
     });
 
     this.candles = this.chart.addSeries(CandlestickSeries, {
@@ -90,8 +115,12 @@ export class ChartEngine {
     this.tradeSig = null;
     this.tradeLines = null; // lazily created entry / SL / TP segments
 
-    this.chart.subscribeCrosshairMove((param) => this.emitCrosshair(param));
+    this.chart.subscribeCrosshairMove((param) => {
+      this.hoverTime = param && param.time !== undefined && param.point ? param.time : null;
+      this.emitCrosshair();
+    });
     this.chart.timeScale().subscribeVisibleTimeRangeChange((range) => this.rememberRange(range));
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange((logical) => this.onLogicalRange(logical));
     // Pane legends are positioned from the laid-out pane elements.
     this.resizeObserver = new ResizeObserver(() => this.emitSoon());
     this.resizeObserver.observe(container);
@@ -100,48 +129,62 @@ export class ChartEngine {
   // ---- public -----------------------------------------------------------
 
   update(payload) {
+    const timeScale = this.chart.timeScale();
     const newView = payload.view_key !== this.viewKey;
     const newBars = payload.bars_rev !== this.barsRev;
     const precision = payload.price_precision ?? 2;
-    const keepRange = !newView && newBars ? this.chart.timeScale().getVisibleRange() : null;
-    // Replay follows the newest revealed bar while the latest bar is in view;
-    // panning away stops following until "Latest" is used. Zoom is kept.
-    const replay = !!payload.replay?.enabled;
-    const logical = this.chart.timeScale().getVisibleLogicalRange();
-    const liveStreaming = payload.live?.phase === "streaming";
-    const streaming = replay || liveStreaming;
-    const following = streaming && !newView && newBars && logical && logical.to >= this.bars.length - 1.5;
+    const streaming = !!payload.replay?.enabled || payload.live?.phase === "streaming";
+    const before = newView ? null : timeScale.getVisibleLogicalRange();
+    const beforeTime = newView ? null : timeScale.getVisibleRange();
+    const wasFollowing = this.follow;
+    this.stats.updates += 1;
 
     if (precision !== this.precision) {
       this.precision = precision;
       this.candles.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
     }
-    // Live: update the forming candle (or append at rollover) in place when the
-    // window did not slide; otherwise replace the data.
-    const tail = liveStreaming && !newView && newBars ? tailUpdate(this.bars, payload.bars) : null;
-    if (tail) {
-      this.bars = payload.bars;
-      for (const b of tail) {
-        this.candles.update({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close });
-        this.volume.update({ time: b.time, value: b.volume, color: b.close >= b.open ? `${COLORS.up}55` : `${COLORS.down}55` });
+    let replaced = null; // {shift} when the data was replaced
+    if (newBars) {
+      const diff = newView ? { kind: "replace", shift: null } : diffSeries(this.bars, payload.bars);
+      if (diff.kind === "tail") this.stats.incremental += 1;
+      else if (diff.kind === "replace") this.stats.setData += 1;
+      if (diff.kind === "tail") {
+        for (const b of diff.updates) {
+          this.candles.update(candle(b));
+          this.volume.update(volumeBar(b));
+        }
+      } else if (diff.kind === "replace") {
+        this.candles.setData(payload.bars.map(candle));
+        this.volume.setData(payload.bars.map(volumeBar));
+        replaced = { shift: diff.shift };
       }
-    } else if (newBars) {
       this.bars = payload.bars;
-      this.candles.setData(payload.bars.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
-      this.volume.setData(payload.bars.map((b) => ({
-        time: b.time, value: b.volume, color: b.close >= b.open ? `${COLORS.up}55` : `${COLORS.down}55`,
-      })));
     }
-    this.volume.applyOptions({ visible: !!payload.ui.show_volume });
-    this.syncOverlays(payload.overlays, payload.bars_rev, precision);
-    this.syncPanes(payload.panes, payload.bars_rev);
+    if (this.volumeVisible !== !!payload.ui.show_volume) {
+      this.volumeVisible = !!payload.ui.show_volume;
+      this.volume.applyOptions({ visible: this.volumeVisible });
+    }
+    this.syncOverlays(payload.overlays, precision);
+    this.syncPanes(payload.panes);
 
     this.viewKey = payload.view_key;
     this.barsRev = payload.bars_rev;
-    if (newView && streaming) this.showLatest();
-    else if (newView) this.restoreOrDefaultRange();
-    else if (following) this.scrollToLatest();
-    else if (newBars) this.applyRange(keepRange);
+    this.moreHistory = payload.live?.phase === "streaming" && !!payload.live.more_history;
+    if (newView) {
+      this.historyRequestedFor = null;
+      if (streaming) this.showLatest();
+      else this.restoreOrDefaultRange();
+      this.setFollow(true);
+    } else if (replaced) {
+      // Keep exactly what the user was looking at, unless they were following the newest bar.
+      const range = shiftedRange(before, replaced.shift);
+      if (range) timeScale.setVisibleLogicalRange(range);
+      else this.applyRange(beforeTime);
+      if (streaming && wasFollowing) timeScale.scrollToRealTime();
+    }
+    // (Incremental updates need nothing: an appended bar shifts the view only while the
+    //  newest bar is visible - Lightweight Charts' shiftVisibleRangeOnNewBar.)
+    this.maybeRequestHistory(timeScale.getVisibleLogicalRange());
     this.emitSoon();
   }
 
@@ -227,10 +270,46 @@ export class ChartEngine {
 
   fit() { this.chart.timeScale().fitContent(); }
 
-  goToLatest() { this.showLatest(); }
+  goToLatest() { this.showLatest(); this.setFollow(true); }
 
-  // Keep the current zoom (bar spacing) and bring the newest bar into view.
-  scrollToLatest() { this.chart.timeScale().scrollToRealTime(); }
+  // Keep the current zoom (bar spacing) and bring the newest bar into view; follow it again.
+  scrollToLatest() { this.chart.timeScale().scrollToRealTime(); this.setFollow(true); }
+
+  onFollow(listener) {
+    this.followListeners.add(listener);
+    listener(this.follow);
+    return () => this.followListeners.delete(listener);
+  }
+
+  setFollow(value) {
+    if (value === this.follow) return;
+    this.follow = value;
+    this.followListeners.forEach((listener) => listener(value));
+  }
+
+  onLogicalRange(logical) {
+    this.setFollow(isAtLatest(logical, this.bars.length));
+    this.maybeRequestHistory(logical);
+  }
+
+  maybeRequestHistory(logical) {
+    const firstTime = this.bars.length ? this.bars[0].time : null;
+    if (!this.onNeedHistory || !wantsOlderHistory(logical, { more: this.moreHistory, firstTime, requestedFor: this.historyRequestedFor })) return;
+    if (this.onNeedHistory()) this.historyRequestedFor = firstTime; // once per left edge
+  }
+
+  // Read-only state for browser regression tests.
+  debugState() {
+    const timeScale = this.chart.timeScale();
+    return {
+      logical: timeScale.getVisibleLogicalRange(), time: timeScale.getVisibleRange(),
+      price: this.chart.priceScale("right").getVisibleRange(), barSpacing: timeScale.options().barSpacing,
+      count: this.bars.length, first: this.bars[0]?.time ?? null, last: this.bars[this.bars.length - 1] ?? null,
+      follow: this.follow, viewKey: this.viewKey, stats: { ...this.stats },
+    };
+  }
+
+  coordinateOf(time) { return this.chart.timeScale().timeToCoordinate(time); }
 
   resetPriceScale() {
     this.chart.priceScale("right").applyOptions({ autoScale: true });
@@ -243,7 +322,7 @@ export class ChartEngine {
 
   emitSoon() {
     cancelAnimationFrame(this.emitFrame);
-    this.emitFrame = requestAnimationFrame(() => this.emitCrosshair({}));
+    this.emitFrame = requestAnimationFrame(() => this.emitCrosshair());
   }
 
   destroy() {
@@ -286,7 +365,16 @@ export class ChartEngine {
 
   // ---- indicators -------------------------------------------------------
 
-  syncOverlays(overlays, barsRev, precision) {
+  // Indicator values change every tick; the series only change when the indicator does.
+  applyPoints(target, data) {
+    const toSeries = target.histogram ? histogramData : (points) => points;
+    const diff = diffSeries(target.data, data, samePoint);
+    if (diff.kind === "tail") toSeries(diff.updates).forEach((point) => target.api.update(point));
+    else if (diff.kind === "replace") target.api.setData(toSeries(data));
+    target.data = data;
+  }
+
+  syncOverlays(overlays, precision) {
     const wanted = new Set(overlays.map((o) => o.id));
     for (const [id, entry] of this.overlays) {
       if (!wanted.has(id)) {
@@ -295,9 +383,12 @@ export class ChartEngine {
       }
     }
     for (const item of overlays) {
-      const sig = seriesSignature(item, barsRev);
+      const sig = structureSignature(item, precision);
       let entry = this.overlays.get(item.id);
-      if (entry && entry.sig === sig) continue;
+      if (entry && entry.sig === sig) {
+        item.series.forEach((s, i) => this.applyPoints(entry.series[i], s.data));
+        continue;
+      }
       if (entry) entry.series.forEach((s) => this.chart.removeSeries(s.api));
       entry = {
         sig, name: item.name, params: item.params,
@@ -309,16 +400,20 @@ export class ChartEngine {
             priceFormat: { type: "price", precision, minMove: 10 ** -precision },
           }, 0);
           api.setData(s.data);
-          return { name: s.name, api, color: s.color };
+          return { name: s.name, api, color: s.color, data: s.data, histogram: false };
         }),
       };
       this.overlays.set(item.id, entry);
     }
   }
 
-  syncPanes(panes, barsRev) {
-    const sig = panes.map((p) => `${p.id}:${seriesSignature(p, barsRev)}`).join("|");
-    if (sig === this.paneSig) return;
+  syncPanes(panes) {
+    const sig = panes.map((p) => `${p.id}:${structureSignature(p, "")}:${(p.levels || []).join(",")}`).join("|");
+    if (sig === this.paneSig) {
+      // Same panes: update values in place (a rebuild would reset pane layout and scales).
+      panes.forEach((item, index) => item.series.forEach((s, i) => this.applyPoints(this.panes[index].series[i], s.data)));
+      return;
+    }
     this.paneSig = sig;
     // Rebuild lower panes. Empty panes are removed by the library automatically.
     this.panes.forEach((pane) => pane.series.forEach((s) => this.chart.removeSeries(s.api)));
@@ -331,7 +426,7 @@ export class ChartEngine {
           : { color: s.color, lineWidth: s.name === "value" || s.name === "macd" ? 2 : 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false },
         paneIndex);
         api.setData(isHistogram ? histogramData(s.data) : s.data);
-        return { name: s.name, api, color: s.color };
+        return { name: s.name, api, color: s.color, data: s.data, histogram: isHistogram };
       });
       (item.levels || []).forEach((level) => series[0]?.api.createPriceLine({
         price: level, color: "#3a4354", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false,
@@ -344,42 +439,39 @@ export class ChartEngine {
 
   // ---- legend -----------------------------------------------------------
 
-  emitCrosshair(param) {
+  // Legend: the candle under the crosshair (by its bar time), else the newest candle.
+  // Every value is looked up in the Python data by time.
+  emitCrosshair() {
     const n = this.bars.length;
-    let bar = null;
-    let time = null;
-    if (param && param.time !== undefined && param.seriesData) {
-      time = param.time;
-      const data = param.seriesData.get(this.candles);
-      const index = this.findIndex(time);
-      if (data && index >= 0) bar = { ...this.bars[index], index };
-    } else if (n) {
-      bar = { ...this.bars[n - 1], index: n - 1 };
-      time = bar.time;
-    }
+    let index = this.hoverTime !== null ? this.findIndex(this.hoverTime) : -1;
+    const hovering = index >= 0;
+    if (!hovering && n) index = n - 1;
+    const bar = index >= 0 ? { ...this.bars[index], index } : null;
+    const time = bar ? bar.time : null;
     const previous = bar && bar.index > 0 ? this.bars[bar.index - 1] : null;
-    const valueAt = (api) => {
-      if (param && param.seriesData && param.time !== undefined) return param.seriesData.get(api)?.value;
-      const data = api.data();
-      return data.length ? data[data.length - 1].value : undefined;
+    const valueAt = (series) => {
+      if (time === null) return undefined;
+      const at = indexOfTime(series.data, time);
+      return at >= 0 ? series.data[at].value : undefined;
     };
     const containerTop = this.container.getBoundingClientRect().top;
     const legend = {
       time,
+      hovering,
       bar,
       change: bar && previous ? bar.close - previous.close : null,
       changePct: bar && previous && previous.close ? ((bar.close - previous.close) / previous.close) * 100 : null,
       volume: bar ? bar.volume : null,
       overlays: [...this.overlays.entries()].map(([id, entry]) => ({
         id, name: entry.name, params: entry.params,
-        values: entry.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s.api) })),
+        values: entry.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s) })),
       })),
-      panes: this.panes.map((pane, index) => {
-        const element = this.chart.panes()[index + 1]?.getHTMLElement();
+      panes: this.panes.map((pane, i) => {
+        const element = this.chart.panes()[i + 1]?.getHTMLElement();
         return {
           id: pane.id, name: pane.name, params: pane.params,
           top: element ? element.getBoundingClientRect().top - containerTop : null,
-          values: pane.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s.api) })),
+          values: pane.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s) })),
         };
       }),
     };

@@ -139,6 +139,12 @@ class BinanceFuturesProvider:
         self.symbol = provider_symbol(market, "binance")
         self.hub = hub or binance.hub()
 
+    def load_older(self) -> tuple[int, str]:
+        stream = self.hub.kline(self.session_id, self.symbol, self.timeframe)
+        added = stream.load_older()
+        return added, (f"Loaded {added:,} older {self.symbol} {self.timeframe} candles from Binance Futures."
+                       if added else "No older Binance history to load (start of history or bar limit reached).")
+
     def view(self, now: float) -> LiveView:
         stream = self.hub.kline(self.session_id, self.symbol, self.timeframe)
         board = self.hub.quotes(self.session_id)
@@ -170,6 +176,7 @@ class BinanceFuturesProvider:
             "heartbeat_age_s": round(now - snap["updated_at"], 1) if snap["updated_at"] else None,
             "tick_age_s": None, "tick_time_ms": top.event_ms if top else None,
             "forming_bar_time": snap["forming_bar_time"], "bar_count": int(len(frame)),
+            "more_history": snap["more_history"], "history_limit": snap["history_limit"],
             "rejected_updates": snap["book"]["out_of_order"] + snap["book"]["malformed"],
             "stream": {**snap["book"], "reconciles": snap["reconciles"], "connections": snap["connections"],
                        "recycles": snap["recycles"], "connection_age_s": snap["connection_age_s"]},
@@ -193,6 +200,9 @@ class ExnessMT5Provider:
         self.market, self.timeframe = market, timeframe
         self.symbol = provider_symbol(market, "exness")
         self.books, self.folder = books, folder
+
+    def load_older(self) -> tuple[int, str]:
+        return 0, f"The Exness MT5 bridge provides the last {mt5.SEED_BARS} broker bars only."
 
     def view(self, now: float) -> LiveView:
         key = (self.symbol, self.timeframe)
@@ -238,6 +248,7 @@ def exness_view(book: mt5.Book, feed: mt5.FeedRead, now: float, market: str | No
         "heartbeat_age_s": round(now - snapshot.written_utc, 1) if snapshot else None,
         "tick_age_s": round(now - snapshot.tick_time_ms / 1000, 1) if snapshot else None,
         "forming_bar_time": forming, "bar_count": int(len(book.bars)), "rejected_updates": book.rejected,
+        "more_history": False, "history_limit": mt5.SEED_BARS,
     }
     return LiveView(frame, status_dict, ident)
 

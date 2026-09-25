@@ -125,7 +125,7 @@ REPLAY_EVENTS = ("enter_replay", "set_replay_start", "step_forward", "step_backw
                  "pause_replay", "set_replay_speed", "jump_replay", "exit_replay", "go_to_replay_latest")
 
 
-LIVE_EVENTS = ("enter_live", "go_live", "exit_live", "live_poll")
+LIVE_EVENTS = ("enter_live", "go_live", "exit_live", "live_poll", "load_live_history")
 
 
 def _apply_live(state: TerminalState, event: FrontendEvent, ctx: TerminalContext) -> tuple[TerminalState, LogEntry | None]:
@@ -135,6 +135,11 @@ def _apply_live(state: TerminalState, event: FrontendEvent, ctx: TerminalContext
     if kind == "live_poll":
         # A refresh request: nothing changes; not logged (it arrives every second).
         return state, None
+    if kind == "load_live_history":
+        # A data request, not a state change: terminal.py fetches the older candles.
+        if state.live is None or not state.live.streaming:
+            return _reject(state, "older live history needs a streaming Live chart.")
+        return state, LogEntry("debug", "Older live history requested.")
     if kind == "exit_live":
         if state.live is None:
             return _reject(state, "Live mode is not active.")

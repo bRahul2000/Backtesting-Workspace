@@ -211,7 +211,10 @@ def test_stream_seeds_from_rest_then_goes_live_on_websocket_updates(stream_parts
     clock, market, rest, connect, make = stream_parts
     stream = make()
     assert wait_for(lambda: len(stream.book.bars) == B.SEED_BARS)
-    assert ("klines", "BTCUSDT", "15m", B.SEED_BARS) in rest.calls and ("contract", "BTCUSDT") in rest.calls
+    pages = [call for call in rest.calls if call[0] == "klines"]
+    assert len(pages) == 2 and all(call[3] == B.KLINES_PAGE for call in pages)  # 2,000 bars in two pages
+    assert pages[1][4] == stream.book.bars[B.KLINES_PAGE].time * 1000 - 1     # page 2 ends before page 1
+    assert ("contract", "BTCUSDT") in rest.calls
     assert connect.current.url == f"{B.MARKET_WS}/stream?streams=btcusdt@kline_15m/btcusdt@markPrice@1s"
     t = _forming(stream)
     connect.current.push(mark_msg(int(clock() * 1000)))
@@ -666,3 +669,85 @@ def test_binance_code_is_market_data_only():
         assert ".post(" not in code and ".put(" not in code and ".delete(" not in code, name
     paths = set(re.findall(r'"(/fapi/[^"]+)"', (ROOT / "ui/tradingview_mode/component/binance.py").read_text()))
     assert paths == {"/fapi/v1/time", "/fapi/v1/exchangeInfo", "/fapi/v1/klines"}
+
+
+# ---- deeper history: paging, prepend, cap -------------------------------------------------------------
+
+class PagingRest(FakeRest):
+    """A sloppy server whose pages run past endTime (would overlap the previous page)."""
+
+    def klines(self, symbol, interval, limit, end_ms=None):
+        rows = super().klines(symbol, interval, limit, None if end_ms is None else end_ms + 900_000 * 3)
+        return rows
+
+
+def test_history_is_paged_backwards_in_order_without_duplicates():
+    clock = Clock()
+    market = FakeMarket(clock, count=5000)
+    rest = FakeRest(market)
+    server_ms = int(clock() * 1000)
+    bars = B.fetch_history(rest, "BTCUSDT", "15m", 2500, server_ms)
+    times = [b.time for b in bars]
+    assert len(bars) == 2500 and times == sorted(set(times)) and all(b - a == 900 for a, b in zip(times, times[1:]))
+    assert [c[3] for c in rest.calls if c[0] == "klines"] == [1000, 1000, 500]
+    assert all(b.final for b in bars[:-1]) and not bars[-1].final  # forming candle stays last
+    with pytest.raises(B.BinanceDataError, match="past the requested end time"):
+        B.fetch_history(PagingRest(market), "BTCUSDT", "15m", 2500, server_ms)  # a page past endTime is refused
+
+
+def test_history_stops_at_the_start_of_binance_data():
+    clock = Clock()
+    rest = FakeRest(FakeMarket(clock, count=1200))
+    bars = B.fetch_history(rest, "BTCUSDT", "15m", 2000, int(clock() * 1000))
+    assert len(bars) == 1200 and len([c for c in rest.calls if c[0] == "klines"]) == 2
+
+
+def test_older_history_prepends_only_completed_older_bars_and_keeps_history_immutable():
+    book = seeded_book()
+    before = list(book.bars)
+    older = [bar(T0 - 900 * i, 90.0 + i, final=True) for i in range(3, 0, -1)]
+    assert book.prepend(older + [bar(T0, 1.0, final=True), bar(T0 - 60 * 900, 5.0)], exhausted=False) == 3
+    assert book.bars[3:] == before and [b.time for b in book.bars[:3]] == [T0 - 2700, T0 - 1800, T0 - 900]
+    assert book.more_history()
+    capped = B.KlineBook("BTCUSDT", "15m", limit=4)
+    capped.seed([bar(T0, final=True), bar(T0 + 900)], asof_ms=0)
+    assert capped.prepend(older, exhausted=False) == 2 and len(capped.bars) == 4 and not capped.more_history()
+    start = B.KlineBook("BTCUSDT", "15m")
+    start.seed([bar(T0)], asof_ms=0)
+    assert start.prepend(older, exhausted=True) == 3 and start.oldest_reached and not start.more_history()
+
+
+def test_load_older_extends_the_live_window_beyond_the_seed():
+    clock = Clock()
+    stream = fake_stream(clock=clock, rest=FakeRest(FakeMarket(clock, count=9000)))
+    stream.spec = stream.rest.contract("BTCUSDT")
+    stream._reconcile(full=True)
+    first, last = stream.book.bars[0], stream.book.bars[-1]
+    assert len(stream.book.bars) == B.SEED_BARS == 2000 and stream.book.more_history()
+    assert stream.load_older() == B.HISTORY_PAGE
+    times = [b.time for b in stream.book.bars]
+    assert len(times) == 3000 and times == sorted(set(times)) and all(b - a == 900 for a, b in zip(times, times[1:]))
+    assert stream.book.bars[1000] == first and stream.book.bars[-1] == last  # nothing already loaded changed
+    for _ in range(5):
+        stream.load_older()
+    assert len(stream.book.bars) == B.MAX_LIVE_BARS and not stream.book.more_history()
+    assert stream.load_older() == 0
+    snap = stream.snapshot(clock())
+    assert snap["more_history"] is False and snap["history_limit"] == B.MAX_LIVE_BARS and len(snap["frame"]) == B.MAX_LIVE_BARS
+
+
+def test_load_live_history_event_is_live_only_and_changes_no_state():
+    ctx = T.context_for()
+    state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m")
+    same, log = apply_event(state, ev("load_live_history"), ctx)
+    assert same == state and log.level == "error"
+    live = dataclasses.replace(state, live=P.LiveState("GOLD", "binance", "15m", True))
+    same, log = apply_event(live, ev("load_live_history"), ctx)
+    assert same == live and log.level == "debug"
+    assert P.ExnessMT5Provider("BTC", "15m", books={}).load_older()[0] == 0
+
+
+def test_payload_reports_loaded_bar_count_and_more_history():
+    payload, view = binance_payload("GOLD")
+    assert payload["live"]["bar_count"] == len(payload["bars"]) == B.SEED_BARS
+    assert payload["live"]["more_history"] is True and payload["live"]["history_limit"] == B.MAX_LIVE_BARS

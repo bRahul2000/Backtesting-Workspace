@@ -42,12 +42,23 @@ export function clientLog(level, message) {
   window.dispatchEvent(new CustomEvent("tvterm:log", { detail: { level, message } }));
 }
 
+function historyNote(live) {
+  if (live.more_history) return "More history available (scroll left)";
+  if (live.bar_count >= live.history_limit) return `History limit ${live.history_limit.toLocaleString()} bars`;
+  return live.source === "binance" ? "Start of Binance history" : "All bars the MT5 bridge provides";
+}
+
 function StatusBar({ payload, crosshairTime }) {
   return (
     <footer className="statusbar">
       <span className="mono">{formatUtc(crosshairTime ?? payload.bars.at(-1)?.time)} UTC</span>
       <span className="sep" />
-      <span>{payload.bars.length.toLocaleString()} bars</span>
+      {payload.live?.phase === "streaming" ? (
+        <span className="history-status">
+          {payload.bars.length.toLocaleString()} bars · {payload.live.source_label} · {payload.live.timeframe}
+          <span className="muted"> · {historyNote(payload.live)}</span>
+        </span>
+      ) : <span>{payload.bars.length.toLocaleString()} bars</span>}
       <span className="sep" />
       <span>{payload.source.dataset_key} · {payload.source.description}</span>
       <div className="spacer" />

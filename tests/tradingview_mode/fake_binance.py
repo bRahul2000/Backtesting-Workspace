@@ -54,7 +54,7 @@ def depth_msg(event_ms: int, update_id: int, bid: float, ask: float, symbol: str
 class FakeMarket:
     """Bars keyed by open time; the newest may be forming (final decided by server time)."""
 
-    def __init__(self, clock: Clock, seconds: int = 900, count: int = 600, price: float = 80000.0):
+    def __init__(self, clock: Clock, seconds: int = 900, count: int = 3000, price: float = 80000.0):
         self.clock, self.seconds = clock, seconds
         now = int(clock())
         first = (now // seconds - count + 1) * seconds
@@ -72,9 +72,11 @@ class FakeMarket:
             p = self.bars[last - self.seconds][3]
             self.bars[last] = (p, p + 5, p - 5, p + 2, 10.0)
 
-    def rows(self, limit: int) -> list:
+    def rows(self, limit: int, end_ms: int | None = None) -> list:
+        """Like /fapi/v1/klines: the ``limit`` newest bars opening at or before endTime."""
         self.extend_to_now()
-        return [kline_row(t, *self.bars[t][:4], self.bars[t][4], seconds=self.seconds) for t in sorted(self.bars)[-limit:]]
+        times = [t for t in sorted(self.bars) if end_ms is None or t * 1000 <= end_ms][-limit:]
+        return [kline_row(t, *self.bars[t][:4], self.bars[t][4], seconds=self.seconds) for t in times]
 
 
 class FakeRest:
@@ -100,10 +102,12 @@ class FakeRest:
         return B.ContractSpec(symbol, info["contract_type"], "TRADING", "0.10" if symbol == "BTCUSDT" else "0.01",
                               info["digits"], "COIN")
 
-    def klines(self, symbol: str, interval: str, limit: int) -> list:
+    def klines(self, symbol: str, interval: str, limit: int, end_ms: int | None = None) -> list:
         self._check()
-        self.calls.append(("klines", symbol, interval, limit))
-        return self.market.rows(limit)
+        if not 1 <= limit <= 1500:
+            raise B.BinanceDataError("Binance REST HTTP 400: limit must be 1..1500")
+        self.calls.append(("klines", symbol, interval, limit) if end_ms is None else ("klines", symbol, interval, limit, end_ms))
+        return self.market.rows(limit, end_ms)
 
 
 class FakeSocket:

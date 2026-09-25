@@ -372,6 +372,7 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "go_live": {"market": (True, _is_str), "source": (True, _is_str), "timeframe": (True, _is_str)},
     "exit_live": {},
     "live_poll": {},
+    "load_live_history": {},  # older candles for the streaming provider (Binance: REST pages)
     # Strategy Tester. Semantics (registry, dataset, broker, parameters) are
     # validated in tester.py against the authoritative configuration model.
     "run_backtest": {"strategy_id": (True, _is_str), "dataset_key": (True, _is_str),

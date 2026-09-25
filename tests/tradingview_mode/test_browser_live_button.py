@@ -8,61 +8,19 @@ switch back to Binance, then Historical and Replay. Uses the real Binance
 public network; skipped when Chrome, Node or Binance is unavailable.
 """
 import json
-import os
 from pathlib import Path
-import shutil
-import socket
 import subprocess
 import sys
-import time
-import urllib.request
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+from .conftest import CHROME, binance_reachable, browser_available
+
 SCRIPT = Path(__file__).with_name("browser") / "live_button.mjs"
 FEED = Path(__file__).with_name("synthetic_mt5_feed.py")
-CHROME = os.environ.get("CHROME_PATH", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 
-
-def _binance_reachable() -> bool:
-    try:
-        urllib.request.urlopen("https://fapi.binance.com/fapi/v1/time", timeout=5)
-        return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(not (shutil.which("node") and Path(CHROME).exists() and _binance_reachable()),
+pytestmark = pytest.mark.skipif(not (browser_available() and binance_reachable()),
                                 reason="needs node, Google Chrome and the Binance public API")
-
-
-def _free_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-
-
-@pytest.fixture
-def app(tmp_path):
-    mt5_folder = tmp_path / "mt5files"   # MT5 OFF: exists, but nothing writes to it
-    mt5_folder.mkdir()
-    port = _free_port()
-    env = {**os.environ, "TV_MT5_COMMON_FILES": str(mt5_folder)}
-    server = subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(ROOT / "app.py"), "--server.headless", "true",
-                               "--server.port", str(port), "--browser.gatherUsageStats", "false"],
-                              cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        for _ in range(120):
-            try:
-                urllib.request.urlopen(f"http://127.0.0.1:{port}/_stcore/health", timeout=1)
-                break
-            except OSError:
-                time.sleep(0.5)
-        yield f"http://127.0.0.1:{port}/render_tradingview_mode", mt5_folder
-    finally:
-        server.terminate()
-        server.wait(10)
 
 
 def test_live_modes_with_real_clicks(app):

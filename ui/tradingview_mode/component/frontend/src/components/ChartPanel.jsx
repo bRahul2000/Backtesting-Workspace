@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { sendEvent } from "../events.js";
+import { isIdle, sendEvent } from "../events.js";
+import { utcLabel } from "../chart/chartView.js";
 import { ChartEngine } from "../chart/ChartEngine.js";
 import { LiveBar } from "./LiveBar.jsx";
 import { ReplayBar } from "./ReplayBar.jsx";
@@ -31,6 +32,7 @@ function Legend({ engine, payload }) {
         {payload.live?.phase === "streaming" && payload.live.note && <div className="lg-note">{payload.live.note}</div>}
         {bar && (
           <div className={`lg-ohlc mono ${direction}`}>
+            <span className={`lg-time ${legend.hovering ? "is-hover" : ""}`} title="Candle open time (UTC)">{utcLabel(bar.time)}</span>
             <span><i>O</i>{formatPrice(bar.open, precision)}</span>
             <span><i>H</i>{formatPrice(bar.high, precision)}</span>
             <span><i>L</i>{formatPrice(bar.low, precision)}</span>
@@ -63,12 +65,18 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
   const [engine, setEngine] = useState(null);
   const [dismissed, setDismissed] = useState(() => new Set());
 
+  const [atLatest, setAtLatest] = useState(true);
+
   useLayoutEffect(() => {
     const instance = new ChartEngine(host.current);
+    // Older live history: asked for once per left edge, only when no event is in flight.
+    instance.onNeedHistory = () => (isIdle() ? (sendEvent("load_live_history"), true) : false);
+    window.__tvChart = instance; // read-only hook for browser regression tests
     setEngine(instance);
     onEngine(instance);
     return () => { onEngine(null); instance.destroy(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => engine?.onFollow(setAtLatest), [engine]);
 
   useEffect(() => {
     if (!engine) return;
@@ -84,6 +92,10 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
       <div className="chart-host" ref={host} />
       {engine && <Legend engine={engine} payload={payload} />}
       {payload.bars.length === 0 && <div className="chart-empty">No bars in the selected range.</div>}
+      {!atLatest && payload.bars.length > 0 && !payload.replay?.enabled && (
+        <button type="button" className="go-latest" title="Scroll to the newest candle and follow it"
+          onClick={() => engine?.scrollToLatest()}>Go to latest ⇥</button>
+      )}
       <LiveBar live={payload.live} />
       <ReplayBar replay={payload.replay} busy={busy} onLatest={() => {
         engine?.scrollToLatest();

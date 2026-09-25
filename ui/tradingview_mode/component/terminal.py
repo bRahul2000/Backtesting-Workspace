@@ -621,6 +621,10 @@ def render_custom_terminal() -> None:
             st.session_state[TESTER_RESULT_KEY] = result  # full authoritative result, untruncated
         state = replace(state, bottom_panel="strategy_tester", bottom_open=True)
     st.session_state[LAST_EVENT_KEY] = last_id
+    if (entry is not None and entry.level != "error" and isinstance(raw_event, dict)
+            and raw_event.get("type") == "load_live_history"):
+        _added, message = live_provider(state, st.session_state).load_older()
+        entry = LogEntry("info", message)
     if entry is not None:
         _log(entry)
         if entry.level == "error":

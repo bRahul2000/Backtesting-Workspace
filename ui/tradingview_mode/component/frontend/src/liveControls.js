@@ -33,17 +33,3 @@ export function quoteText(value, digits) {
   if (value === null || value === undefined || digits === null || digits === undefined) return "—";
   return Number(value).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
-
-// Incremental candle update is safe only when the window did not slide:
-// same first bar and the same length (last bar changed) or one bar appended.
-export function tailUpdate(previous, next) {
-  if (!previous.length || !next.length || previous[0].time !== next[0].time) return null;
-  if (next.length === previous.length) {
-    for (let i = 0; i < next.length - 1; i += 1) if (next[i].time !== previous[i].time) return null;
-    return next.slice(-1);
-  }
-  if (next.length === previous.length + 1 && next[next.length - 2].time === previous[previous.length - 1].time) {
-    return next.slice(-2);
-  }
-  return null;
-}
