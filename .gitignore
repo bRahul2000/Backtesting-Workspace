@@ -62,3 +62,7 @@ experiments/experiments.sqlite3
 *.sqlite3-journal
 *.sqlite3-wal
 *.sqlite3-shm
+
+# Feed comparison lab: downloaded Binance history and large per-candle outputs stay local.
+research/feed_comparison/cache/
+research/feed_comparison/output/*_*.csv
