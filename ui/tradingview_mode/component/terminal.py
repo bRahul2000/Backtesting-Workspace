@@ -39,6 +39,7 @@ from . import binance
 from . import live as live_model
 from . import providers
 from . import replay as replay_model
+from . import source_roles
 from . import tester
 from .protocol import (
     CONTRACT_VERSION,
@@ -74,6 +75,9 @@ TESTER_RUNS_KEY = "tv_terminal_tester_runs"
 LIVE_BOOKS_KEY = "tv_terminal_live_books"
 LIVE_TARGET_KEY = "tv_terminal_live_target"
 LIVE_SESSION_KEY = "tv_terminal_live_session"
+AUTHORITY_KEY = "tv_terminal_signal_authority"
+SOURCE_LOG_KEY = "tv_terminal_source_log"
+CHART_ROLE_KEY = "tv_terminal_chart_role"
 MAX_LOGS = 200
 _RSI_LEVELS = (70.0, 50.0, 30.0)
 _SECONDARY_COLORS = {"signal": "#f5a623", "histogram": "#7d8799"}
@@ -262,7 +266,7 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
                            logs: list[LogEntry], notices: list[dict[str, str]],
                            watchlist: list[dict], ack: str | None = None,
                            tester_payload: dict | None = None, replay_status: dict | None = None,
-                           live_status: dict | None = None) -> dict:
+                           live_status: dict | None = None, sources: dict | None = None) -> dict:
     bars = bars_from_frame(frame)
     times = [bar["time"] for bar in bars]
     overlays, panes, indicator_notices = indicator_payload(frame, times, state.indicators)
@@ -321,6 +325,8 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         "ack": ack,
         "replay": replay_status or {"enabled": False},
         "live": live_status or {"enabled": False},
+        # Chart / Signal / Execution roles: streaming Live only (never in Replay or Historical).
+        "sources": sources,
     }
     if live_status and live_status.get("phase") == "setup":
         payload["mode"] = "live"  # setup: the chart still shows the historical dataset
@@ -530,6 +536,40 @@ def live_setup_status(live: providers.LiveState, selected: MarketDataset) -> dic
             "note": providers.BINANCE_NOTE, **providers.catalog()}
 
 
+def update_source_roles(state: TerminalState, live_status: dict, session, now: float, *,
+                        folder: Path | None = None) -> dict:
+    """Chart / Signal / Execution roles for a streaming Live chart (read-only).
+
+    The signal source is observed from Exness MT5 for the live market whatever
+    the chart shows; the chart role comes from the chart provider's status."""
+    live = state.live
+    tracker = session.get(AUTHORITY_KEY) or source_roles.AuthorityTracker()
+    observation = source_roles.observe_exness(live.market, live.timeframe, now, folder)
+    tracker, assessment, events = source_roles.advance(tracker, observation)
+    readiness = source_roles.execution_readiness(observation, assessment)
+    if readiness.reason != tracker.execution_reason:
+        events.append(f"Execution DISABLED: {readiness.reason}")
+        tracker = dataclasses.replace(tracker, execution_reason=readiness.reason)
+    chart = source_roles.chart_role(live_status)
+    chart_key = (chart.source, chart.symbol, chart.timeframe)
+    if session.get(CHART_ROLE_KEY) != chart_key:
+        session[CHART_ROLE_KEY] = chart_key
+        events.insert(0, f"Chart source: {chart.provider} · {chart.symbol} · {chart.timeframe} (signal source unchanged)")
+    log = source_roles.append_log(session.get(SOURCE_LOG_KEY, []), events, now)
+    session[AUTHORITY_KEY], session[SOURCE_LOG_KEY] = tracker, log
+    signal = source_roles.signal_role(observation, assessment, chart)
+    return source_roles.source_payload(chart, signal, source_roles.execution_role(live.market, readiness), readiness,
+                                       assessment, log)
+
+
+def release_source_roles(session, now: float) -> None:
+    """Leaving Live drops signal authority; re-entering must validate again."""
+    if session.pop(AUTHORITY_KEY, None) is not None:
+        session.pop(CHART_ROLE_KEY, None)
+        session[SOURCE_LOG_KEY] = source_roles.append_log(
+            session.get(SOURCE_LOG_KEY, []), ["Live ended: signal authority released, execution DISABLED"], now)
+
+
 def live_session_id(session) -> str:
     """Stable id of this browser session (lease owner in the Binance hub)."""
     if LIVE_SESSION_KEY not in session:
@@ -640,6 +680,8 @@ def render_custom_terminal() -> None:
         return
     st.session_state[STATE_KEY] = state
     switched = sync_live_connections(state, st.session_state, hub=binance.hub())
+    if not (state.live is not None and state.live.streaming):
+        release_source_roles(st.session_state, time.time())
     if switched is not None:
         _log(switched)
     st.session_state["tv_dataset_selection"] = state.dataset_key
@@ -663,12 +705,14 @@ def render_custom_terminal() -> None:
             _log(LogEntry("error", f"Replay ended: {exc}"))
     live_status = None
     rows = None
+    sources = None
     streaming = state.live is not None and state.live.streaming
     if state.live is not None and not streaming:
         live_status = live_setup_status(state.live, selected)
     if streaming:
         frame, live_status, resolution = _live_frame(state, notices, selected)
         rows = live_rows(state, st.session_state, time.time())
+        sources = update_source_roles(state, live_status, st.session_state, time.time())
         shown = (frame["timestamp"].iloc[0].date(), frame["timestamp"].iloc[-1].date()) if len(frame) else None
     elif replay_status is None and bounds is not None:
         start, end, range_notices = effective_range(state, bounds, resolution.target_seconds)
@@ -686,7 +730,7 @@ def render_custom_terminal() -> None:
         payload = build_terminal_payload(
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
             logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, rows),
-            replay_status=replay_status, live_status=live_status, ack=last_id,
+            replay_status=replay_status, live_status=live_status, sources=sources, ack=last_id,
             tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
     except ValueError as exc:
         st.error(f"TradingView Mode payload rejected: {exc}")

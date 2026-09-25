@@ -4,6 +4,7 @@ import { utcLabel } from "../chart/chartView.js";
 import { ChartEngine } from "../chart/ChartEngine.js";
 import { LiveBar } from "./LiveBar.jsx";
 import { ReplayBar } from "./ReplayBar.jsx";
+import { SourceStrip } from "./SourceStrip.jsx";
 import { formatPrice, formatSigned, formatVolume, paramsLabel, providerShort, timeframeLabel } from "../format.js";
 
 function Values({ values, precision }) {
@@ -88,7 +89,7 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
   const notices = payload.notices.filter((notice) => !dismissed.has(notice.message));
   return (
     <main className={`chart-panel ${payload.replay?.enabled || payload.live?.enabled ? "replaying" : ""} ${
-      payload.live?.phase === "setup" && payload.live.message ? "live-message" : ""}`}>
+      payload.live?.phase === "setup" && payload.live.message ? "live-message" : ""} ${payload.sources ? "has-sources" : ""}`}>
       <div className="chart-host" ref={host} />
       {engine && <Legend engine={engine} payload={payload} />}
       {payload.bars.length === 0 && <div className="chart-empty">No bars in the selected range.</div>}
@@ -97,6 +98,7 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
           onClick={() => engine?.scrollToLatest()}>Go to latest ⇥</button>
       )}
       <LiveBar live={payload.live} />
+      <SourceStrip sources={payload.sources} />
       <ReplayBar replay={payload.replay} busy={busy} onLatest={() => {
         engine?.scrollToLatest();
         sendEvent("go_to_replay_latest");

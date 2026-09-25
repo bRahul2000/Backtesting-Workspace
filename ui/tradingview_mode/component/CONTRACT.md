@@ -357,6 +357,51 @@ a new sequence.
 **Updates:** each poll is a normal rerun with the full window (`live.bar_count`,
 `live.more_history`, `live.history_limit`).
 
+## Source roles: Chart / Signals / Execution (read-only)
+
+This follows the decision from the feed-comparison research (`research/feed_comparison/FINDINGS.md`).
+`source_roles.py` keeps three roles separate:
+
+| role | provider | authoritative | notes |
+|---|---|---|---|
+| Chart | Binance Futures (default) or Exness MT5, as the user chooses | never | context and monitoring only |
+| Signals | always Exness MT5, derived from the market (Gold → XAUUSDm, BTC → BTCUSDm) | yes | never inferred from the chart source |
+| Execution | Exness MT5 | yes | `enabled` is always `false` in this phase |
+
+**`signal_authority_ready`** is true only when every check passes:
+- the provider is Exness MT5 (Binance fails this check whatever its state)
+- the symbol matches the market
+- the MT5 feed is LIVE (the `live.py` health logic)
+- the heartbeat and quote are fresh
+- the timeframe has at least 200 bars
+- bar times are aligned, increasing and current
+- after any start, outage or feed restart, two consecutive fresh updates from one writer have been seen
+
+Readiness drops on the first failing observation. A new file alone never restores it: the
+tracker reports "revalidating" until the second fresh update arrives.
+
+**Payload:** `sources` is present only while Live is streaming (`null` in Historical,
+Replay and Live setup): `{chart, signal, execution, signal_authority_ready, checks,
+readiness, note, log}`.
+- Each role has `{role, provider, symbol, state, is_authoritative, last_update, reason,
+  timeframe, feed_state, source}`.
+- The signal state is `LIVE` or `UNAVAILABLE`; `feed_state` carries the MT5 health (STALE,
+  DISCONNECTED, ERROR, …).
+- `readiness` = `{enabled: false, broker_connected, signal_authority_ready, symbol_match,
+  market_data_fresh, reason}`. The reason is "Live execution not enabled", or "Exness signal
+  source unavailable" when authority is not ready.
+- `note` is the chart/signal mismatch note when the chart is Binance.
+- `log` holds the last 50 source-state events (in session only).
+
+`validate_payload` refuses:
+- a signal provider other than Exness MT5
+- an authoritative chart role
+- authority without a LIVE feed
+- execution that is enabled or not DISABLED
+- `sources` outside streaming Live, including Replay
+
+The Strategy Tester doesn't read any of this.
+
 ## Chart view (all modes)
 
 `chart/ChartEngine.js` compares each payload with what is drawn, using

@@ -187,6 +187,7 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
     _require(type(payload.get("price_precision")) is int, "price_precision must be an integer.")
     _validate_replay(payload, bar_times)
     _validate_live(payload)
+    _validate_sources(payload)
     _validate_tester(payload.get("tester"), payload.get("trade_overlay"), bar_times)
     _require(payload.get("ack") is None or isinstance(payload["ack"], str), "ack must be an event id or null.")
     return payload
@@ -194,6 +195,27 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 LIVE_SOURCES = {"binance": ("Binance Futures", "BINANCE_LIVE:"), "exness": ("Exness MT5", "MT5_LIVE:")}
 LIVE_STATUSES = ("CONNECTING", "LIVE", "STALE", "DISCONNECTED", "ERROR")
+
+
+def _validate_sources(payload: dict[str, Any]) -> None:
+    """Hard guards for the Chart / Signal / Execution roles (see source_roles.py)."""
+    sources = payload.get("sources")
+    live = payload.get("live") or {}
+    if sources is None:
+        return
+    _require(payload["mode"] == "live" and live.get("phase") == "streaming" and not (payload.get("replay") or {}).get("enabled"),
+             "source roles are shown for a streaming Live chart only (never in Replay or Historical).")
+    signal, chart, execution = sources.get("signal") or {}, sources.get("chart") or {}, sources.get("execution") or {}
+    _require(signal.get("provider") == "Exness MT5" and signal.get("source") == "exness" and signal.get("is_authoritative") is True,
+             "the signal source must be Exness MT5; Binance can never be authoritative for Exness triggers.")
+    _require(chart.get("is_authoritative") is False, "the chart source is never authoritative.")
+    _require(chart.get("source") == live.get("source"), "the chart role must describe the chart being drawn.")
+    ready = sources.get("signal_authority_ready")
+    _require(isinstance(ready, bool), "signal_authority_ready must be a boolean.")
+    _require(not ready or (signal.get("state") == "LIVE" and signal.get("feed_state") == "LIVE"),
+             "signal authority requires a LIVE Exness signal feed.")
+    _require((sources.get("readiness") or {}).get("enabled") is False and execution.get("state") == "DISABLED",
+             "execution must stay disabled in this phase.")
 
 
 def _validate_live(payload: dict[str, Any]) -> None:
