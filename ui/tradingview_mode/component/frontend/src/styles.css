@@ -361,6 +361,33 @@ input { font: inherit; color: var(--text); }
 .wl-live { font-size: 9.5px; font-weight: 700; text-align: right; align-self: center; }
 .wl-live.is-live { color: var(--up); }
 .wl-live.is-stale { color: var(--warn); }
+.wl-live.is-off { color: var(--muted); }
+.wl-group { padding: 6px 10px 3px; font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+.wl-row.is-live-row { grid-template-columns: minmax(0, 1fr) auto; }
+.wl-row.is-live-row .wl-live { display: inline; font-size: 9.5px; }
+.live-bar > * { flex: none; }
+.live-bar > .spacer { flex: 1 1 0; min-width: 0; }
+.live-bar > .live-contract { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Setup with an explanation: the message gets its own full-width line (never cut off). */
+.live-bar.is-setup.has-message { height: 56px; flex-wrap: wrap; align-content: center; row-gap: 3px; }
+.live-bar.has-message > .live-unsupported { order: 10; flex: 1 0 100%; white-space: normal; overflow: visible; }
+.chart-panel.live-message .chart-host { top: 56px; }
+.chart-panel.live-message .legend:not(.pane-legend) { top: 62px; }
+.chart-panel.live-message .pane-legend { margin-top: 56px; }
+.chart-panel.live-message .notices { top: 114px; }
+.live-bar > .live-shrink { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; overflow: hidden; }
+.live-shrink > * { flex: none; }
+.live-shrink > .live-reason { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.symbol-btn.is-live-header:disabled { opacity: 1; cursor: default; }
+.lg-note { color: var(--muted); font-size: 10.5px; }
+.live-contract { color: var(--text-2); }
+.live-header { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.live-header-sep { color: var(--muted); font-weight: 400; }
+.live-header-state { font-size: 11px; letter-spacing: 0.04em; }
+.live-header-state.live { color: var(--up); }
+.live-header-state.stale, .live-header-state.connecting { color: var(--warn); }
+.live-header-state.error { color: var(--down); }
+.live-header-state.disconnected { color: var(--muted); }
 
 .live-bar.is-setup { border-bottom-color: rgba(61, 139, 253, 0.45); gap: 8px; }
 .live-state.is-setup { color: var(--accent); }

@@ -112,7 +112,7 @@ VALID_EVENTS = {
     "jump_replay": {"to": "2026-07-01T09:00"},
     "step_forward": {}, "step_backward": {}, "play_replay": {}, "pause_replay": {},
     "set_replay_speed": {"speed": 5}, "exit_replay": {}, "go_to_replay_latest": {},
-    "enter_live": {}, "go_live": {"symbol": "BTCUSDm", "timeframe": "15m"}, "exit_live": {}, "live_poll": {},
+    "enter_live": {}, "go_live": {"market": "BTC", "source": "binance", "timeframe": "15m"}, "exit_live": {}, "live_poll": {},
     "export_run": {"history_id": 1, "kind": "trades_csv"},
 }
 

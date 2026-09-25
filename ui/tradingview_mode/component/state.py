@@ -15,7 +15,7 @@ from ..indicators import INDICATORS
 from . import replay as replay_model
 from .protocol import FrontendEvent
 from .replay import ReplayError, ReplayState
-from .live import LIVE_SYMBOLS, LIVE_TIMEFRAMES, UNSUPPORTED_MESSAGE, LiveState
+from .providers import DEFAULT_SOURCE, LIVE_TIMEFRAMES, MARKETS, SOURCES, UNSUPPORTED_MESSAGE, LiveState, market_for_instrument
 
 
 MAX_BARS = 50_000
@@ -57,7 +57,7 @@ class TerminalState:
     next_indicator: int = 1
     # Historical when None; otherwise the session's replay (see replay.py).
     replay: ReplayState | None = None
-    # Read-only MT5 live view (see live.py). Never set together with replay.
+    # Read-only live view (see providers.py). Never set together with replay.
     live: LiveState | None = None
 
 
@@ -73,8 +73,8 @@ class TerminalContext:
     data_bounds: tuple[date, date] | None = None
     # Open times (epoch seconds) of every bar of the resolved dataset/timeframe.
     bar_times: object = None
-    # Registry symbol of a dataset key (used to preselect a live symbol).
-    dataset_symbol: Callable[[str], str] | None = None
+    # Registry instrument of a dataset key (used to preselect the live market).
+    dataset_instrument: Callable[[str], str | None] | None = None
 
 
 def validate_indicator_params(key: str, params: dict | None) -> dict[str, float | int]:
@@ -129,8 +129,8 @@ LIVE_EVENTS = ("enter_live", "go_live", "exit_live", "live_poll")
 
 
 def _apply_live(state: TerminalState, event: FrontendEvent, ctx: TerminalContext) -> tuple[TerminalState, LogEntry | None]:
-    """Live mode has two steps: enter (setup: choose symbol/timeframe) and
-    Go Live (start reading the MT5 feed). Entering never needs a feed."""
+    """Live mode has two steps: enter (setup: choose market/source/timeframe) and
+    Go Live (connect to that one provider). Entering never needs a feed."""
     kind, data = event.type, event.data
     if kind == "live_poll":
         # A refresh request: nothing changes; not logged (it arrives every second).
@@ -144,22 +144,28 @@ def _apply_live(state: TerminalState, event: FrontendEvent, ctx: TerminalContext
     if kind == "enter_live":
         if state.live is not None:
             return state, LogEntry("debug", "Live mode already active.")
-        current = ctx.dataset_symbol(state.dataset_key) if ctx.dataset_symbol else None
-        symbol = current if current in LIVE_SYMBOLS else None
-        timeframe = state.timeframe if state.timeframe in LIVE_TIMEFRAMES else next(iter(LIVE_TIMEFRAMES))
-        note = "" if symbol else f" {current or state.dataset_key} has no live feed. {UNSUPPORTED_MESSAGE}"
-        return (replace(state, live=LiveState(symbol, timeframe, streaming=False)),
-                LogEntry("info", f"Live mode: choose a symbol and timeframe, then Go Live.{note}"))
-    # go_live
+        instrument = ctx.dataset_instrument(state.dataset_key) if ctx.dataset_instrument else None
+        market = market_for_instrument(instrument)
+        timeframe = state.timeframe if state.timeframe in LIVE_TIMEFRAMES else LIVE_TIMEFRAMES[0]
+        note = "" if market else f" {state.dataset_key} has no live market. {UNSUPPORTED_MESSAGE}"
+        return (replace(state, live=LiveState(market, DEFAULT_SOURCE, timeframe, streaming=False)),
+                LogEntry("info", f"Live mode: choose market, source and timeframe, then Go Live.{note}"))
+    # go_live (also used to switch market or source while streaming)
     if state.live is None:
         return _reject(state, "enter Live mode before Go Live.")
-    symbol, timeframe = data["symbol"], data["timeframe"]
-    if symbol not in LIVE_SYMBOLS:
-        return _reject(state, f"{symbol} has no live MT5 feed. {UNSUPPORTED_MESSAGE}")
+    market, source, timeframe = data["market"], data["source"], data["timeframe"]
+    if market not in MARKETS:
+        return _reject(state, f"{market} is not a live market. {UNSUPPORTED_MESSAGE}")
+    if source not in SOURCES:
+        return _reject(state, f"{source} is not a live source (sources: {', '.join(SOURCES.values())}).")
     if timeframe not in LIVE_TIMEFRAMES:
-        return _reject(state, f"{timeframe} is not a live MT5 timeframe (live: {', '.join(LIVE_TIMEFRAMES)}).")
-    return (replace(state, live=LiveState(symbol, timeframe, streaming=True)),
-            LogEntry("info", f"Go Live: Exness MT5 {symbol} {timeframe} (read-only)."))
+        return _reject(state, f"{timeframe} is not a live timeframe (live: {', '.join(LIVE_TIMEFRAMES)}).")
+    new = LiveState(market, source, timeframe, streaming=True)
+    if new == state.live:
+        return state, LogEntry("debug", "Live source unchanged.")
+    verb = "switched to" if state.live.streaming else "Go Live:"
+    return (replace(state, live=new),
+            LogEntry("info", f"Live {verb} {SOURCES[source]} {new.symbol} {timeframe} (read-only market data)."))
 
 
 def _utc(epoch: int) -> str:
@@ -234,9 +240,9 @@ def apply_event(state: TerminalState, event: FrontendEvent, ctx: TerminalContext
     if state.live is not None and kind == "select_timeframe":
         timeframe = event.data["timeframe"].strip().lower()
         if timeframe not in LIVE_TIMEFRAMES:
-            return _reject(state, f"{timeframe} is not a live MT5 timeframe (live: {', '.join(LIVE_TIMEFRAMES)}).")
+            return _reject(state, f"{timeframe} is not a live timeframe (live: {', '.join(LIVE_TIMEFRAMES)}).")
         return (replace(state, live=replace(state.live, timeframe=timeframe)),
-                LogEntry("info", f"Live timeframe {timeframe} (MT5 native)."))
+                LogEntry("info", f"Live timeframe {timeframe} ({SOURCES[state.live.source]} native)."))
     if state.live is not None and kind in ("select_dataset", "select_watchlist_item", "set_date_range"):
         return _reject(state, "exit Live before changing the dataset or date range.")
     if state.replay is not None and kind in ("select_dataset", "select_watchlist_item", "select_timeframe",

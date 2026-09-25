@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { sendEvent } from "../events.js";
+import { statusClass } from "../liveControls.js";
 import { providerShort, timeframeLabel } from "../format.js";
 import { Icon } from "./icons.jsx";
 import { Popover } from "./Popover.jsx";
@@ -126,6 +127,7 @@ export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engi
   const [menu, setMenu] = useState(null);
   const replay = payload.replay?.enabled;
   const live = payload.live?.enabled;
+  const streaming = live && payload.live.phase === "streaming";
   const locked = replay ? "Exit Replay to change this" : live ? "Exit Live to change this" : undefined;
   const close = () => setMenu(null);
   const toggle = (name) => setMenu((current) => (current === name ? null : name));
@@ -136,10 +138,21 @@ export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engi
   return (
     <header className="topbar">
       <div className="anchor">
-        <button type="button" className="symbol-btn" disabled={replay || live} onClick={() => toggle("symbol")} title={locked || payload.source.label}>
-          <span className="symbol-name">{payload.symbol}</span>
-          <span className="provider-badge">{providerShort(payload.provider)}</span>
-          <Icon name="chevron" size={14} />
+        <button type="button" className={`symbol-btn ${streaming ? "is-live-header" : ""}`} disabled={replay || live}
+          onClick={() => toggle("symbol")} title={streaming ? `${payload.live.identity.venue} · ${payload.live.identity.instrument_kind} · read-only` : locked || payload.source.label}>
+          {streaming ? (
+            // While Live streams, the header always names contract, source and state.
+            <span className="symbol-name live-header">
+              {payload.live.title}<span className="live-header-sep">·</span>
+              <span className={`live-header-state ${statusClass(payload.live.status)}`}>{payload.live.status}</span>
+            </span>
+          ) : (
+            <>
+              <span className="symbol-name">{payload.symbol}</span>
+              <span className="provider-badge">{providerShort(payload.provider)}</span>
+            </>
+          )}
+          {!streaming && <Icon name="chevron" size={14} />}
         </button>
         <Popover open={menu === "symbol"} onClose={close} width={300}><SymbolMenu payload={payload} onClose={close} /></Popover>
       </div>

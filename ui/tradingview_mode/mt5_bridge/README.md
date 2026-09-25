@@ -1,4 +1,4 @@
-# TradingView Mode Live feed (read-only MT5 bridge)
+# TradingView Mode Live feed: Exness MT5 source (read-only bridge)
 
 `TradingViewLiveFeed.mq5` is an MQL5 **Service**. It is not an Expert Advisor and
 is not attached to a chart. It only reads market data (`SymbolInfoTick`,
@@ -31,7 +31,12 @@ Python never reads a half-written file.
 5. Check the **Experts/Journal** tab for `TradingView Live Feed started (read-only)`.
 6. In the project, run `./venv/bin/python -m streamlit run app.py`, open
    TradingView Mode, click **Live** (the strip above the chart shows the Live controls),
-   pick a symbol and timeframe, and click **Go Live**.
+   pick the market (BTC or Gold), set **Source** to **Exness MT5**, pick a timeframe
+   and click **Go Live**.
+
+The default Live source is Binance Futures (BTCUSDT / XAUUSDT perpetuals), which
+needs neither MetaTrader nor this service. Exness MT5 is the broker-native
+alternative; the two are different instruments and are never mixed.
 
 Python reads
 `~/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/users/user/AppData/Roaming/MetaQuotes/Terminal/Common/Files`.

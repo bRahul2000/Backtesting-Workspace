@@ -13,6 +13,7 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import asdict, replace
 import time
+import uuid
 from datetime import date, timedelta
 import json
 from pathlib import Path
@@ -34,7 +35,9 @@ from ..timeframes import (
 )
 from ..workspace import watchlist_groups
 from . import render_terminal_component
+from . import binance
 from . import live as live_model
+from . import providers
 from . import replay as replay_model
 from . import tester
 from .protocol import (
@@ -69,6 +72,8 @@ TESTER_KEY = "tv_terminal_tester"
 TESTER_RESULT_KEY = "tv_terminal_tester_result"
 TESTER_RUNS_KEY = "tv_terminal_tester_runs"
 LIVE_BOOKS_KEY = "tv_terminal_live_books"
+LIVE_TARGET_KEY = "tv_terminal_live_target"
+LIVE_SESSION_KEY = "tv_terminal_live_session"
 MAX_LOGS = 200
 _RSI_LEVELS = (70.0, 50.0, 30.0)
 _SECONDARY_COLORS = {"signal": "#f5a623", "histogram": "#7d8799"}
@@ -122,7 +127,7 @@ def context_for(bounds: tuple[date, date] | None = None, bar_times=None) -> Term
         timeframe_seconds=timeframe_seconds,
         data_bounds=bounds,
         bar_times=bar_times,
-        dataset_symbol=lambda key: dataset(key).symbol if key in keys else None,
+        dataset_instrument=lambda key: dataset(key).instrument if key in keys else None,
     )
 
 
@@ -207,8 +212,34 @@ def live_quotes(folder: Path, now: float) -> dict[str, dict]:
     return quotes
 
 
-def watchlist_payload(selected: MarketDataset, quotes: dict[str, dict] | None = None) -> list[dict]:
-    items = []
+def live_watchlist(live: providers.LiveState, binance_quotes: dict[str, dict | None], mt5_quotes: dict[str, dict],
+                   digits: dict[str, int] | None = None) -> list[dict]:
+    """Live rows, one per (market, source), each labelled with its source. A
+    source without a current quote shows no price (never another source's)."""
+    rows = []
+    for source, source_label in providers.SOURCES.items():
+        for market in providers.MARKETS:
+            ident = providers.identity(market, source)
+            symbol = ident["symbol"]
+            quote = (binance_quotes if source == "binance" else mt5_quotes).get(symbol)
+            precision = (digits or {}).get(symbol) if source == "binance" else (quote or {}).get("digits")
+            rows.append({
+                "dataset_key": ident["dataset_key"], "kind": "live", "market": market, "source": source,
+                "source_label": source_label.split()[0].upper(), "symbol": symbol + (" PERP" if source == "binance" else ""),
+                "provider": ident["provider"], "instrument": ident["instrument"], "title": providers.title(ident),
+                "native_timeframes": list(providers.LIVE_TIMEFRAMES), "last_close": None, "change_pct": None,
+                "price_precision": precision if precision is not None else 2,
+                "selected": live.market == market and live.source == source,
+                "live": None if quote is None else {"status": quote["status"], "bid": quote["bid"], "ask": quote["ask"],
+                                                    "digits": precision},
+            })
+    return rows
+
+
+def watchlist_payload(selected: MarketDataset, live_rows: list[dict] | None = None) -> list[dict]:
+    """Registered datasets (historical reference closes), preceded by the
+    source-labelled live rows while Live is streaming."""
+    items = list(live_rows or [])
     for group in watchlist_groups():
         available = [entry for entry in group if entry.exists]
         if not available:
@@ -217,12 +248,11 @@ def watchlist_payload(selected: MarketDataset, quotes: dict[str, dict] | None = 
         last, previous, precision = _last_closes(str(primary.path), _mtime(primary.path))
         change = None if last is None or not previous else (last - previous) / previous * 100.0
         items.append({
-            "dataset_key": primary.key, "symbol": primary.symbol, "provider": primary.broker,
+            "dataset_key": primary.key, "kind": "dataset", "symbol": primary.symbol, "provider": primary.broker,
             "instrument": primary.instrument, "native_timeframes": [entry.timeframe for entry in available],
             "last_close": last, "change_pct": change, "price_precision": precision,
-            "selected": any(entry.key == selected.key for entry in group),
-            # Only the live feed's own symbol gets live values; others stay historical reference.
-            "live": (quotes or {}).get(primary.symbol) if primary.broker == "Exness Technologies Ltd" else None,
+            "selected": not live_rows and any(entry.key == selected.key for entry in group),
+            "live": None,
         })
     return items
 
@@ -295,15 +325,18 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
     if live_status and live_status.get("phase") == "setup":
         payload["mode"] = "live"  # setup: the chart still shows the historical dataset
     elif live_status:
-        # Live bars come from the MT5 feed, not from a registry dataset file.
-        symbol, timeframe = live_status["symbol"], live_status["timeframe"]
+        # Live bars come from exactly one provider (never a registry file, never mixed).
+        ident, timeframe = live_status["identity"], live_status["timeframe"]
         payload.update({
-            "mode": "live", "dataset_key": f"MT5_LIVE:{symbol}", "timeframe": timeframe,
-            "timeframes": list(live_model.LIVE_TIMEFRAMES),
-            "view_key": f"{selected.instrument}|{selected.broker}|{selected.symbol}|{timeframe}|live",
-            "source": {"dataset_key": f"MT5_LIVE:{symbol}", "label": f"Exness MT5 live · {symbol} (read-only)",
-                       "provider": selected.broker, "symbol": selected.symbol, "timeframe": timeframe, "native": True,
-                       "description": "MT5 live · native", "read_only": True},
+            "mode": "live", "dataset_key": ident["dataset_key"], "symbol": ident["symbol"],
+            "provider": ident["provider"], "instrument": ident["instrument"], "timeframe": timeframe,
+            "timeframes": list(providers.LIVE_TIMEFRAMES),
+            # A provider switch is a new view: the chart reloads instead of stitching histories.
+            "view_key": f"{ident['dataset_key']}|{timeframe}|live",
+            "bars_rev": bars_revision(bars, ident["dataset_key"], timeframe),
+            "source": {"dataset_key": ident["dataset_key"], "label": f"{live_status['title']} · live (read-only)",
+                       "provider": ident["provider"], "symbol": ident["symbol"], "timeframe": timeframe, "native": True,
+                       "description": f"{ident['source_label']} live · native", "read_only": True},
         })
         if live_status.get("digits") is not None:
             payload["price_precision"] = live_status["digits"]
@@ -480,70 +513,84 @@ def _load(state: TerminalState) -> tuple[MarketDataset, TimeframeResolution, pd.
     return selected, resolution, frame
 
 
-def live_view(book: live_model.Book, feed: live_model.FeedRead, now: float) -> tuple[pd.DataFrame, dict]:
-    """Chart frame and status for one live book (pure; no I/O)."""
-    symbol, timeframe = book.symbol, book.timeframe
-    seconds = live_model.LIVE_TIMEFRAMES[timeframe][1]
-    snapshot = book.snapshot
-    status, reason = live_model.connection_status(file_found=feed.file_found, snapshot=snapshot, error=feed.error,
-                                                  has_bars=not book.bars.empty, now=now)
-    frame = pd.DataFrame({
-        "timestamp": pd.to_datetime(book.bars["time"].astype("int64"), unit="s", utc=True),
-        "open": book.bars["open"].astype(float), "high": book.bars["high"].astype(float),
-        "low": book.bars["low"].astype(float), "close": book.bars["close"].astype(float),
-        "volume": book.bars["tick_volume"].astype(float),
-    }) if not book.bars.empty else pd.DataFrame({
-        # No feed yet: an empty, correctly typed frame (the page shows the state, not an error).
-        "timestamp": pd.Series([], dtype="datetime64[ns, UTC]"),
-        **{column: pd.Series([], dtype=float) for column in ("open", "high", "low", "close", "volume")},
-    })
-    forming = live_model.forming_bar_time(book.bars, seconds, snapshot.tick_time_ms if snapshot else None)
-    return frame, {
-        "enabled": True, "phase": "streaming", "status": status, "reason": reason, "symbol": symbol, "timeframe": timeframe,
-        "provider": live_model.LIVE_SYMBOLS[symbol]["provider"], "source": "Exness MT5 (read-only file bridge)",
-        **live_model.quote_payload(snapshot),
-        "updated_utc": snapshot.written_utc if snapshot else None,
-        "heartbeat_age_s": round(now - snapshot.written_utc, 1) if snapshot else None,
-        "tick_age_s": round(now - snapshot.tick_time_ms / 1000, 1) if snapshot else None,
-        "forming_bar_time": forming, "bar_count": int(len(book.bars)),
-        "rejected_updates": book.rejected,
-        # Convention: indicators include the forming candle and update with it.
-        "indicators_include_forming_bar": True,
-        "symbols": list(live_model.LIVE_SYMBOLS), "timeframes": list(live_model.LIVE_TIMEFRAMES),
-    }
-
-
-def live_setup_status(live: live_model.LiveState, selected: MarketDataset) -> dict:
+def live_setup_status(live: providers.LiveState, selected: MarketDataset) -> dict:
     """Live mode before Go Live: the chart still shows the historical dataset and
-    nothing is read from MT5."""
-    supported = selected.symbol in live_model.LIVE_SYMBOLS
-    return {
-        "enabled": True, "phase": "setup", "status": None, "symbol": live.symbol, "timeframe": live.timeframe,
-        "symbols": list(live_model.LIVE_SYMBOLS), "timeframes": list(live_model.LIVE_TIMEFRAMES),
-        "current_supported": supported,
-        "message": None if supported else
-        f"{live_model.UNSUPPORTED_MESSAGE} {selected.symbol} ({selected.broker}) has no live feed — choose a symbol.",
-    }
+    nothing is connected or read."""
+    market = providers.market_for_instrument(selected.instrument)
+    native = selected.broker == "Exness Technologies Ltd"
+    if market is None:
+        message = f"{providers.UNSUPPORTED_MESSAGE} {selected.symbol} ({selected.broker}) has no live market — choose one."
+    elif not native:
+        message = (f"{selected.symbol} ({selected.broker.split(' (')[0]}) has no live feed. Live shows "
+                   f"{providers.MARKETS[market]['label']} from the source you choose — a different instrument.")
+    else:
+        message = None
+    return {"enabled": True, "phase": "setup", "status": None, "market": live.market, "source": live.source,
+            "timeframe": live.timeframe, "current_supported": market is not None, "message": message,
+            "note": providers.BINANCE_NOTE, **providers.catalog()}
 
 
-def _live_frame(state: TerminalState, notices: list[dict[str, str]]):
-    symbol, timeframe = state.live.symbol, state.live.timeframe
-    books = st.session_state.setdefault(LIVE_BOOKS_KEY, {})
-    book = books.get((symbol, timeframe)) or live_model.empty_book(symbol, timeframe)
-    feed = live_model.read_feed(live_model.common_files_dir(), symbol, timeframe)
-    if feed.snapshot is not None and feed.error is None:
-        book, verdict = live_model.apply_snapshot(book, feed.snapshot, feed.seed)
-        if verdict == "out_of_order":
-            _log(LogEntry("warning", f"Live {symbol}: out-of-order MT5 update rejected (seq {feed.snapshot.seq})."))
-    books[(symbol, timeframe)] = book
-    frame, status = live_view(book, feed, time.time())
+def live_session_id(session) -> str:
+    """Stable id of this browser session (lease owner in the Binance hub)."""
+    if LIVE_SESSION_KEY not in session:
+        session[LIVE_SESSION_KEY] = uuid.uuid4().hex
+    return session[LIVE_SESSION_KEY]
+
+
+def sync_live_connections(state: TerminalState, session, *, hub: binance.BinanceHub) -> LogEntry | None:
+    """Tear down the previous provider whenever the live target changes.
+
+    Clears the MT5 books, releases the session's Binance kline lease (the hub
+    then closes that socket) and, when Live ends, the quote lease too. Runs
+    every rerun but acts only on a change, so reruns never reconnect."""
+    target = state.live.target if state.live is not None else None
+    previous = session.get(LIVE_TARGET_KEY)
+    if target == previous:
+        return None
+    session[LIVE_TARGET_KEY] = target
+    session.pop(LIVE_BOOKS_KEY, None)
+    session_id = live_session_id(session)
+    if target is None:
+        hub.release(session_id)
+    elif target[0] != "binance":
+        hub.release(session_id, "kline")
+    if previous is None:
+        return None
+    return LogEntry("info", f"Live source changed: {providers.SOURCES[previous[0]]} {previous[1]} {previous[2]} closed "
+                            f"and its bars cleared.")
+
+
+def live_provider(state: TerminalState, session, *, hub: binance.BinanceHub | None = None):
+    live = state.live
+    if live.source == "binance":
+        return providers.BinanceFuturesProvider(live.market, live.timeframe, session_id=live_session_id(session),
+                                                hub=hub or binance.hub())
+    return providers.ExnessMT5Provider(live.market, live.timeframe, books=session.setdefault(LIVE_BOOKS_KEY, {}))
+
+
+def live_rows(state: TerminalState, session, now: float, *, hub: binance.BinanceHub | None = None,
+              folder: Path | None = None) -> list[dict]:
+    hub = hub or binance.hub()
+    board = hub.quotes(live_session_id(session))
+    binance_quotes = {providers.MARKETS[m]["binance"]: providers.binance_watch_quote(board, providers.MARKETS[m]["binance"], now)
+                      for m in providers.MARKETS}
+    digits = {symbol: info["digits"] for symbol, info in binance.CONTRACTS.items()}
+    return live_watchlist(state.live, {k: v for k, v in binance_quotes.items() if v},
+                          live_quotes(folder or live_model.common_files_dir(), now), digits)
+
+
+def _live_frame(state: TerminalState, notices: list[dict[str, str]], selected: MarketDataset):
+    provider = live_provider(state, st.session_state)
+    view = provider.view(time.time())
+    status = view.status
+    if getattr(provider, "last_verdict", None) == "out_of_order":
+        _log(LogEntry("warning", f"Live {status['symbol']}: out-of-order MT5 update rejected."))
     if status["status"] in ("ERROR", "DISCONNECTED"):
         notices.append({"level": "error" if status["status"] == "ERROR" else "warning",
-                        "message": f"Live {symbol}: {status['status']} — {status['reason']}"})
-    selected = dataset(live_model.LIVE_SYMBOLS[symbol]["dataset_key"])
-    seconds = live_model.LIVE_TIMEFRAMES[timeframe][1]
-    resolution = TimeframeResolution(timeframe, seconds, selected, True)
-    return frame, status, selected, resolution
+                        "message": f"Live {status['title']}: {status['status']} — {status['reason']}"})
+    timeframe = state.live.timeframe
+    resolution = TimeframeResolution(timeframe, timeframe_seconds(timeframe), selected, True)
+    return view.frame, status, resolution
 
 
 def render_custom_terminal() -> None:
@@ -588,6 +635,9 @@ def render_custom_terminal() -> None:
         st.error(f"TradingView Mode could not load {state.dataset_key} @ {state.timeframe}: {exc}")
         return
     st.session_state[STATE_KEY] = state
+    switched = sync_live_connections(state, st.session_state, hub=binance.hub())
+    if switched is not None:
+        _log(switched)
     st.session_state["tv_dataset_selection"] = state.dataset_key
     st.session_state["tv_tf_selection"] = state.timeframe
 
@@ -608,13 +658,13 @@ def render_custom_terminal() -> None:
             notices.append({"level": "error", "message": f"Replay ended: {exc}"})
             _log(LogEntry("error", f"Replay ended: {exc}"))
     live_status = None
-    quotes = None
+    rows = None
     streaming = state.live is not None and state.live.streaming
     if state.live is not None and not streaming:
         live_status = live_setup_status(state.live, selected)
     if streaming:
-        frame, live_status, selected, resolution = _live_frame(state, notices)
-        quotes = live_quotes(live_model.common_files_dir(), time.time())
+        frame, live_status, resolution = _live_frame(state, notices, selected)
+        rows = live_rows(state, st.session_state, time.time())
         shown = (frame["timestamp"].iloc[0].date(), frame["timestamp"].iloc[-1].date()) if len(frame) else None
     elif replay_status is None and bounds is not None:
         start, end, range_notices = effective_range(state, bounds, resolution.target_seconds)
@@ -631,7 +681,7 @@ def render_custom_terminal() -> None:
     try:
         payload = build_terminal_payload(
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
-            logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, quotes),
+            logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, rows),
             replay_status=replay_status, live_status=live_status, ack=last_id,
             tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
     except ValueError as exc:

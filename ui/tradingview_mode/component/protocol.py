@@ -186,9 +186,44 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
     _require(payload.get("ui", {}).get("bottom_panel") in BOTTOM_PANELS, "ui.bottom_panel is invalid.")
     _require(type(payload.get("price_precision")) is int, "price_precision must be an integer.")
     _validate_replay(payload, bar_times)
+    _validate_live(payload)
     _validate_tester(payload.get("tester"), payload.get("trade_overlay"), bar_times)
     _require(payload.get("ack") is None or isinstance(payload["ack"], str), "ack must be an event id or null.")
     return payload
+
+
+LIVE_SOURCES = {"binance": ("Binance Futures", "BINANCE_LIVE:"), "exness": ("Exness MT5", "MT5_LIVE:")}
+LIVE_STATUSES = ("CONNECTING", "LIVE", "STALE", "DISCONNECTED", "ERROR")
+
+
+def _validate_live(payload: dict[str, Any]) -> None:
+    """A streaming Live payload is exactly one provider's data, labelled as such."""
+    live = payload.get("live")
+    _require(isinstance(live, dict) and isinstance(live.get("enabled"), bool), "live status is required.")
+    for item in payload["watchlist"]:
+        quote = item.get("live")
+        if quote is not None:
+            _require(item.get("source") in LIVE_SOURCES and isinstance(item.get("source_label"), str),
+                     "a live watchlist value must name its source.")
+    if not live["enabled"]:
+        _require(payload["mode"] != "live", "live mode needs live status.")
+        return
+    _require(payload["mode"] == "live", "live status outside Live mode.")
+    _require(live.get("phase") in ("setup", "streaming"), "live.phase must be setup or streaming.")
+    if live["phase"] == "setup":
+        return
+    _require(live.get("status") in LIVE_STATUSES, f"live.status {live.get('status')!r} is invalid.")
+    _require(live.get("source") in LIVE_SOURCES, f"live.source {live.get('source')!r} is invalid.")
+    label, prefix = LIVE_SOURCES[live["source"]]
+    identity = live.get("identity")
+    _require(isinstance(identity, dict) and identity.get("source") == live["source"], "live identity must match its source.")
+    _require(live.get("source_label") == label and identity.get("source_label") == label, "live source label mismatch.")
+    _require(payload["dataset_key"] == identity.get("dataset_key") == payload["source"]["dataset_key"]
+             and payload["dataset_key"].startswith(prefix), "live bars must come from the labelled provider only.")
+    _require(payload["symbol"] == identity.get("symbol") == live.get("symbol"), "live symbol mismatch.")
+    _require(payload["provider"] == identity.get("provider") == live.get("provider"), "live provider mismatch.")
+    _require(isinstance(live.get("title"), str) and label in live["title"], "live title must name the source.")
+    _require(not (payload.get("trade_overlay") or {}).get("trades"), "backtest markers are not shown on live data.")
 
 
 def _validate_replay(payload: dict[str, Any], bar_times: set[int]) -> None:
@@ -331,9 +366,10 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "set_replay_speed": {"speed": (True, lambda v: type(v) is int and v in REPLAY_SPEEDS)},
     "exit_replay": {},
     "go_to_replay_latest": {},
-    # Live (read-only MT5 market data). Symbols/timeframes are validated in state.py.
+    # Live (read-only market data: Binance Futures or Exness MT5). Market/source/
+    # timeframe semantics are validated in state.py.
     "enter_live": {},  # Live mode setup; no feed is read yet
-    "go_live": {"symbol": (True, _is_str), "timeframe": (True, _is_str)},
+    "go_live": {"market": (True, _is_str), "source": (True, _is_str), "timeframe": (True, _is_str)},
     "exit_live": {},
     "live_poll": {},
     # Strategy Tester. Semantics (registry, dataset, broker, parameters) are

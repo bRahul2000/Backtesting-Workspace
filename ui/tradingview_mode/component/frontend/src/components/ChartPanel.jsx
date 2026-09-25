@@ -23,11 +23,12 @@ function Legend({ engine, payload }) {
     <>
       <div className="legend">
         <div className="lg-title">
-          <span className="lg-symbol">{payload.symbol}</span>
+          <span className="lg-symbol">{payload.live?.phase === "streaming" ? payload.live.title : payload.symbol}</span>
           <span>·</span><span>{timeframeLabel(payload.timeframe)}</span>
-          <span>·</span><span>{providerShort(payload.provider)}</span>
+          {payload.live?.phase !== "streaming" && <><span>·</span><span>{providerShort(payload.provider)}</span></>}
           <span className={`lg-source ${payload.source.native ? "" : "derived"}`}>{payload.source.description}</span>
         </div>
+        {payload.live?.phase === "streaming" && payload.live.note && <div className="lg-note">{payload.live.note}</div>}
         {bar && (
           <div className={`lg-ohlc mono ${direction}`}>
             <span><i>O</i>{formatPrice(bar.open, precision)}</span>
@@ -78,7 +79,8 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
 
   const notices = payload.notices.filter((notice) => !dismissed.has(notice.message));
   return (
-    <main className={`chart-panel ${payload.replay?.enabled || payload.live?.enabled ? "replaying" : ""}`}>
+    <main className={`chart-panel ${payload.replay?.enabled || payload.live?.enabled ? "replaying" : ""} ${
+      payload.live?.phase === "setup" && payload.live.message ? "live-message" : ""}`}>
       <div className="chart-host" ref={host} />
       {engine && <Legend engine={engine} payload={payload} />}
       {payload.bars.length === 0 && <div className="chart-empty">No bars in the selected range.</div>}

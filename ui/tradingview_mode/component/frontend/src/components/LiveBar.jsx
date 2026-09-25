@@ -2,63 +2,78 @@ import React, { useEffect, useState } from "react";
 import { sendEvent } from "../events.js";
 import { formatAge, quoteText, statusClass, utcClock } from "../liveControls.js";
 
-// Live mode, step 1: choose symbol/timeframe. Nothing is read from MT5 until Go Live.
-function LiveSetup({ live }) {
-  const [symbol, setSymbol] = useState(live.symbol || "");
-  const [timeframe, setTimeframe] = useState(live.timeframe);
-  useEffect(() => { setSymbol(live.symbol || ""); setTimeframe(live.timeframe); }, [live.symbol, live.timeframe]);
+// Contract, source and state live in the header and the chart legend; this strip holds
+// the controls and the provider's quotes, and its Exit button is never pushed off.
+
+function Select({ label, value, options, onChange, disabledText }) {
   return (
-    <div className="live-bar is-setup" role="group" aria-label="Live setup">
+    <label className="live-field"><i>{label}</i>
+      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={`Live ${label.toLowerCase()}`}>
+        {disabledText && <option value="" disabled>{disabledText}</option>}
+        {options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
+const timeframeOptions = (live) => live.timeframes.map((t) => ({ key: t, label: t }));
+
+// Live mode, step 1: choose market, source and timeframe. Nothing connects until Go Live.
+function LiveSetup({ live }) {
+  const [market, setMarket] = useState(live.market || "");
+  const [source, setSource] = useState(live.source);
+  const [timeframe, setTimeframe] = useState(live.timeframe);
+  useEffect(() => { setMarket(live.market || ""); setSource(live.source); setTimeframe(live.timeframe); },
+    [live.market, live.source, live.timeframe]);
+  const contract = market ? live.contracts[market][source] : null;
+  return (
+    <div className={`live-bar is-setup ${live.message ? "has-message" : ""}`} role="group" aria-label="Live setup">
       <span className="live-state is-setup"><span className="live-dot" />LIVE SETUP</span>
-      {live.message && <span className="live-unsupported">{live.message}</span>}
-      <label className="live-field"><i>Symbol</i>
-        <select value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label="Live symbol">
-          <option value="" disabled>Choose…</option>
-          {live.symbols.map((s) => <option key={s} value={s}>{s} · Exness</option>)}
-        </select>
-      </label>
-      <label className="live-field"><i>Timeframe</i>
-        <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} aria-label="Live timeframe">
-          {live.timeframes.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </label>
-      <button type="button" className="btn primary small go-live" disabled={!symbol}
-        onClick={() => sendEvent("go_live", { symbol, timeframe })}>Go Live</button>
-      <span className="live-reason">Read-only MT5 market data · the chart shows the historical dataset until Go Live</span>
+      {live.message && <span className="live-unsupported" title={live.message}>{live.message}</span>}
+      <Select label="Market" value={market} options={live.markets} onChange={setMarket} disabledText="Choose…" />
+      <Select label="Source" value={source} options={live.sources} onChange={setSource} />
+      <Select label="Timeframe" value={timeframe} options={timeframeOptions(live)} onChange={setTimeframe} />
+      <button type="button" className="btn primary small go-live" disabled={!market}
+        title={contract ? `Connect to ${contract} (read-only market data)` : "Choose a market"}
+        onClick={() => sendEvent("go_live", { market, source, timeframe })}>Go Live</button>
+      <span className="live-reason live-contract">{contract || "Read-only market data · the chart shows the historical dataset until Go Live"}</span>
       <div className="spacer" />
       <button type="button" className="rp-btn exit" title="Leave Live mode" onClick={() => sendEvent("exit_live")}>✕ Exit</button>
     </div>
   );
 }
 
-// Read-only live status strip. All values are the broker's, relayed by Python.
+// Streaming strip. Every value (and its label) comes from the active provider via Python.
 export function LiveBar({ live }) {
   if (!live?.enabled) return null;
   if (live.phase === "setup") return <LiveSetup live={live} />;
   const cls = statusClass(live.status);
-  const digits = live.digits;
+  const go = (change) => sendEvent("go_live", { market: live.market, source: live.source, timeframe: live.timeframe, ...change });
   return (
-    <div className={`live-bar ${cls}`} role="status" aria-label="Live market data status">
+    <div className={`live-bar ${cls}`} role="status" aria-label="Live market data status" data-source={live.source}>
       <span className={`live-state ${cls}`} title={live.reason}><span className="live-dot" />{live.status}</span>
-      <select className="live-switch mono" value={live.symbol} aria-label="Live symbol"
-        onChange={(e) => sendEvent("go_live", { symbol: e.target.value, timeframe: live.timeframe })}>
-        {live.symbols.map((s) => <option key={s} value={s}>{s}</option>)}
+      <select className="live-switch" value={live.market} aria-label="Live market" onChange={(e) => go({ market: e.target.value })}>
+        {live.markets.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
       </select>
-      <span className="live-symbol mono">{live.timeframe}</span>
+      <select className="live-switch" value={live.source} aria-label="Live source" onChange={(e) => go({ source: e.target.value })}>
+        {live.sources.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+      </select>
       <span className="live-sep" />
-      <span className="live-q"><i>Bid</i><b className="mono">{quoteText(live.bid, digits)}</b></span>
-      <span className="live-q"><i>Ask</i><b className="mono">{quoteText(live.ask, digits)}</b></span>
-      <span className="live-q" title={live.spread_points !== null ? `${live.spread_points} points (broker)` : undefined}>
-        <i>Spread</i><b className="mono">{quoteText(live.spread, digits)}</b>
-      </span>
+      {live.quotes.map((q) => (
+        <span key={q.key} className="live-q" data-quote={q.key} title={q.title}>
+          <i>{q.label}</i><b className="mono">{quoteText(q.value, live.digits)}</b>
+        </span>
+      ))}
       <span className="live-sep" />
-      <span className="live-meta mono" title="Last write by the MT5 feed service">
-        Updated {utcClock(live.updated_utc)} · {formatAge(live.heartbeat_age_s)} ago
+      <span className="live-shrink">
+        <span className="live-meta mono" title={`Last message from ${live.source_label} at ${utcClock(live.updated_utc)}`}>
+          Updated {utcClock(live.updated_utc)} · {formatAge(live.heartbeat_age_s)} ago
+        </span>
+        {live.tick_age_s !== null && live.tick_age_s !== undefined && live.tick_age_s > 5
+          && <span className="live-meta mono">last tick {formatAge(live.tick_age_s)} ago</span>}
+        {live.forming_bar_time && <span className="live-meta mono">forming {utcClock(live.forming_bar_time).slice(0, 5)}</span>}
+        <span className="live-reason" title={live.reason}>{live.status === "LIVE" ? "Read-only · no trading" : live.reason}</span>
       </span>
-      {live.tick_age_s !== null && live.tick_age_s > 5 && <span className="live-meta mono">last tick {formatAge(live.tick_age_s)} ago</span>}
-      {live.forming_bar_time && <span className="live-meta mono">forming {utcClock(live.forming_bar_time).slice(0, 5)}</span>}
-      <span className="live-reason">{live.status === "LIVE" ? "Read-only · no trading" : live.reason}</span>
-      <div className="spacer" />
       <button type="button" className="rp-btn exit" title="Exit Live and return to the historical chart" onClick={() => sendEvent("exit_live")}>✕ Exit</button>
     </div>
   );

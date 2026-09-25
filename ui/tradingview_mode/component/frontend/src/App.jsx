@@ -237,7 +237,7 @@ function Terminal({ payload, fallbackHeight }) {
         engineActions={engineActions} drawingsEnabled={payload.capabilities.drawings} />
       <ChartPanel payload={payload} onEngine={setEngine} onCrosshairTime={setCrosshairTime}
         tradesByKey={focus.tradesByKey} selectedKey={focus.selectedKey} busy={!!pending} />
-      <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} live={payload.live?.phase === "streaming"} />
+      <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} live={payload.live?.phase === "streaming"} timeframe={payload.timeframe} />
       <BottomPanel payload={payload} clientLogs={clientLogs} pending={pending}
         selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note} />
       <StatusBar payload={payload} crosshairTime={crosshairTime} />

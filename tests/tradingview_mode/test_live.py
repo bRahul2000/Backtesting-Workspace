@@ -1,5 +1,8 @@
-"""Live Phase 1: read-only Exness MT5 market data (synthetic feed; no terminal needed)."""
+"""Live: the read-only Exness MT5 provider (synthetic feed; no terminal needed).
+
+Binance Futures provider tests are in test_live_binance.py."""
 import copy
+import dataclasses
 import hashlib
 import json
 from pathlib import Path
@@ -11,6 +14,7 @@ import pandas as pd
 import pytest
 
 from ui.tradingview_mode.component import live as L
+from ui.tradingview_mode.component import providers as P
 from ui.tradingview_mode.component import terminal as T
 from ui.tradingview_mode.component.protocol import parse_event, validate_payload
 from ui.tradingview_mode.component.state import IndicatorInstance, TerminalState, apply_event
@@ -38,11 +42,15 @@ def feed_book(folder, symbol="BTCUSDm", timeframe="15m", book=None):
     return book, read
 
 
+MARKET = {"BTCUSDm": "BTC", "XAUUSDm": "GOLD"}
+
+
 def live_payload(folder, symbol="BTCUSDm", timeframe="15m", now=NOW, indicators=(), book=None):
     book, read = feed_book(folder, symbol, timeframe, book)
-    frame, status = T.live_view(book, read, now)
+    view = P.exness_view(book, read, now)
+    frame, status = view.frame, view.status
     state = TerminalState(dataset_key=L.LIVE_SYMBOLS[symbol]["dataset_key"], timeframe="15m",
-                          indicators=tuple(indicators), live=L.LiveState(symbol, timeframe, streaming=True))
+                          indicators=tuple(indicators), live=P.LiveState(MARKET[symbol], "exness", timeframe, streaming=True))
     selected = T.dataset(L.LIVE_SYMBOLS[symbol]["dataset_key"])
     resolution = TimeframeResolution(timeframe, L.LIVE_TIMEFRAMES[timeframe][1], selected, True)
     payload = T.build_terminal_payload(state=state, selected=selected, resolution=resolution, frame=frame, bounds=None,
@@ -73,7 +81,11 @@ def test_missing_or_stopped_mt5_is_disconnected(folder):
     payload, _, _ = live_payload(folder)
     assert payload["live"]["status"] == "DISCONNECTED" and payload["bars"] == [] and payload["live"]["bid"] is None
     SyntheticFeed(folder, "BTCUSDm").write(NOW - 600)  # service stopped 10 minutes ago
-    assert live_payload(folder)[0]["live"]["status"] == "DISCONNECTED"
+    stopped = live_payload(folder)[0]
+    assert stopped["live"]["status"] == "DISCONNECTED"
+    # No stale quote or forming candle survives a stopped feed; the last bars stay, labelled DISCONNECTED.
+    assert all(q["value"] is None for q in stopped["live"]["quotes"]) and stopped["live"]["bid"] is None
+    assert stopped["live"]["forming_bar_time"] is None and stopped["bars"]
 
 
 @pytest.mark.parametrize("kwargs, status, text", [
@@ -198,53 +210,57 @@ def test_native_timeframes_use_their_own_mt5_period(folder):
         assert payload["bars"][-1]["time"] == int(NOW // seconds * seconds)
 
 
-def _live(state, ctx=None, symbol="BTCUSDm", timeframe="15m"):
+def _live(state, ctx=None, market="BTC", source="exness", timeframe="15m"):
     ctx = ctx or T.context_for()
     setup, _ = apply_event(state, ev("enter_live"), ctx)
-    return apply_event(setup, ev("go_live", symbol=symbol, timeframe=timeframe), ctx)
+    return apply_event(setup, ev("go_live", market=market, source=source, timeframe=timeframe), ctx)
 
 
 def test_no_derived_or_unsupported_live_timeframe():
     state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m")
     setup, _ = apply_event(state, ev("enter_live"), T.context_for())
     for timeframe in ("4h", "1d", "5m"):
-        same, log = apply_event(setup, ev("go_live", symbol="BTCUSDm", timeframe=timeframe), T.context_for())
-        assert same == setup and log.level == "error"
+        for source in ("exness", "binance"):
+            same, log = apply_event(setup, ev("go_live", market="BTC", source=source, timeframe=timeframe), T.context_for())
+            assert same == setup and log.level == "error"
     live, _ = _live(state)
     rejected, log = apply_event(live, ev("select_timeframe", timeframe="4h"), T.context_for())
-    assert rejected == live and "not a live MT5 timeframe" in log.message
+    assert rejected == live and "not a live timeframe" in log.message
     switched, _ = apply_event(live, ev("select_timeframe", timeframe="1h"), T.context_for())
     assert switched.live.timeframe == "1h" and switched.timeframe == "15m"  # historical selection untouched
-    bitstamp, log = apply_event(setup, ev("go_live", symbol="BTC/USD", timeframe="15m"), T.context_for())
-    assert bitstamp == setup and "Exness BTCUSDm and XAUUSDm only" in log.message
+    for market, source in (("BTC/USD", "exness"), ("ETH", "binance"), ("BTC", "bitstamp"), ("BTC", "Binance Futures")):
+        rejected, log = apply_event(setup, ev("go_live", market=market, source=source, timeframe="15m"), T.context_for())
+        assert rejected == setup and log.level == "error"
 
 
 # ---- mode entry is separate from Go Live (the Live-button bug) ---------------------------------
 
-def test_entering_live_needs_no_feed_and_preselects_a_supported_symbol():
+def test_entering_live_needs_no_feed_and_preselects_the_market_with_binance_default():
     state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m")
     setup, log = apply_event(state, ev("enter_live"), T.context_for())
-    assert setup.live == L.LiveState("BTCUSDm", "15m", streaming=False) and log.level == "info"
+    assert setup.live == P.LiveState("BTC", "binance", "15m", streaming=False) and log.level == "info"
     xau, _ = apply_event(TerminalState(dataset_key="EXNESS_XAUUSDM_H1", timeframe="1h"), ev("enter_live"), T.context_for())
-    assert xau.live == L.LiveState("XAUUSDm", "1h", streaming=False)
+    assert xau.live == P.LiveState("GOLD", "binance", "1h", streaming=False)
 
 
 def test_entering_live_from_bitstamp_is_explicit_not_a_silent_noop():
     state = TerminalState(dataset_key="BITSTAMP_BTCUSD_15M", timeframe="4h")
     setup, log = apply_event(state, ev("enter_live"), T.context_for())
-    assert setup.live == L.LiveState(None, "15m", streaming=False)
-    assert "Exness BTCUSDm and XAUUSDm only" in log.message
+    assert setup.live == P.LiveState("BTC", "binance", "15m", streaming=False)
     assert setup.dataset_key == "BITSTAMP_BTCUSD_15M" and setup.timeframe == "4h"  # nothing changed behind the user's back
     status = T.live_setup_status(setup.live, T.dataset("BITSTAMP_BTCUSD_15M"))
-    assert status["phase"] == "setup" and status["current_supported"] is False
-    assert status["message"].startswith("Live mode supports Exness BTCUSDm and XAUUSDm only.")
-    assert status["symbols"] == ["BTCUSDm", "XAUUSDm"] and status["timeframes"] == ["15m", "30m", "1h"]
+    assert status["phase"] == "setup" and status["current_supported"] is True
+    assert status["message"].startswith("BTC/USD (Bitstamp) has no live feed.") and "different instrument" in status["message"]
+    assert [m["key"] for m in status["markets"]] == ["BTC", "GOLD"] and status["timeframes"] == ["15m", "30m", "1h"]
+    assert [s["label"] for s in status["sources"]] == ["Binance Futures", "Exness MT5"]
+    unknown, log = apply_event(state, ev("enter_live"), dataclasses.replace(T.context_for(), dataset_instrument=lambda key: "ETHUSD"))
+    assert unknown.live.market is None and P.UNSUPPORTED_MESSAGE in log.message
 
 
 def test_setup_phase_payload_reads_nothing_from_mt5(folder, monkeypatch):
     calls = []
     monkeypatch.setattr(L, "read_feed", lambda *a, **k: calls.append(a) or None)
-    state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m", live=L.LiveState("BTCUSDm", "15m"))
+    state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m", live=P.LiveState("BTC", "exness", "15m"))
     selected, resolution, frame = T._load(state)
     payload = T.build_terminal_payload(state=state, selected=selected, resolution=resolution,
                                        frame=frame.iloc[-200:].reset_index(drop=True), bounds=None, shown=None,
@@ -257,7 +273,7 @@ def test_setup_phase_payload_reads_nothing_from_mt5(folder, monkeypatch):
 
 def test_go_live_requires_live_mode_and_replay_blocks_it():
     state = TerminalState(dataset_key="EXNESS_BTCUSDM_M15", timeframe="15m")
-    same, log = apply_event(state, ev("go_live", symbol="BTCUSDm", timeframe="15m"), T.context_for())
+    same, log = apply_event(state, ev("go_live", market="BTC", source="exness", timeframe="15m"), T.context_for())
     assert same == state and "enter Live mode" in log.message
     setup, _ = apply_event(state, ev("enter_live"), T.context_for())
     blocked, log = apply_event(setup, ev("select_timeframe", timeframe="1h"), T.context_for())
@@ -304,7 +320,8 @@ def test_the_mt5_service_and_python_live_code_cannot_trade():
                       "ExpertRemove", "#property script"):
         assert forbidden not in code, forbidden
     assert "#property service" in source
-    for path in (ROOT / "ui/tradingview_mode/component/live.py", ROOT / "ui/tradingview_mode/component/terminal.py"):
+    for path in (ROOT / "ui/tradingview_mode/component/live.py", ROOT / "ui/tradingview_mode/component/terminal.py",
+                 ROOT / "ui/tradingview_mode/component/providers.py"):
         text = path.read_text()
         for forbidden in ("OrderSend", "order_send", "MetaTrader5", "positions_get", "TRADE_ACTION"):
             assert forbidden not in text, (path.name, forbidden)
@@ -339,7 +356,7 @@ def test_live_replay_and_historical_are_isolated():
     selected, resolution, frame = T._load(ctx_state)
     ctx = T.context_for(T._bounds(frame), __import__("ui.tradingview_mode.component.replay", fromlist=["x"]).frame_times(frame))
     live, _ = _live(ctx_state, ctx, timeframe="30m")
-    assert live.replay is None and live.live == L.LiveState("BTCUSDm", "30m", streaming=True)
+    assert live.replay is None and live.live == P.LiveState("BTC", "exness", "30m", streaming=True)
     for kind, data in (("enter_replay", {"start": "2026-06-10T14:30"}), ("step_forward", {}),
                        ("select_dataset", {"dataset_key": "EXNESS_BTCUSDM_H1"}),
                        ("set_date_range", {"start": "2026-01-01", "end": "2026-01-02"})):
@@ -371,8 +388,12 @@ def test_watchlist_shows_live_values_only_for_live_symbols(folder):
     SyntheticFeed(folder, "BTCUSDm").write(NOW)
     quotes = T.live_quotes(folder, NOW)
     assert set(quotes) == {"BTCUSDm"}  # XAUUSDm has no feed file: nothing is faked
-    rows = T.watchlist_payload(T.dataset("EXNESS_BTCUSDM_M15"), quotes)
-    by_symbol = {row["symbol"]: row for row in rows}
-    assert by_symbol["BTCUSDm"]["live"]["bid"] == 80350.0 and by_symbol["BTCUSDm"]["live"]["status"] == "LIVE"
-    assert by_symbol["BTC/USD"]["live"] is None and by_symbol["XAUUSDm"]["live"] is None
+    live = P.LiveState("BTC", "exness", "15m", streaming=True)
+    rows = T.watchlist_payload(T.dataset("EXNESS_BTCUSDM_M15"), T.live_watchlist(live, {}, quotes))
+    live_rows = {(row["source"], row["symbol"]): row for row in rows if row["kind"] == "live"}
+    assert live_rows[("exness", "BTCUSDm")]["live"]["bid"] == 80350.0
+    assert live_rows[("exness", "BTCUSDm")]["live"]["status"] == "LIVE" and live_rows[("exness", "BTCUSDm")]["source_label"] == "EXNESS"
+    assert live_rows[("exness", "XAUUSDm")]["live"] is None
+    assert live_rows[("binance", "BTCUSDT PERP")]["live"] is None  # no Binance quote: no value, never the MT5 one
+    assert all(row["live"] is None for row in rows if row["kind"] == "dataset")  # registry rows stay historical
     assert T.live_quotes(folder, NOW + 600) == {}  # a stopped feed is not shown as a live value

@@ -219,22 +219,42 @@ again. `trade_overlay` draws only trades that closed within the revealed bars,
 and the selected trade's SL/TP segments come from that overlay. The watchlist
 shows reference last closes, labelled as not replay prices.
 
-## Live (read-only Exness MT5)
+## Live (read-only market data: Binance Futures or Exness MT5)
 
-Transport: the MQL5 service `ui/tradingview_mode/mt5_bridge/TradingViewLiveFeed.mq5`
-writes quote and bar files into MetaTrader's Common/Files folder. `live.py` only
-reads them; see `mt5_bridge/README.md`. The service has no trading calls, and a
-test fails if one is added. Python never writes to that folder. No web price,
-dataset file or other provider is ever used in place of the feed.
+Two markets, each from one of two sources. The sources are **different
+instruments** and are never mixed:
 
-**Events:** Live has two steps, and entering the mode never needs a feed.
-- `enter_live {}` switches the mode to Live **setup**. The chart keeps the historical
-  dataset, and nothing is read from MT5. The current symbol is preselected only if it
-  is an Exness live symbol. Otherwise the strip shows "Live mode supports Exness BTCUSDm
-  and XAUUSDm only." and the historical dataset is not changed.
-- `go_live {symbol ∈ BTCUSDm, XAUUSDm; timeframe ∈ 15m, 30m, 1h}` starts streaming.
-  Only MT5-native periods are allowed; nothing is derived. Sending it again while
-  streaming switches the symbol.
+| Market | Binance Futures (default) | Exness MT5 |
+|---|---|---|
+| BTC | BTCUSDT Perpetual (`PERPETUAL`) | BTCUSDm (CFD) |
+| Gold | XAUUSDT Perpetual (`TRADIFI_PERPETUAL`) | XAUUSDm (CFD) |
+
+`providers.py` defines the markets, the `LiveState(market, source, timeframe,
+streaming)` and the two providers, which share one interface: `view(now) ->
+LiveView(frame, status, identity)`. React only renders what a view contains.
+
+- **Binance Futures** (`binance.py`) uses public market data only: no API key,
+  account, order or user-data endpoint. REST calls are `GET /fapi/v1/{exchangeInfo,
+  klines,time}` on `fapi.binance.com`. WebSockets are
+  `wss://fstream.binance.com/market/stream?streams=<sym>@kline_<tf>/<sym>@markPrice@1s`
+  (klines and mark price) and `wss://fstream.binance.com/public/stream?streams=<sym>@depth5@500ms`
+  (best bid/ask). Kline streams are served on `/market` only and book streams on
+  `/public` only. A kline subscription on the legacy `/ws` root is accepted but
+  never delivers a message.
+- **Exness MT5** (`live.py`) is the read-only file bridge: the MQL5 service
+  `mt5_bridge/TradingViewLiveFeed.mq5` writes into MetaTrader's Common/Files and
+  Python only reads (see `mt5_bridge/README.md`).
+
+**Events:** Live has two steps, and entering the mode connects nothing.
+- `enter_live {}` opens Live **setup**. The chart keeps the historical dataset. The
+  market is preselected from the dataset's instrument (BTCUSD → BTC, XAUUSDm → Gold),
+  and the source defaults to Binance Futures. A dataset with no live feed of its own
+  (Bitstamp BTC/USD) shows an explicit message that Live shows the chosen source, a
+  different instrument. An instrument with no live market shows "Live mode supports
+  BTC and Gold (Binance Futures or Exness MT5)."
+- `go_live {market ∈ BTC, GOLD; source ∈ binance, exness; timeframe ∈ 15m, 30m, 1h}`
+  starts streaming. Sent again while streaming, it switches market or source and
+  keeps the timeframe. Only native periods are allowed on both sources.
 - `exit_live` leaves Live from either step.
 - `live_poll`: the browser sends it about once a second while streaming, only when
   no event is in flight. It changes no state and is not logged.
@@ -242,33 +262,89 @@ dataset file or other provider is ever used in place of the feed.
   start. While streaming, `select_timeframe` changes only the live timeframe. Live
   can't start during Replay. The historical selection is restored unchanged on exit.
 
-**Merge:** bars are kept in memory per session, keyed by bar time:
-book, then the seed file, then the newest quote bars, with later sources winning.
-That gives no duplicates, a forming candle updated in place, and rollover by
-appending. The window holds the last 500 bars. Snapshots with the same `seq`
-are duplicates and ignored. A lower `seq` or an older tick from the same writer
-is rejected and counted. A new `writer_id` (service restart) starts a new sequence.
+**Provider switch:** `terminal.sync_live_connections` runs every rerun and acts only
+when `(source, symbol, timeframe)` changes. It clears the MT5 books and releases the
+session's Binance kline lease, which closes that socket. On exit it releases the quote
+lease as well. A switch is a new `view_key`, so the chart reloads instead of
+tail-updating across providers, and indicators are recalculated from the new bars.
+There is no silent fallback: an offline source shows its own DISCONNECTED/ERROR state.
 
-**Payload:**
-- `mode: "live"`, `dataset_key` / `source.dataset_key` = `MT5_LIVE:<symbol>`,
-  provider "Exness Technologies Ltd", and `timeframes` = the live periods.
-- `live` = `{status, reason, symbol, timeframe, bid, ask, spread (same-tick ask − bid at
-  the symbol's digits), spread_points (broker), digits, point, tick_time_ms, updated_utc,
-  heartbeat_age_s, tick_age_s, forming_bar_time, bar_count, rejected_updates,
-  indicators_include_forming_bar: true}`.
-- Indicators are calculated in Python on the live bars, **including the forming candle**.
-- Strategy Tester markers are hidden (`trade_overlay.available = false`).
-- Watchlist rows for the live symbols carry `live {status, bid, ask, …}` only while
-  their feed is LIVE or STALE; other rows stay historical reference.
+**Connection ownership (Binance):** sockets live in the process-wide
+`binance.hub()`, never in a rerun. A session (id in `st.session_state`) holds at most
+one kline lease and one quote lease. Asking again returns the same stream, so there is
+no duplicate subscription, and two tabs on the same market share it. A stream stops
+when its last lease is released, or by itself when no rerun has touched it for 180 s
+(a closed tab cannot leak a thread or socket).
 
-**States:** DISCONNECTED (no file, or heartbeat > 60 s), STALE (heartbeat 5–60 s, or no
-tick for > 60 s), CONNECTING (terminal not connected to the broker, or no history yet),
-ERROR (invalid file, symbol mismatch, bad bars, ask < bid, a server clock that isn't
-UTC+0, or a future heartbeat), and LIVE otherwise.
+**Binance lifecycle:**
+- Each connection is recycled 30 minutes before Binance's 24 h limit and reconnects
+  after any close, with exponential backoff (1 → 30 s, jittered). There is no busy loop.
+- Server pings are answered with pongs by the `websockets` library, and the client
+  sends no pings. `markPrice@1s` makes the socket speak every second, so the stream is
+  STALE after 5 s of silence and reconnects after 20 s.
+- After every (re)connect, recent klines are fetched over REST and reconciled: gaps are
+  filled, and a candle that closed while disconnected finalizes exactly once.
 
-**Updates:** each poll is a normal rerun with the full live window of about 500 bars.
-The chart applies it incrementally: it updates the forming candle in place, or
-appends at rollover, whenever the window did not slide, and resets otherwise.
+**Kline merge (Binance):**
+- A 500-bar REST seed; a REST bar is final once its close time passed on the server clock.
+- WebSocket kline updates replace the forming candle in place. `x: true` finalizes it
+  exactly once; a finalized candle never changes again.
+- Identical updates are duplicates. An older event time, or an update to an older
+  candle, is rejected and counted. Queued messages older than the REST snapshot are
+  superseded (ignored, not counted as errors).
+- A missed final message or a gap triggers REST reconciliation.
+- Malformed messages are rejected, never drawn: wrong symbol or interval, misaligned
+  or inconsistent times, non-finite or non-positive prices, high/low inconsistent with
+  open/close, negative volume, or ask < bid.
+
+**Exness merge (MT5):** book, then the seed file, then the newest quote bars, keyed by
+bar time with later sources winning. Snapshots with the same `seq` are duplicates. A
+lower `seq` or an older tick from the same writer is rejected; a new `writer_id` starts
+a new sequence.
+
+**Payload (streaming):**
+- `mode: "live"`, and `dataset_key` = `source.dataset_key` = `live.identity.dataset_key`,
+  which is `BINANCE_LIVE:<symbol>` or `MT5_LIVE:<symbol>`. `symbol`, `provider` and
+  `instrument` come from the active provider (e.g. "BTCUSDT", "Binance Futures",
+  "BTCUSDT Perpetual").
+- `live` = `{status, reason, market, source, source_label, symbol, provider, title
+  ("BTCUSDT Perpetual · Binance Futures"), timeframe, identity, note, quotes: [{key,
+  label, value, title}], digits, bid, ask, spread, updated_utc, heartbeat_age_s,
+  tick_age_s, forming_bar_time, bar_count, rejected_updates, markets, sources,
+  timeframes, contracts, indicators_include_forming_bar: true}`.
+  - Binance quotes are Last, Mark, Bid, Ask and Spread; Exness quotes are Bid, Ask and
+    Spread. Each is labelled with its source.
+  - `note` is "Reference market feed — execution prices may differ from Exness." on
+    Binance, and `null` on Exness.
+  - `identity` keeps venue, contract type, instrument kind, volume unit and time basis
+    for a later comparison tool (`providers.comparison_frame` aligns two providers by
+    bar time and keeps both identities).
+- `validate_payload` refuses a streaming Live payload whose dataset key, provider,
+  symbol, source label, title or identity disagree, or which carries backtest markers.
+- Indicators (EMA, SMA, VWAP with its daily UTC reset, Bollinger Bands, RSI, MACD,
+  ATR, volume) are calculated in Python on the active provider's bars, including the
+  forming candle. Binance volume is base-asset volume; Exness volume is tick volume.
+- While streaming, the watchlist leads with one `kind: "live"` row per market × source.
+  Each has `source` and `source_label` (BINANCE / EXNESS), and `live {status, bid, ask,
+  digits}` only while that source has a current quote. Registry rows stay historical
+  reference closes.
+
+**States (both sources):** CONNECTING, LIVE, STALE, DISCONNECTED, ERROR.
+- Binance:
+  - CONNECTING while loading history or reconnecting.
+  - STALE when the socket is open but silent for more than 5 s, or there has been no
+    kline update for more than 60 s.
+  - DISCONNECTED when the socket is closed, with the retry countdown shown.
+  - ERROR when the contract is missing, is not TRADING, or has a different contract type.
+- Exness:
+  - DISCONNECTED when there is no file, or the heartbeat is more than 60 s old.
+  - STALE when the heartbeat is 5–60 s old, or there has been no tick for more than 60 s.
+  - CONNECTING when the terminal isn't connected, or there is no history yet.
+  - ERROR for an invalid file, or a server clock that isn't UTC+0.
+
+**Updates:** each poll is a normal rerun with the full window of about 500 bars. The
+chart updates the forming candle in place, or appends at rollover, whenever the window
+did not slide, and resets otherwise.
 
 ## Reserved for later phases
 

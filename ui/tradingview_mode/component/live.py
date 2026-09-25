@@ -1,4 +1,5 @@
-"""Read-only Exness MT5 live market data for TradingView Mode.
+"""Read-only Exness MT5 live market data for TradingView Mode (the "exness" provider,
+see providers.py; the default cloud source is Binance Futures, see binance.py).
 
 Transport: the MQL5 service ``ui/tradingview_mode/mt5_bridge/TradingViewLiveFeed.mq5``
 writes files into MetaTrader's Common/Files folder (the same file bridge the
@@ -47,19 +48,6 @@ _BAR_COLUMNS = ("time", "open", "high", "low", "close", "tick_volume", "spread")
 
 class LiveFeedError(ValueError):
     """A feed file that cannot be trusted as written."""
-
-
-@dataclass(frozen=True)
-class LiveState:
-    """Live mode. ``streaming`` is False while the user is still choosing the
-    symbol/timeframe (setup); nothing is read from MT5 until Go Live."""
-
-    symbol: str | None
-    timeframe: str
-    streaming: bool = False
-
-
-UNSUPPORTED_MESSAGE = "Live mode supports Exness BTCUSDm and XAUUSDm only."
 
 
 @dataclass(frozen=True)
