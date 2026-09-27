@@ -1,0 +1,79 @@
+//@version=6
+// Pine parity MANUAL script for fixture `s03_history` (table). Generated from fixtures.py - do not edit.
+// Same calculations as fixtures/s03_history.pine; the values are shown in a table (TradingView Basic plan).
+indicator("parity s03_history (manual)", overlay=true, precision=8)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+float v_c_1 = c[1]
+float v_c_2 = c[2]
+float acc = na
+acc := nz(acc[1]) + (c - o)
+float v_acc = acc
+float v_acc_1 = acc[1]
+float diff = c - o
+float v_diff_3 = diff[3]
+float v_range_1 = (h - l)[1]
+float v_sma3_2 = ta.sma(c, 3)[2]
+delta(float x) => x - x[1]
+float v_udf_hist = delta(c)
+float v_bi_5 = bar_index[5]
+// ---- manual parity table (TradingView only) ----
+int page = input.int(0, "Page", minval=0, maxval=1, tooltip="0: bars 0-9 history warm-up: na until enough bars exist | 1: bars 100-109 mid-series")
+int part = input.int(1, "Columns", minval=1, maxval=2, tooltip="1: c_1, c_2, acc, acc_1, diff_3 | 2: range_1, sma3_2, udf_hist, bi_5")
+int firstBarInput = input.int(-1, "First bar (-1 = use Page)", minval=-1)
+int pageStart = switch page
+    0 => 0
+    1 => 100
+    => 0
+int firstBar = firstBarInput >= 0 ? firstBarInput : pageStart
+var table grid = table.new(position.top_right, 6, 12, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt) =>
+    table.cell(grid, col, row, txt, text_color=color.black, text_size=size.normal, text_halign=text.align_right)
+fmt(float value) => na(value) ? "na" : str.tostring(value, "0.########")
+if barstate.isfirst
+    put(0, 0, "s03_history · columns " + str.tostring(part) + " · bars " + str.tostring(firstBar) + "-" + str.tostring(firstBar + 9))
+    table.merge_cells(grid, 0, 0, 5, 0)
+    put(0, 1, "bar")
+    if part == 1
+        put(1, 1, "c_1")
+        put(2, 1, "c_2")
+        put(3, 1, "acc")
+        put(4, 1, "acc_1")
+        put(5, 1, "diff_3")
+    if part == 2
+        put(1, 1, "range_1")
+        put(2, 1, "sma3_2")
+        put(3, 1, "udf_hist")
+        put(4, 1, "bi_5")
+int row = bar_index - firstBar + 2
+if row >= 2 and row <= 11
+    put(0, row, str.tostring(bar_index))
+    if part == 1
+        put(1, row, fmt(v_c_1))
+        put(2, row, fmt(v_c_2))
+        put(3, row, fmt(v_acc))
+        put(4, row, fmt(v_acc_1))
+        put(5, row, fmt(v_diff_3))
+    if part == 2
+        put(1, row, fmt(v_range_1))
+        put(2, row, fmt(v_sma3_2))
+        put(3, row, fmt(v_udf_hist))
+        put(4, row, fmt(v_bi_5))
+plot(bar_index, "bi", display=display.data_window)

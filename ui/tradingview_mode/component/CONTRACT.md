@@ -402,6 +402,71 @@ readiness, note, log}`.
 
 The Strategy Tester doesn't read any of this.
 
+## Pine scripts (language-driven engine, P1)
+
+The engine lives in `ui/tradingview_mode/pine/`:
+
+1. The **lexer** and **parser** read the whole v5/v6 language surface.
+2. The **analyzer** resolves scopes, names, calls and types, and reports capability gaps.
+3. A bar-by-bar **runtime** executes the script, keeping series history, per-call-site
+   state and commit/rollback.
+4. The **built-in registries** (`builtins/`) implement `ta.*`, `math.*`, `str.*`, `color.*`,
+   `input.*`, time and chart info, and the plot family.
+
+Nothing is implemented per indicator. Adding a Pine built-in means registering it; the
+parser does not change. Coverage by feature is in `pine/COMPATIBILITY.md`, generated
+from the code and checked by a test.
+
+**Events** (the source may be up to 100,000 characters):
+- `pine_compile {source}` only compiles; the result goes to the editor.
+- `pine_add {source}` adds the script to the chart if it compiles without errors or gaps.
+- `pine_update {id, source}` replaces a script's source and resets its inputs.
+- `pine_remove {id}` and `pine_toggle {id, enabled}` remove or hide a script.
+- `pine_set_input {id, index, value}` is validated against the input's type, `minval`/`maxval` and `options`.
+
+A rejected event changes nothing and says why. A capability gap reads, for example,
+"Line 3: `request.security()` is not implemented yet (data requests)."
+
+**Execution:**
+- Scripts run on exactly the bars the payload shows:
+  - the historical window, capped at the last 10,000 bars (the payload says how many were not executed)
+  - the revealed Replay bars, so there is no future data
+  - the live provider's bars, whose last bar is forming (`barstate.isrealtime`)
+- `pine_bridge.py` caches compiled programs by source hash and keeps one execution per script per session:
+  - An unchanged chart executes nothing.
+  - A Replay step or new bar executes one bar.
+  - A changed live forming bar is rolled back and re-run once (`varip` keeps intrabar updates).
+  - Any other change to the bars re-runs from bar 0.
+
+**Payload** `pine` (null outside the terminal render):
+`{scripts: [{id, title, shorttitle, overlay, enabled, source, source_hash, inputs:
+[{index, kind, title, defval, value, options, minval, maxval, step, tooltip, group, line}],
+outputs, error, runtime_ms, bars, executed, incremental, truncated_bars}], editor, examples,
+compat, limits}`.
+
+Each output has an `id` and a `kind`:
+
+| kind | fields |
+|---|---|
+| `plot` | `title`, `style` (line / linebr / stepline / histogram / columns / area / circles / cross), `linewidth`, `offset`, `trackprice`, `histbase`, `data: [{time, value \| null, color \| null}]` |
+| `shape` / `char` | `style` or `char`, `location`, `size`, `textcolor`, `data: [{time, color, text, price?}]` |
+| `hline` | `price`, `color`, `linestyle`, `linewidth` |
+| `fill` | `between: [id, id]` (two plots or two hlines of the same script), `data: [{time, color}]` |
+| `bgcolor` / `barcolor` | `data: [{time, color}]` |
+
+Colors are CSS `rgba()` strings, and a na color is `null`. `validate_payload` requires
+every output time to be a chart bar time, so Replay cannot leak, and every fill to reference
+its own script's plots or hlines.
+
+**Rendering** (`chart/PineLayer.js`):
+- **Panes:** overlay scripts draw on the price pane; every other script gets its own pane after the indicator panes.
+- **Plots:** map to line, histogram or area series.
+- **Primitives:** `fill` bands, `bgcolor` columns and Pine's shape glyphs are custom series primitives.
+- **Other outputs:**
+  - `hline` is a price line.
+  - `barcolor` recolors the candles.
+- **Updates:** data updates are incremental, as for the rest of the chart.
+
 ## Chart view (all modes)
 
 `chart/ChartEngine.js` compares each payload with what is drawn, using

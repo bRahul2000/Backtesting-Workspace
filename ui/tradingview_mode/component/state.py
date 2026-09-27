@@ -45,6 +45,17 @@ class LogEntry:
 
 
 @dataclass(frozen=True)
+class PineInstance:
+    """A Pine script on the chart: its source, enabled flag and input overrides."""
+
+    id: str
+    source: str
+    title: str
+    enabled: bool = True
+    inputs: tuple[tuple[int, object], ...] = ()   # (input index, user value)
+
+
+@dataclass(frozen=True)
 class TerminalState:
     dataset_key: str
     timeframe: str
@@ -59,6 +70,9 @@ class TerminalState:
     replay: ReplayState | None = None
     # Read-only live view (see providers.py). Never set together with replay.
     live: LiveState | None = None
+    # Pine scripts on the chart (see pine_bridge.py); they run on whatever bars the chart shows.
+    pine: tuple[PineInstance, ...] = ()
+    next_pine: int = 1
 
 
 @dataclass(frozen=True)

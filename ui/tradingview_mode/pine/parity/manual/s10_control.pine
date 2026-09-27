@@ -1,0 +1,108 @@
+//@version=6
+// Pine parity MANUAL script for fixture `s10_control` (table). Generated from fixtures.py - do not edit.
+// Same calculations as fixtures/s10_control.pine; the values are shown in a table (TradingView Basic plan).
+indicator("parity s10_control (manual)", overlay=true, precision=8)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+int dirSwitch = switch
+    c > o => 1
+    c < o => -1
+    => 0
+float v_switch_nosubject = dirSwitch
+float bucket = switch k % 4
+    0 => 10.0
+    1 => 20.0
+    2 => 30.0
+    => na
+float v_switch_subject = bucket
+float v_ternary_chain = c > o ? 1 : c < o ? -1 : 0
+float v_ternary_na = c > 110 ? c : na
+spread(float a, float b, float scale = 1.0) =>
+    float d = a - b
+    d * scale
+float v_udf_default = spread(h, l)
+float v_udf_arg = spread(h, l, 0.5)
+bands(float src, int len) =>
+    float mid = ta.sma(src, len)
+    float dev = ta.stdev(src, len)
+    [mid, mid + 2 * dev, mid - 2 * dev]
+[m1, u1, l1] = bands(c, 10)
+float v_tuple_mid = m1
+float v_tuple_up = u1
+float v_tuple_lo = l1
+[m2, u2, l2] = bands(h, 5)
+float v_tuple2_up = u2
+int sgn = if c > o
+    1
+else
+    -1
+float v_if_expr = sgn
+float noElse = if k % 3 == 0
+    c
+float v_if_noelse_na = noElse
+// ---- manual parity table (TradingView only) ----
+int page = input.int(0, "Page", minval=0, maxval=1, tooltip="0: bars 0-9 first bars | 1: bars 14-23 ternary_na becomes a number from bar 18")
+int part = input.int(1, "Columns", minval=1, maxval=2, tooltip="1: switch_nosubject, switch_subject, ternary_chain, ternary_na, if_expr, if_noelse_na | 2: udf_default, udf_arg, tuple_mid, tuple_up, tuple_lo, tuple2_up")
+int firstBarInput = input.int(-1, "First bar (-1 = use Page)", minval=-1)
+int pageStart = switch page
+    0 => 0
+    1 => 14
+    => 0
+int firstBar = firstBarInput >= 0 ? firstBarInput : pageStart
+var table grid = table.new(position.top_right, 7, 12, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt) =>
+    table.cell(grid, col, row, txt, text_color=color.black, text_size=size.normal, text_halign=text.align_right)
+fmt(float value) => na(value) ? "na" : str.tostring(value, "0.########")
+if barstate.isfirst
+    put(0, 0, "s10_control · columns " + str.tostring(part) + " · bars " + str.tostring(firstBar) + "-" + str.tostring(firstBar + 9))
+    table.merge_cells(grid, 0, 0, 6, 0)
+    put(0, 1, "bar")
+    if part == 1
+        put(1, 1, "switch_nosubject")
+        put(2, 1, "switch_subject")
+        put(3, 1, "ternary_chain")
+        put(4, 1, "ternary_na")
+        put(5, 1, "if_expr")
+        put(6, 1, "if_noelse_na")
+    if part == 2
+        put(1, 1, "udf_default")
+        put(2, 1, "udf_arg")
+        put(3, 1, "tuple_mid")
+        put(4, 1, "tuple_up")
+        put(5, 1, "tuple_lo")
+        put(6, 1, "tuple2_up")
+int row = bar_index - firstBar + 2
+if row >= 2 and row <= 11
+    put(0, row, str.tostring(bar_index))
+    if part == 1
+        put(1, row, fmt(v_switch_nosubject))
+        put(2, row, fmt(v_switch_subject))
+        put(3, row, fmt(v_ternary_chain))
+        put(4, row, fmt(v_ternary_na))
+        put(5, row, fmt(v_if_expr))
+        put(6, row, fmt(v_if_noelse_na))
+    if part == 2
+        put(1, row, fmt(v_udf_default))
+        put(2, row, fmt(v_udf_arg))
+        put(3, row, fmt(v_tuple_mid))
+        put(4, row, fmt(v_tuple_up))
+        put(5, row, fmt(v_tuple_lo))
+        put(6, row, fmt(v_tuple2_up))
+plot(bar_index, "bi", display=display.data_window)

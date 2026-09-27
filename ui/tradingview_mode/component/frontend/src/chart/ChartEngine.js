@@ -20,6 +20,7 @@ import {
 import {
   diffSeries, indexOfTime, isAtLatest, samePoint, shiftedRange, tickLabel, utcLabel, wantsOlderHistory,
 } from "./chartView.js";
+import { PineLayer } from "./PineLayer.js";
 
 export const COLORS = {
   bg: "#0b0e14",
@@ -50,7 +51,7 @@ function structureSignature(item, precision) {
   return `${precision}|${JSON.stringify(item.params)}|${item.series.map((s) => `${s.name}:${s.type}:${s.color}`).join(",")}`;
 }
 
-const candle = (b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close });
+const plainCandle = (b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close });
 const volumeBar = (b) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? `${COLORS.up}55` : `${COLORS.down}55` });
 
 function histogramData(points) {
@@ -112,6 +113,8 @@ export class ChartEngine {
     this.volume.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
 
     this.markers = createSeriesMarkers(this.candles, []);
+    this.pine = new PineLayer(this);
+    this.barColorSig = "";
     this.tradeSig = null;
     this.tradeLines = null; // lazily created entry / SL / TP segments
 
@@ -144,17 +147,28 @@ export class ChartEngine {
       this.candles.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
     }
     let replaced = null; // {shift} when the data was replaced
-    if (newBars) {
-      const diff = newView ? { kind: "replace", shift: null } : diffSeries(this.bars, payload.bars);
+    // Pine barcolor() recolors candles; a change on any earlier bar forces a reload.
+    const barColors = barColorMap(payload.pine);
+    const barColorSig = [...barColors].slice(0, -1).join("|");
+    const recolor = barColorSig !== this.barColorSig;
+    this.barColors = barColors;
+    this.barColorSig = barColorSig;
+    if (newBars || recolor) {
+      let diff;
+      if (newView) diff = { kind: "replace", shift: null };
+      else {
+        diff = newBars ? diffSeries(this.bars, payload.bars) : { kind: "none" };
+        if (recolor) diff = { kind: "replace", shift: diff.kind === "replace" ? diff.shift : 0 };   // keep the view
+      }
       if (diff.kind === "tail") this.stats.incremental += 1;
       else if (diff.kind === "replace") this.stats.setData += 1;
       if (diff.kind === "tail") {
         for (const b of diff.updates) {
-          this.candles.update(candle(b));
+          this.candles.update(this.candle(b));
           this.volume.update(volumeBar(b));
         }
       } else if (diff.kind === "replace") {
-        this.candles.setData(payload.bars.map(candle));
+        this.candles.setData(payload.bars.map((b) => this.candle(b)));
         this.volume.setData(payload.bars.map(volumeBar));
         replaced = { shift: diff.shift };
       }
@@ -165,7 +179,9 @@ export class ChartEngine {
       this.volume.applyOptions({ visible: this.volumeVisible });
     }
     this.syncOverlays(payload.overlays, precision);
+    if (this.panesSignature(payload.panes) !== this.paneSig) this.pine.clear();  // pane indices are about to move
     this.syncPanes(payload.panes);
+    this.pine.sync(payload.pine?.scripts || [], 1 + this.panes.length);
 
     this.viewKey = payload.view_key;
     this.barsRev = payload.bars_rev;
@@ -407,8 +423,17 @@ export class ChartEngine {
     }
   }
 
+  candle(b) {
+    const color = this.barColors?.get(b.time);
+    return color ? { ...plainCandle(b), color, borderColor: color, wickColor: color } : plainCandle(b);
+  }
+
+  panesSignature(panes) {
+    return panes.map((p) => `${p.id}:${structureSignature(p, "")}:${(p.levels || []).join(",")}`).join("|");
+  }
+
   syncPanes(panes) {
-    const sig = panes.map((p) => `${p.id}:${structureSignature(p, "")}:${(p.levels || []).join(",")}`).join("|");
+    const sig = this.panesSignature(panes);
     if (sig === this.paneSig) {
       // Same panes: update values in place (a rebuild would reset pane layout and scales).
       panes.forEach((item, index) => item.series.forEach((s, i) => this.applyPoints(this.panes[index].series[i], s.data)));
@@ -455,6 +480,11 @@ export class ChartEngine {
       return at >= 0 ? series.data[at].value : undefined;
     };
     const containerTop = this.container.getBoundingClientRect().top;
+    const pineLegend = this.pine.legend(hovering ? time : null);
+    const pineTop = (pane) => {
+      const element = this.chart.panes()[pane]?.getHTMLElement();
+      return element ? element.getBoundingClientRect().top - containerTop : null;
+    };
     const legend = {
       time,
       hovering,
@@ -465,7 +495,7 @@ export class ChartEngine {
       overlays: [...this.overlays.entries()].map(([id, entry]) => ({
         id, name: entry.name, params: entry.params,
         values: entry.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s) })),
-      })),
+      })).concat(pineLegend.filter((p) => p.pane === 0).map((p) => ({ id: p.id, name: p.name, params: "", values: p.values }))),
       panes: this.panes.map((pane, i) => {
         const element = this.chart.panes()[i + 1]?.getHTMLElement();
         return {
@@ -473,7 +503,7 @@ export class ChartEngine {
           top: element ? element.getBoundingClientRect().top - containerTop : null,
           values: pane.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s) })),
         };
-      }),
+      }).concat(pineLegend.filter((p) => p.pane > 0).map((p) => ({ id: p.id, name: p.name, params: "", top: pineTop(p.pane), values: p.values }))),
     };
     this.crosshairListeners.forEach((listener) => listener(legend));
   }
@@ -490,4 +520,11 @@ export class ChartEngine {
     }
     return -1;
   }
+}
+
+function barColorMap(pine) {
+  const map = new Map();
+  (pine?.scripts || []).filter((s) => s.enabled && !s.error).forEach((script) => script.outputs
+    .filter((o) => o.kind === "barcolor").forEach((o) => o.data.forEach((p) => map.set(p.time, p.color))));
+  return map;
 }

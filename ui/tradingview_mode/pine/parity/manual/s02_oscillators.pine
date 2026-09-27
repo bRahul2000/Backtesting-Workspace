@@ -1,0 +1,100 @@
+//@version=6
+// Pine parity MANUAL script for fixture `s02_oscillators` (table). Generated from fixtures.py - do not edit.
+// Same calculations as fixtures/s02_oscillators.pine; the values are shown in a table (TradingView Basic plan).
+indicator("parity s02_oscillators (manual)", overlay=true, precision=8)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+float v_rsi14 = ta.rsi(c, 14)
+float v_rsi2 = ta.rsi(c, 2)
+float trManual = na(c[1]) ? h - l : math.max(h - l, math.abs(h - c[1]), math.abs(l - c[1]))
+float v_atr14_formula = ta.rma(trManual, 14)
+float v_change1 = ta.change(c)
+float v_change3 = ta.change(c, 3)
+float v_mom10 = ta.mom(c, 10)
+float v_stdev20 = ta.stdev(c, 20)
+float v_stoch14 = ta.stoch(c, h, l, 14)
+float v_cci20 = ta.cci(c, 20)
+[macdLine, signalLine, histLine] = ta.macd(c, 12, 26, 9)
+float v_macd = macdLine
+float v_macd_signal = signalLine
+float v_macd_hist = histLine
+[bbMid, bbUp, bbLo] = ta.bb(c, 20, 2)
+float v_bb_mid = bbMid
+float v_bb_up = bbUp
+float v_bb_lo = bbLo
+// ---- manual parity table (TradingView only) ----
+int page = input.int(0, "Page", minval=0, maxval=3, tooltip="0: bars 0-9 warm-up: rsi2 from 2, atr from 13, rsi14 from 14 | 1: bars 17-26 stdev / stoch / cci / bb from 19, macd from 25 | 2: bars 28-37 macd signal / histogram from 33 | 3: bars 208-217 zero-range candles from bar 211 (no movement)")
+int part = input.int(1, "Columns", minval=1, maxval=3, tooltip="1: rsi14, rsi2, atr14_formula, change1, change3, mom10 | 2: stdev20, stoch14, cci20, macd, macd_signal, macd_hist | 3: bb_mid, bb_up, bb_lo")
+int firstBarInput = input.int(-1, "First bar (-1 = use Page)", minval=-1)
+int pageStart = switch page
+    0 => 0
+    1 => 17
+    2 => 28
+    3 => 208
+    => 0
+int firstBar = firstBarInput >= 0 ? firstBarInput : pageStart
+var table grid = table.new(position.top_right, 7, 12, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt) =>
+    table.cell(grid, col, row, txt, text_color=color.black, text_size=size.normal, text_halign=text.align_right)
+fmt(float value) => na(value) ? "na" : str.tostring(value, "0.########")
+if barstate.isfirst
+    put(0, 0, "s02_oscillators · columns " + str.tostring(part) + " · bars " + str.tostring(firstBar) + "-" + str.tostring(firstBar + 9))
+    table.merge_cells(grid, 0, 0, 6, 0)
+    put(0, 1, "bar")
+    if part == 1
+        put(1, 1, "rsi14")
+        put(2, 1, "rsi2")
+        put(3, 1, "atr14_formula")
+        put(4, 1, "change1")
+        put(5, 1, "change3")
+        put(6, 1, "mom10")
+    if part == 2
+        put(1, 1, "stdev20")
+        put(2, 1, "stoch14")
+        put(3, 1, "cci20")
+        put(4, 1, "macd")
+        put(5, 1, "macd_signal")
+        put(6, 1, "macd_hist")
+    if part == 3
+        put(1, 1, "bb_mid")
+        put(2, 1, "bb_up")
+        put(3, 1, "bb_lo")
+int row = bar_index - firstBar + 2
+if row >= 2 and row <= 11
+    put(0, row, str.tostring(bar_index))
+    if part == 1
+        put(1, row, fmt(v_rsi14))
+        put(2, row, fmt(v_rsi2))
+        put(3, row, fmt(v_atr14_formula))
+        put(4, row, fmt(v_change1))
+        put(5, row, fmt(v_change3))
+        put(6, row, fmt(v_mom10))
+    if part == 2
+        put(1, row, fmt(v_stdev20))
+        put(2, row, fmt(v_stoch14))
+        put(3, row, fmt(v_cci20))
+        put(4, row, fmt(v_macd))
+        put(5, row, fmt(v_macd_signal))
+        put(6, row, fmt(v_macd_hist))
+    if part == 3
+        put(1, row, fmt(v_bb_mid))
+        put(2, row, fmt(v_bb_up))
+        put(3, row, fmt(v_bb_lo))
+plot(bar_index, "bi", display=display.data_window)

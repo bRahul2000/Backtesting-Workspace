@@ -39,10 +39,12 @@ from . import binance
 from . import live as live_model
 from . import providers
 from . import replay as replay_model
+from . import pine_bridge
 from . import source_roles
 from . import tester
 from .protocol import (
     CONTRACT_VERSION,
+    PINE_EVENTS,
     TESTER_EVENTS,
     EventValidationError,
     FrontendEvent,
@@ -266,7 +268,8 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
                            logs: list[LogEntry], notices: list[dict[str, str]],
                            watchlist: list[dict], ack: str | None = None,
                            tester_payload: dict | None = None, replay_status: dict | None = None,
-                           live_status: dict | None = None, sources: dict | None = None) -> dict:
+                           live_status: dict | None = None, sources: dict | None = None,
+                           pine: dict | None = None) -> dict:
     bars = bars_from_frame(frame)
     times = [bar["time"] for bar in bars]
     overlays, panes, indicator_notices = indicator_payload(frame, times, state.indicators)
@@ -327,6 +330,8 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         "live": live_status or {"enabled": False},
         # Chart / Signal / Execution roles: streaming Live only (never in Replay or Historical).
         "sources": sources,
+        # Pine scripts: editor state and each script's outputs on these bars (see pine_bridge.py).
+        "pine": pine,
     }
     if live_status and live_status.get("phase") == "setup":
         payload["mode"] = "live"  # setup: the chart still shows the historical dataset
@@ -397,7 +402,7 @@ def consume_event(state: TerminalState, raw, ctx: TerminalContext, last_id: str 
         event = parse_event(raw)
     except EventValidationError as exc:
         return state, LogEntry("error", f"Rejected malformed event: {exc}"), event_id, None
-    if event.type in TESTER_EVENTS:
+    if event.type in TESTER_EVENTS or event.type in PINE_EVENTS:
         return state, None, event.id, event
     new_state, entry = apply_event(state, event, ctx)
     return new_state, entry, event.id, None
@@ -633,6 +638,32 @@ def _live_frame(state: TerminalState, notices: list[dict[str, str]], selected: M
     return view.frame, status, resolution
 
 
+def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketDataset, live_status: dict | None,
+                 replay_status: dict | None, seconds: int, notices: list[dict[str, str]]) -> dict:
+    """Run the chart's Pine scripts on exactly the bars this payload shows."""
+    streaming = live_status is not None and live_status.get("phase") == "streaming"
+    if streaming:
+        ident = live_status["identity"]
+        identity = ("live", ident["dataset_key"], live_status["timeframe"])
+        symbol, provider = ident["symbol"], ident["source_label"]
+        digits = live_status.get("digits")
+    else:
+        identity = ("replay" if replay_status else "historical", selected.key, state.timeframe)
+        symbol, provider = selected.symbol, selected.broker
+        digits = price_precision(frame["close"]) if len(frame) else 2
+    digits = 2 if digits is None else int(digits)
+    section = pine_bridge.pine_payload(
+        state, frame, st.session_state, identity=identity, timeframe_seconds=seconds, ticker=symbol,
+        tickerid=f"{provider.split(' ')[0].upper()}:{symbol}", mintick=10.0 ** -digits, forming_last=streaming,
+        kind="cfd" if provider.startswith("Exness") else "crypto",
+        currency="USDT" if symbol.upper().endswith("USDT") else "USD")
+    for script in section["scripts"]:
+        if script["error"] and script["enabled"]:
+            where = f" (bar {script['error']['bar_index']})" if script["error"].get("bar_index") is not None else ""
+            notices.append({"level": "error", "message": f"Pine `{script['title']}`: {script['error']['message']}{where}"})
+    return section
+
+
 def render_custom_terminal() -> None:
     state: TerminalState = st.session_state.get(STATE_KEY) or _initial_state()
     notices: list[dict[str, str]] = []
@@ -649,7 +680,10 @@ def render_custom_terminal() -> None:
         state, raw_event, context_for(bounds, current_times), st.session_state.get(LAST_EVENT_KEY))
     tester_session = st.session_state.get(TESTER_KEY) or empty_tester_session()
     registry = discover_builtin_strategies()
-    if tester_event is not None:
+    if tester_event is not None and tester_event.type in PINE_EVENTS:
+        state, entry = pine_bridge.handle_pine_event(tester_event, state, st.session_state)
+        state = replace(state, bottom_panel="pine", bottom_open=True)
+    elif tester_event is not None:
         # Runs synchronously inside this rerun. The event id is persisted only
         # afterwards, so an interrupted run is retried, never silently dropped.
         tester_session, runs, entry, result = handle_tester_event(
@@ -725,12 +759,14 @@ def render_custom_terminal() -> None:
     elif replay_status is None:
         notices.append({"level": "warning", "message": "The selected dataset contains no bars."})
 
+    pine = pine_section(state, frame, selected, live_status, replay_status, resolution.target_seconds, notices)
+
     # 4. Build, validate, render.
     try:
         payload = build_terminal_payload(
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
             logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, rows),
-            replay_status=replay_status, live_status=live_status, sources=sources, ack=last_id,
+            replay_status=replay_status, live_status=live_status, sources=sources, pine=pine, ack=last_id,
             tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
     except ValueError as exc:
         st.error(f"TradingView Mode payload rejected: {exc}")

@@ -22,7 +22,7 @@ from .replay import SPEEDS as REPLAY_SPEEDS, is_utc_text
 
 CONTRACT_VERSION = 1
 MODES = ("historical", "replay", "live")
-BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs")
+BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs", "pine")
 _BAR_FIELDS = ("time", "open", "high", "low", "close", "volume")
 _REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
 
@@ -188,6 +188,7 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
     _validate_replay(payload, bar_times)
     _validate_live(payload)
     _validate_sources(payload)
+    _validate_pine(payload, bar_times)
     _validate_tester(payload.get("tester"), payload.get("trade_overlay"), bar_times)
     _require(payload.get("ack") is None or isinstance(payload["ack"], str), "ack must be an event id or null.")
     return payload
@@ -195,6 +196,43 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 LIVE_SOURCES = {"binance": ("Binance Futures", "BINANCE_LIVE:"), "exness": ("Exness MT5", "MT5_LIVE:")}
 LIVE_STATUSES = ("CONNECTING", "LIVE", "STALE", "DISCONNECTED", "ERROR")
+
+
+PINE_OUTPUT_KINDS = ("plot", "shape", "char", "hline", "fill", "bgcolor", "barcolor")
+
+
+def _validate_pine(payload: dict[str, Any], bar_times: set[int]) -> None:
+    """Pine outputs only ever sit on bars the chart has (so Replay cannot leak)."""
+    pine = payload.get("pine")
+    if pine is None:
+        return
+    _require(isinstance(pine, dict) and isinstance(pine.get("scripts"), list), "pine.scripts is required.")
+    script_ids = set()
+    for script in pine["scripts"]:
+        _require(isinstance(script.get("id"), str) and script["id"] not in script_ids, "pine script ids must be unique.")
+        script_ids.add(script["id"])
+        outputs = script.get("outputs") or []
+        kinds = {}
+        for output in outputs:
+            _require(output.get("kind") in PINE_OUTPUT_KINDS, f"unknown pine output kind {output.get('kind')!r}.")
+            _require(isinstance(output.get("id"), str) and output["id"] not in kinds, "pine output ids must be unique.")
+            kinds[output["id"]] = output["kind"]
+            previous = None
+            for point in output.get("data", []):
+                _require(type(point.get("time")) is int and point["time"] in bar_times,
+                         f"pine output {output['id']}: time {point.get('time')!r} is not a chart bar.")
+                if output["kind"] == "plot":
+                    _require(previous is None or point["time"] > previous, f"pine output {output['id']}: times must increase.")
+                    value = point.get("value")
+                    _require(value is None or (isinstance(value, float) and math.isfinite(value)),
+                             f"pine output {output['id']}: values must be finite or null.")
+                previous = point["time"]
+        for output in outputs:
+            if output["kind"] == "fill":
+                between = output.get("between") or []
+                _require(len(between) == 2 and all(ref in kinds for ref in between)
+                         and kinds[between[0]] == kinds[between[1]] and kinds[between[0]] in ("plot", "hline"),
+                         "a pine fill must reference two plots or two hlines of the same script.")
 
 
 def _validate_sources(payload: dict[str, Any]) -> None:
@@ -332,6 +370,15 @@ def _is_str(value: Any) -> bool:
     return isinstance(value, str) and 0 < len(value) <= 128
 
 
+def _is_source(value: Any) -> bool:
+    return isinstance(value, str) and 0 < len(value) <= 100_000
+
+
+def _is_input_value(value: Any) -> bool:
+    return isinstance(value, (bool, str)) and len(str(value)) <= 1000 or (
+        isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value))
+
+
 def _is_iso_date(value: Any) -> bool:
     if not isinstance(value, str):
         return False
@@ -395,6 +442,14 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "exit_live": {},
     "live_poll": {},
     "load_live_history": {},  # older candles for the streaming provider (Binance: REST pages)
+    # Pine editor. Compilation and semantics live in the Pine engine (ui/tradingview_mode/pine).
+    "pine_compile": {"source": (True, _is_source)},
+    "pine_add": {"source": (True, _is_source)},
+    "pine_update": {"id": (True, _is_str), "source": (True, _is_source)},
+    "pine_remove": {"id": (True, _is_str)},
+    "pine_toggle": {"id": (True, _is_str), "enabled": (True, lambda v: isinstance(v, bool))},
+    "pine_set_input": {"id": (True, _is_str), "index": (True, lambda v: type(v) is int and 0 <= v < 500),
+                       "value": (True, _is_input_value)},
     # Strategy Tester. Semantics (registry, dataset, broker, parameters) are
     # validated in tester.py against the authoritative configuration model.
     "run_backtest": {"strategy_id": (True, _is_str), "dataset_key": (True, _is_str),
@@ -410,6 +465,7 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "export_run": {"history_id": (True, _is_int), "kind": (True, lambda v: v in EXPORT_KINDS)},
 }
 TESTER_EVENTS = ("run_backtest", "clear_backtest", "restore_run", "export_run")
+PINE_EVENTS = ("pine_compile", "pine_add", "pine_update", "pine_remove", "pine_toggle", "pine_set_input")
 TESTER_STATUSES = ("idle", "completed", "failed")
 
 

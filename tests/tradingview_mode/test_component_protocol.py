@@ -113,6 +113,9 @@ VALID_EVENTS = {
     "step_forward": {}, "step_backward": {}, "play_replay": {}, "pause_replay": {},
     "set_replay_speed": {"speed": 5}, "exit_replay": {}, "go_to_replay_latest": {},
     "enter_live": {}, "go_live": {"market": "BTC", "source": "binance", "timeframe": "15m"}, "exit_live": {}, "live_poll": {}, "load_live_history": {},
+    "pine_compile": {"source": "//@version=5\nindicator(\"x\")\nplot(close)"}, "pine_add": {"source": "x"},
+    "pine_update": {"id": "pine-1", "source": "x"}, "pine_remove": {"id": "pine-1"},
+    "pine_toggle": {"id": "pine-1", "enabled": False}, "pine_set_input": {"id": "pine-1", "index": 0, "value": 14},
     "export_run": {"history_id": 1, "kind": "trades_csv"},
 }
 

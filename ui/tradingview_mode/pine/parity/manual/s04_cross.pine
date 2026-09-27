@@ -1,0 +1,86 @@
+//@version=6
+// Pine parity MANUAL script for fixture `s04_cross` (table). Generated from fixtures.py - do not edit.
+// Same calculations as fixtures/s04_cross.pine; the values are shown in a table (TradingView Basic plan).
+indicator("parity s04_cross (manual)", overlay=true, precision=8)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+float fast = ta.ema(c, 5)
+float slow = ta.sma(c, 20)
+float v_xover = ta.crossover(fast, slow) ? 1 : 0
+float v_xunder = ta.crossunder(fast, slow) ? 1 : 0
+float v_xany = ta.cross(fast, slow) ? 1 : 0
+float v_xover_touch = ta.crossover(k - 100, 0) ? 1 : 0
+float v_xunder_touch = ta.crossunder(100 - k, 0) ? 1 : 0
+float v_xover_flat = ta.crossover(c, 110.0) ? 1 : 0
+float v_rising3 = ta.rising(c, 3) ? 1 : 0
+float v_falling3 = ta.falling(c, 3) ? 1 : 0
+float v_since_xover = ta.barssince(ta.crossover(fast, slow))
+float v_valuewhen0 = ta.valuewhen(ta.crossover(fast, slow), c, 0)
+float v_valuewhen1 = ta.valuewhen(ta.crossover(fast, slow), c, 1)
+// ---- manual parity table (TradingView only) ----
+int page = input.int(0, "Page", minval=0, maxval=4, tooltip="0: bars 84-93 first ema/sma crossover at bar 88 | 1: bars 96-105 k - 100 touches 0 at bar 100, crosses at 101 | 2: bars 150-159 volatility: crosses at 154, 155, 160, 161, 165 | 3: bars 203-212 crossunder at 207; closes sit exactly on 110 from 210 | 4: bars 216-225 crossover of 110 at bar 222")
+int part = input.int(1, "Columns", minval=1, maxval=2, tooltip="1: xover, xunder, xany, xover_touch, xunder_touch, xover_flat | 2: rising3, falling3, since_xover, valuewhen0, valuewhen1")
+int firstBarInput = input.int(-1, "First bar (-1 = use Page)", minval=-1)
+int pageStart = switch page
+    0 => 84
+    1 => 96
+    2 => 150
+    3 => 203
+    4 => 216
+    => 0
+int firstBar = firstBarInput >= 0 ? firstBarInput : pageStart
+var table grid = table.new(position.top_right, 7, 12, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt) =>
+    table.cell(grid, col, row, txt, text_color=color.black, text_size=size.normal, text_halign=text.align_right)
+fmt(float value) => na(value) ? "na" : str.tostring(value, "0.########")
+if barstate.isfirst
+    put(0, 0, "s04_cross · columns " + str.tostring(part) + " · bars " + str.tostring(firstBar) + "-" + str.tostring(firstBar + 9))
+    table.merge_cells(grid, 0, 0, 6, 0)
+    put(0, 1, "bar")
+    if part == 1
+        put(1, 1, "xover")
+        put(2, 1, "xunder")
+        put(3, 1, "xany")
+        put(4, 1, "xover_touch")
+        put(5, 1, "xunder_touch")
+        put(6, 1, "xover_flat")
+    if part == 2
+        put(1, 1, "rising3")
+        put(2, 1, "falling3")
+        put(3, 1, "since_xover")
+        put(4, 1, "valuewhen0")
+        put(5, 1, "valuewhen1")
+int row = bar_index - firstBar + 2
+if row >= 2 and row <= 11
+    put(0, row, str.tostring(bar_index))
+    if part == 1
+        put(1, row, fmt(v_xover))
+        put(2, row, fmt(v_xunder))
+        put(3, row, fmt(v_xany))
+        put(4, row, fmt(v_xover_touch))
+        put(5, row, fmt(v_xunder_touch))
+        put(6, row, fmt(v_xover_flat))
+    if part == 2
+        put(1, row, fmt(v_rising3))
+        put(2, row, fmt(v_falling3))
+        put(3, row, fmt(v_since_xover))
+        put(4, row, fmt(v_valuewhen0))
+        put(5, row, fmt(v_valuewhen1))
+plot(bar_index, "bi", display=display.data_window)

@@ -1,0 +1,28 @@
+//@version=6
+// Pine parity manual check: var vs varip on realtime ticks, shown in a table. Generated from manual.py.
+// Add to a LIVE 1-minute chart and watch the table for one forming candle and the start of the next.
+indicator("parity m03 live var/varip", overlay=true)
+varip int ticksThisBar = 0
+if barstate.isnew
+    ticksThisBar := 0
+ticksThisBar += 1
+var int varPerBar = 0
+varPerBar += 1
+varip int varipTotal = 0
+varipTotal += 1
+plot(bar_index, "bi")
+plot(ticksThisBar, "varip ticks this bar")
+plot(varPerBar, "var count")
+plot(varipTotal, "varip count")
+var table grid = table.new(position.top_right, 2, 7, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int row, string name, string value) =>
+    table.cell(grid, 0, row, name, text_color=color.black, text_halign=text.align_left)
+    table.cell(grid, 1, row, value, text_color=color.black, text_halign=text.align_right)
+if barstate.islast
+    put(0, "bar_index", str.tostring(bar_index))
+    put(1, "barstate.isnew", barstate.isnew ? "T" : "F")
+    put(2, "barstate.isrealtime", barstate.isrealtime ? "T" : "F")
+    put(3, "var count", str.tostring(varPerBar))
+    put(4, "varip count", str.tostring(varipTotal))
+    put(5, "varip ticks this bar", str.tostring(ticksThisBar))
+    put(6, "time (UTC)", str.format_time(time, "HH:mm", "UTC"))

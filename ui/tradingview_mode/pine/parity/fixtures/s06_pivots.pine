@@ -1,0 +1,64 @@
+//@version=6
+// Pine parity fixture `s06_pivots` (synthetic track). Paste into TradingView's Pine Editor,
+// add to chart, then export the chart data (see parity/README.md).
+indicator("parity s06_pivots", overlay=false, precision=10)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+plot(bar_index, "bi")
+float tp = switch bar_index % 24
+    0 => 3.0
+    1 => 5.0
+    2 => 5.0
+    3 => 2.0
+    4 => 6.0
+    5 => 6.0
+    6 => 6.0
+    7 => 1.0
+    8 => 4.0
+    9 => 7.0
+    10 => 2.0
+    11 => 7.0
+    12 => 3.0
+    13 => 9.0
+    14 => 1.0
+    15 => 1.0
+    16 => 9.0
+    17 => 2.0
+    18 => 4.0
+    19 => 8.0
+    20 => 3.0
+    21 => 4.0
+    22 => 8.0
+    23 => 1.0
+    => na
+
+plot(tp, "tp")
+plot(ta.pivothigh(tp, 1, 1), "ph11")
+plot(ta.pivotlow(tp, 1, 1), "pl11")
+plot(ta.pivothigh(tp, 2, 2), "ph22")
+plot(ta.pivotlow(tp, 2, 2), "pl22")
+plot(ta.pivothigh(tp, 3, 3), "ph33")
+plot(ta.pivotlow(tp, 3, 3), "pl33")
+plot(ta.pivothigh(tp, 2, 1), "ph21")
+plot(ta.pivotlow(tp, 1, 3), "pl13")
+plot(ta.pivothigh(h, 2, 2), "ph22_h")
+plot(ta.pivotlow(l, 2, 2), "pl22_l")
+plot(ta.pivothigh(h, 3, 3), "ph33_h")
+plot(ta.pivotlow(l, 3, 3), "pl33_l")

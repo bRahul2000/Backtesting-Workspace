@@ -441,3 +441,50 @@ input { font: inherit; color: var(--text); }
 .chart-panel.has-sources .legend:not(.pane-legend) { top: 66px; }
 .chart-panel.has-sources .pane-legend { margin-top: 60px; }
 .chart-panel.has-sources .notices { top: 118px; }
+
+/* ---- Pine editor ------------------------------------------------------------ */
+.pine-editor { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); height: 100%; min-height: 0; }
+.pine-left { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--border); }
+.pine-toolbar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--border); flex: none; }
+.pine-examples { height: 24px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; }
+.pine-code { display: flex; flex: 1; min-height: 0; background: var(--bg); }
+.pine-gutter { margin: 0; padding: 6px 6px 6px 8px; text-align: right; color: var(--muted); font-size: 12px; line-height: 18px;
+  overflow: hidden; user-select: none; border-right: 1px solid var(--border); min-width: 36px; }
+.pine-text { flex: 1; min-width: 0; resize: none; border: 0; outline: none; padding: 6px 8px; background: transparent; color: var(--text);
+  font-size: 12px; line-height: 18px; tab-size: 4; white-space: pre; overflow: auto; }
+.pine-right { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.pine-tabs { display: flex; gap: 2px; padding: 4px 6px; border-bottom: 1px solid var(--border); flex: none; }
+.pine-tab { height: 22px; padding: 0 9px; border-radius: 4px; color: var(--text-2); font-size: 11px; }
+.pine-tab.is-active { background: var(--panel-2); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.pine-pane { flex: 1; overflow: auto; min-height: 0; padding: 6px 8px; font-size: 11.5px; }
+.pine-empty { color: var(--muted); padding: 8px; font-size: 11.5px; }
+.pine-stale { color: var(--warn); margin-bottom: 6px; }
+.pine-ok { color: var(--up); margin-bottom: 6px; }
+.pine-diag { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; width: 100%; text-align: left; padding: 4px 6px; border-radius: 4px; }
+.pine-diag:hover { background: var(--hover); }
+.pine-diag-kind { font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; padding-top: 1px; }
+.pine-diag.is-error .pine-diag-kind { color: var(--down); }
+.pine-diag.is-gap .pine-diag-kind { color: var(--warn); }
+.pine-diag.is-warning .pine-diag-kind { color: var(--muted); }
+.pine-diag-text { color: var(--text); }
+.pine-features { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.pine-chip { font-size: 10px; padding: 0 5px; border-radius: 3px; border: 1px solid var(--border); color: var(--text-2); }
+.pine-chip.is-supported { color: var(--up); border-color: rgba(34, 171, 148, 0.4); }
+.pine-chip.is-partial { color: var(--accent); border-color: rgba(61, 139, 253, 0.4); }
+.pine-chip.is-gap { color: var(--warn); border-color: rgba(226, 162, 59, 0.4); }
+.pine-script { border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; margin-bottom: 6px; }
+.pine-script.is-hidden { opacity: 0.55; }
+.pine-script.is-editing { border-color: var(--accent); }
+.pine-script-head { display: flex; align-items: center; gap: 7px; }
+.pine-script-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pine-script-meta { font-size: 10.5px; margin: 2px 0 0 22px; }
+.pine-badge { font-size: 9.5px; padding: 0 5px; border-radius: 3px; background: var(--panel-2); color: var(--text-2); }
+.pine-script-error { color: var(--down); margin-top: 4px; }
+.pine-script-note { color: var(--muted); margin-top: 4px; }
+.pine-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 10px; margin-top: 6px; }
+.pine-input { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; color: var(--muted); }
+.pine-input input:not([type=checkbox]), .pine-input select { height: 22px; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 5px; font-size: 11px; }
+.pine-compat-head { color: var(--text-2); margin-bottom: 8px; }
+.pine-compat-group h4 { margin: 8px 0 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.pine-compat-row { display: flex; gap: 6px; align-items: baseline; padding: 1px 0; }
