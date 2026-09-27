@@ -121,12 +121,22 @@
     "p21_terminal_gap_lower_tf": {
       "chart": "Historical · Exness · XAUUSDm · 1h",
       "result": "PASS",
-      "observed": "request.security() for a lower timeframe (15) than the chart (60) is not implemented yet (request.security_lower_tf() comes later)"
+      "observed": "request.security() for a lower timeframe (15) than the chart (60) is not implemented yet (request.security_lower_tf() comes later)",
+      "confirmation_run": {
+        "setup": "Historical · Exness · XAUUSDm · 1h · request.security(syminfo.tickerid, \"15\", close)",
+        "result": "PASS",
+        "observed": "request.security() for a lower timeframe (15) than the chart (60) is not implemented yet (request.security_lower_tf() comes later). (bar 0)"
+      }
     },
     "p21_terminal_gap_cross_family": {
-      "chart": "Historical · Exness",
+      "chart": "Historical · Exness · XAUUSDm · 1h",
       "result": "PASS",
-      "observed": "error naming BINANCE:BTCUSDT, Binance Futures and Exness MT5, stating that requests across data sources are not allowed"
+      "observed": "error naming BINANCE:BTCUSDT, Binance Futures and Exness MT5, stating that requests across data sources are not allowed",
+      "confirmation_run": {
+        "setup": "Historical · Exness · XAUUSDm · 1h · request.security(\"BINANCE:BTCUSDT\", \"60\", close)",
+        "result": "PASS",
+        "observed": "Line 5: request.security(): symbol `BINANCE:BTCUSDT` belongs to Binance Futures, but this chart's source is Exness MT5. Requests across data sources are not allowed."
+      }
     }
   }
 }

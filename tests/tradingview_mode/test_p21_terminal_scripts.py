@@ -57,6 +57,20 @@ def test_gap_scripts_report_the_documented_errors():
                                           "sources are not allowed.") and script["outputs"] == []
 
 
+def test_recorded_gap_diagnostics_equal_the_engine_on_the_confirmation_setup():
+    """The exact texts the user observed on an Exness XAUUSDm 1h chart (terminal evidence)."""
+    import json
+
+    checks = json.loads(Path("ui/tradingview_mode/pine/parity/terminal/p21_terminal_results.json").read_text())["checks"]
+    state, session = added("EXNESS_XAUUSDM_H1", "1h", "p21_terminal_gap_lower_tf.pine")
+    _, notices = payload_for(state, session)
+    assert notices[0]["message"].endswith(checks["p21_terminal_gap_lower_tf"]["confirmation_run"]["observed"])
+    state, session = added("EXNESS_XAUUSDM_H1", "1h", "p21_terminal_gap_cross_family.pine")
+    payload, _ = payload_for(state, session)
+    assert payload["pine"]["scripts"][0]["error"]["message"] == \
+        checks["p21_terminal_gap_cross_family"]["confirmation_run"]["observed"]
+
+
 def test_replay_walkthrough_values_in_the_checklist():
     state, session = added("EXNESS_BTCUSDM_M15", "15m", "p21_terminal_replay.pine")
     _, _, frame = T._load(state)

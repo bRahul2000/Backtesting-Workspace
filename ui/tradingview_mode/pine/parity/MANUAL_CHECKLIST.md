@@ -55,12 +55,13 @@ so 1h / 4h are requested from a 15m chart (1h = 4 chart bars, the same boundary 
 | [x] | 3 | `manual/p21_terminal_binance_live.pine` | Binance Futures | BTCUSDT | 15m | Live (stay ≥ 1 minute inside one hour) | the right-most values of `HTF close (forming)` / high / low (hover the latest candle) across several updates | the forming 1h close follows the chart's close on every update; high/low widen when price makes a new high/low for the hour; they restart at the next hour's first bar; tooltip shows `60 · Binance Futures · native · … · forming bar`; no red error |
 | [x] | 4 | `manual/p21_terminal_exness_history.pine` | Exness (historical dataset) | XAUUSDm | 15m | Historical | 4 lines (H1 close/EMA 5, H4 close/EMA 5); the status-line tooltip | tooltip line 1: `EXNESS:XAUUSDm 60 · Exness MT5 · native · … · EXNESS_XAUUSDM_H1`; line 2: `EXNESS:XAUUSDm 240 · Exness MT5 · aggregated from 15m · … · EXNESS_XAUUSDM_M15`; nothing mentions Binance |
 | [x] | 5a | `manual/p21_terminal_gap_lower_tf.pine` | Exness (historical dataset) | XAUUSDm | **1h** | Historical | the script row / notice | red error: `request.security() for a lower timeframe (15) than the chart (60) is not implemented yet …` |
-| [x] | 5b | `manual/p21_terminal_gap_cross_family.pine` | Exness (historical dataset) | XAUUSDm | 15m | Historical | the script row / notice | red error before anything is drawn: `Line 5: request.security(): symbol BINANCE:BTCUSDT belongs to Binance Futures, but this chart's source is Exness MT5. Requests across data sources are not allowed.` |
+| [x] | 5b | `manual/p21_terminal_gap_cross_family.pine` | Exness (historical dataset) | XAUUSDm | any (confirmed on 1h) | Historical | the script row / notice | red error before anything is drawn: `Line 5: request.security(): symbol BINANCE:BTCUSDT belongs to Binance Futures, but this chart's source is Exness MT5. Requests across data sources are not allowed.` |
 
 **Result 2026-09-27 (Zoneflow terminal, run by the user): all six checks PASS** — recorded in
 `terminal/p21_terminal_results.json`. This is terminal evidence, not TradingView evidence (only q4 is). Check 4's
 per-context hover tooltip was not captured manually (the chart footer showed the M15 dataset); the detailed
-provenance text is covered by automated tests only.
+provenance text is covered by automated tests only. Checks 5a and 5b were re-run on an Exness XAUUSDm **1h** chart (2026-09-27) with the exact expected
+diagnostics — both PASS.
 
 Notes: in check 1 the `lookahead_off` lines (1h close, close[1], EMA) change only when an hour completes —
 that is correct, not a stall. Check 2's numbers are from the stored Exness BTCUSDm dataset (a dry run of this

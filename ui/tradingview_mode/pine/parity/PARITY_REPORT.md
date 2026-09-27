@@ -270,7 +270,7 @@ This engine against the frozen q4 oracle: **134400 / 134400** cells (13 requeste
 | `manual/p21_terminal_binance_history.pine` | Live · Binance Futures · BTCUSDT · 15m | PASS |
 | `manual/p21_terminal_binance_history_pane.pine` | Live · Binance Futures · BTCUSDT · 15m | PASS |
 | `manual/p21_terminal_gap_lower_tf.pine` | Historical · Exness · XAUUSDm · 1h | PASS |
-| `manual/p21_terminal_gap_cross_family.pine` | Historical · Exness | PASS |
+| `manual/p21_terminal_gap_cross_family.pine` | Historical · Exness · XAUUSDm · 1h | PASS |
 
 
 ## Rules under test
