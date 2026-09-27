@@ -25,6 +25,7 @@ import numpy as np
 
 from . import ast as A
 from . import values as V
+from .builtins.arrays import RE10052
 from .errors import PineRuntimeError
 from .values import NA, ArraySnapshot, Color, PineArray, is_na, truthy
 
@@ -210,12 +211,13 @@ class Runtime:
             A.Call: self.eval_call, A.History: self.eval_history, A.Unary: self.eval_unary,
             A.Binary: self.eval_binary, A.Ternary: self.eval_ternary, A.TupleExpr: self.eval_tuple,
             A.If: self.exec_if, A.Switch: self.exec_switch, A.ForRange: self.exec_for, A.While: self.exec_while,
+            A.ForIn: self.exec_for_in,
         }
         self._exec = {
             A.VarDecl: self.exec_decl, A.TupleDecl: self.exec_tuple_decl, A.Assign: self.exec_assign,
             A.ExprStmt: lambda node, scope: self.eval(node.expr, scope), A.If: self.exec_if,
             A.Switch: self.exec_switch, A.ForRange: self.exec_for, A.While: self.exec_while,
-            A.Break: self.exec_break, A.Continue: self.exec_continue,
+            A.ForIn: self.exec_for_in, A.Break: self.exec_break, A.Continue: self.exec_continue,
             A.FunctionDef: lambda node, scope: NA, A.TypeDef: lambda node, scope: NA, A.Import: lambda node, scope: NA,
         }
 
@@ -389,6 +391,38 @@ class Runtime:
                 end = self.eval(node.end, loop_scope)
                 if is_na(end):
                     break
+        return value
+
+    def exec_for_in(self, node: A.ForIn, scope: Scope):
+        """`for x in a` / `for [i, x] in a` (P22_FORIN_EVIDENCE.md, identical in v5 and v6): the array expression is
+        evaluated once, so reassigning its variable does not redirect the loop (q6e); the size is re-read before every
+        iteration and each element is read live at its index, so pushes, pops and removals during the loop are seen
+        (q6 Q3, q6r 4/5/7). An na array stops the script with RE10052 (q6n)."""
+        array = self.eval(node.iterable, scope)
+        if not isinstance(array, PineArray):
+            self.fail(RE10052 if is_na(array) else "`for ... in` needs an array.", node)
+        loop_scope = Scope(scope)
+        slots = []
+        for position, name in enumerate(node.names):
+            buffer = self.buffer((self.ctx_path, node.id, position))
+            slots.append(buffer)
+            if name != "_":
+                loop_scope.vars[name] = buffer
+        index_slot, item_slot = (slots[0], slots[1]) if len(slots) == 2 else (None, slots[0])
+        value, index = NA, 0                     # `array` stays the loop's object; `:=` on its variable cannot swap it
+        while index < len(array.items):
+            if index_slot is not None:
+                index_slot.set(self.bar, index)
+            item_slot.set(self.bar, array.items[index])
+            try:
+                value = self.exec_block(node.body, loop_scope)
+            except _Continue:
+                pass
+            except _Break:
+                break
+            index += 1
+            if index > MAX_LOOP_ITERATIONS:
+                self.fail(f"Loop exceeded {MAX_LOOP_ITERATIONS:,} iterations on one bar.", node)
         return value
 
     def exec_while(self, node: A.While, scope: Scope):

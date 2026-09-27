@@ -1,0 +1,22 @@
+//@version=5
+// Pine P2.2-A2 parity - FOR...IN OBSERVATION ORACLE (v5), companion D: nested loops that use the SAME loop
+// variable name. Separate because Pine may reject the shadowing at compile time; the exact message IS the result.
+// Any chart works.
+indicator("q6d for...in nested same name v5", overlay=true)
+var table t = table.new(position.top_right, 2, 4, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int col, int row, string txt) =>
+    table.cell(t, col, row, txt, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    array<int> outer = array.from(1, 2)
+    array<int> inner = array.from(10, 20)
+    string seq = ""
+    for x in outer
+        seq += "outer " + str.tostring(x) + ": "
+        for x in inner
+            seq += str.tostring(x) + " "
+        seq += "| after inner " + str.tostring(x) + "; "
+    put(0, 0, "q6d NESTED SAME LOOP VARIABLE (v5) - observed")
+    table.merge_cells(t, 0, 0, 1, 0)
+    put(0, 1, "for x in [1,2] / for x in [10,20]")
+    put(1, 1, seq)
+plot(close, "close", display=display.none)

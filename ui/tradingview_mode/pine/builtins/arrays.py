@@ -4,8 +4,9 @@ Values are ``PineArray`` objects shared by every reference within one execution;
 handled by the runtime (end-of-execution snapshots). Arrays obtained with the history operator are read-only:
 every mutating function raises TradingView's RE10051 message for them.
 
-Only the A1 set is implemented; every other ``array.*`` stays a capability gap. Wording of errors that were not
-observed on TradingView (bounds, empty arrays, na arrays, negative indices) is this engine's own.
+Only the A1 set (plus ``array.remove``, P2.2-A2) is implemented; every other ``array.*`` stays a capability gap.
+Wording of errors that were not observed on TradingView (bounds, empty arrays, na arrays in ``array.*`` calls,
+negative indices) is this engine's own.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ MAX_ELEMENTS = 100_000        # this engine's limit (TradingView documents the s
 RE10051 = ("Cannot modify the elements of a historical array or any slices of that array. Instead of modifying "
            "an array referenced by an ID retrieved with the `[]` operator, create a shallow copy of the array with "
            "`array.copy()`, then modify the copy or a slice of that copy.")
+RE10052 = "Cannot call array methods when id of array is na."    # observed for `for ... in` over an na array (q6n)
 
 ARR = "series array"          # any array<T>
 I, ANY = "series int", "series any"
@@ -205,3 +207,10 @@ def _shift(rt, site, a):
 def _clear(rt, site, a):
     _mutable(a["id"], "array.clear").items.clear()
     return NA
+
+
+@builtin("array.remove", P("id", ARR), P("index", I), returns="element")
+def _remove(rt, site, a):
+    # observed only inside a `for ... in` loop (q6r Case 7: removing index 3 of [1,2,3,4,5] leaves [1 2 3 5])
+    arr = _mutable(a["id"], "array.remove")
+    return arr.items.pop(_index(arr, a["index"], "array.remove"))

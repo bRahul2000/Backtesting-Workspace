@@ -1,0 +1,29 @@
+//@version=6
+// Pine P2.2-A2 parity - FOR...IN OBSERVATION ORACLE (v6), companion Cx: assigning to the VALUE loop variable (`x := x * 2`).
+// Own script (not an input case) because a compile error cannot be isolated by an input; the exact compiler
+// message IS then the result. The other destructured variable is tested by q6c_i. Any chart works.
+indicator("q6c_x for...in assign x v6", overlay=true)
+sq(array<int> a) =>
+    string out = "na"
+    if not na(a)
+        out := "["
+        if array.size(a) > 0
+            for k = 0 to array.size(a) - 1
+                out += str.tostring(array.get(a, k)) + " "
+        out += "]"
+    out
+
+var table t = table.new(position.top_right, 2, 4, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int col, int row, string txt) =>
+    table.cell(t, col, row, txt, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    array<int> a = array.from(10, 20, 30)
+    string seq = ""
+    for [i, x] in a
+        x := x * 2
+        seq += str.tostring(i) + ":" + str.tostring(x) + " "
+    put(0, 0, "q6c_x LOOP VARIABLE x ASSIGNMENT (v6) - observed")
+    table.merge_cells(t, 0, 0, 1, 0)
+    put(0, 1, "for [i, x] in [10,20,30]: x := x * 2")
+    put(1, 1, "i:x after assignment: " + seq + "| array after: " + sq(a))
+plot(close, "close", display=display.none)

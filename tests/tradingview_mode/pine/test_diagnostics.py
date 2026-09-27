@@ -39,8 +39,11 @@ def test_capability_gaps_name_the_feature_and_line(body, line, message):
     assert "unsupported" not in gaps[0].message.lower()
 
 
-def test_gap_in_a_for_in_loop_and_strategy_and_old_versions():
-    assert only(script("for x in close\n    y = x\nplot(close)"))[2].startswith("`for ... in` loops need arrays or maps")
+def test_for_in_over_a_scalar_and_gaps_for_strategy_and_old_versions():
+    # P2.2-A2: `for ... in` over arrays is implemented; iterating a scalar series is a compile error
+    assert only(script("for x in close\n    y = x\nplot(close)"))[:2] == ("error", 3)
+    assert only(script("for x in close\n    y = x\nplot(close)"))[2] == ("`for ... in` needs an array; `float` cannot be "
+                                                                    "iterated.")
     kind, line, message = only("//@version=5\nstrategy('S')\nplot(close)\n")
     assert (kind, line) == ("gap", 2) and "`strategy()` scripts are not implemented yet" in message
     kind, line, message = only("//@version=4\nindicator('Old')\nplot(close)\n")

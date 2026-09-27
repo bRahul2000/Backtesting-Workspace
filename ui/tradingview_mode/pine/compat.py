@@ -44,7 +44,8 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     Feature("functions", "runtime", SUPPORTED, "user-defined functions (single-line and block, defaults, series state per call site)"),
     Feature("tuples", "runtime", SUPPORTED, "tuple returns and `[a, b] = f()` declarations"),
     Feature("realtime", "runtime", SUPPORTED, "realtime bar re-execution with rollback (varip survives)"),
-    Feature("for-in", "runtime", GAP, "`for ... in` loops over arrays/maps"),
+    Feature("for-in", "runtime", PARTIAL, "`for ... in` loops over arrays (`for x in a`, `for [i, x] in a`)",
+            "Maps and matrices are not implemented, so loops over them are gaps."),
     Feature("methods", "runtime", GAP, "methods (`method` declarations and `obj.method()` calls)"),
     Feature("function-overloads", "runtime", GAP, "user-defined function overloading"),
     Feature("libraries", "runtime", GAP, "libraries (`import` / `library()`)"),
@@ -57,10 +58,10 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
             "Only `array.new<T>()` and `array<T>` with int/float/bool/string/color elements."),
     # Collections
     Feature("arrays", "builtins", PARTIAL, "arrays (`array.*`)",
-            "P2.2-A1 core: new_*/new<T>/from, size, get, set, push, pop, shift, unshift, first, last, copy, clear; "
-            "`array<T>` / `T[]` of int/float/bool/string/color; persistent-slot snapshots and read-only history per "
-            "P22_ARRAY_ARCHITECTURE.md. Other array functions, for...in, method syntax and nested arrays are not "
-            "implemented yet."),
+            "P2.2-A1 core: new_*/new<T>/from, size, get, set, push, pop, shift, unshift, first, last, copy, clear "
+            "(and remove, P2.2-A2); `array<T>` / `T[]` of int/float/bool/string/color; persistent-slot snapshots and "
+            "read-only history per P22_ARRAY_ARCHITECTURE.md; `for ... in` per P22_FORIN_EVIDENCE.md. Other array "
+            "functions, method syntax and nested arrays are not implemented yet."),
     Feature("matrices", "builtins", GAP, "matrices (`matrix.*`)"),
     Feature("maps", "builtins", GAP, "maps (`map.*`)"),
     # Built-in namespaces

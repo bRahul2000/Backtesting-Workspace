@@ -71,6 +71,7 @@ class VarInfo:
     type: TypeSpec | None
     function_local: bool
     is_param: bool = False
+    loop_item: bool = False      # a `for ... in` variable: read-only (TradingView CE10174)
 
 
 class Analyzer:
@@ -252,6 +253,9 @@ class Analyzer:
             return None
         if self.function_depth > 0 and not info.function_local:
             self.error(f"Cannot modify global variable `{name}` in a function.", node)
+        if info.loop_item:
+            # TradingView CE10174, observed for both `for [i, x] in` variables (q6c_i, q6c_x)
+            self.error(f'Variable "{name}" cannot be mutable: `for ... in` loop variables are read-only.', node)
         if info.is_param and info.type is not None and info.type.base.startswith("array<"):
             # TradingView CE10175, observed for an array parameter (scalar parameters: not verified, unchanged)
             self.error(f"Function arguments cannot be mutable (`{name}`).", node)
@@ -404,10 +408,31 @@ class Analyzer:
             self.expr(node.condition)
             return self.loop(node, lambda: None)
         if isinstance(node, A.ForIn):
-            self.gap("for-in", "`for ... in` loops need arrays or maps, which are not implemented yet.", node)
-            return None
+            return self.for_in(node)
         self.error(f"Unexpected `{type(node).__name__}` here.", node)
         return None
+
+    def for_in(self, node: A.ForIn) -> None:
+        """`for x in a` / `for [i, x] in a` over an array (P22_FORIN_EVIDENCE.md); maps and matrices are gaps."""
+        self.feature("for-in", node)
+        iterable = self.expr(node.iterable)
+        element = None
+        if iterable is not None:
+            if iterable.base.startswith("array<"):
+                element = TypeSpec("series", iterable.base[6:-1])
+            elif iterable.base in NUMERIC or iterable.base in ("bool", "string", "color"):
+                self.error(f"`for ... in` needs an array; `{iterable.base}` cannot be iterated.", node.iterable)
+            else:
+                self.gap("for-in", f"`for ... in` over `{iterable.base}` is not implemented yet (arrays only).", node)
+        local = self.function_depth > 0
+
+        def declare():
+            types = (TypeSpec("series", "int"), element) if len(node.names) == 2 else (element,)
+            for name, spec in zip(node.names, types):
+                if name != "_":
+                    self.declare(name, VarInfo(spec, local, loop_item=True), node)
+
+        return self.loop(node, declare)
 
     def loop(self, node, declare) -> None:
         self.loop_depth += 1

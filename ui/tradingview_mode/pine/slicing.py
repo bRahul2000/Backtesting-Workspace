@@ -64,6 +64,8 @@ def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementI
     for item in A.walk(node):
         if isinstance(item, A.TypeRef) and (item.array_suffix or item.name == "array"):
             info.arrays.append(("array type", item.line))
+        elif isinstance(item, A.ForIn):
+            info.arrays.append(("for ... in", item.line))
     if top_level and isinstance(node, A.TupleDecl):
         info.writes.update(n for n in node.names if n != "_")
     for item in A.walk(node):
@@ -94,6 +96,8 @@ def _function_globals(functions: dict, names: dict, calls: dict) -> dict[str, se
                 local.update(item.names)
             elif isinstance(item, A.ForRange):
                 local.add(item.var)
+            elif isinstance(item, A.ForIn):
+                local.update(item.names)
         info = _info(fn.body, names, calls, top_level=False)
         direct[name], callees[name] = info.reads - local, info.functions
     result = {}
@@ -110,12 +114,34 @@ def _function_globals(functions: dict, names: dict, calls: dict) -> dict[str, se
     return result
 
 
+def _function_arrays(functions: dict, names: dict, calls: dict) -> dict[str, tuple]:
+    """First array use (construct, line) in each user function, including the functions it calls."""
+    direct, callees = {}, {}
+    for name, fn in functions.items():
+        info = _info(fn, names, calls, top_level=False)
+        direct[name], callees[name] = (info.arrays[0] if info.arrays else None), info.functions
+    result = {}
+    for name in functions:
+        seen, stack = set(), [name]
+        while stack:
+            current = stack.pop()
+            if current in seen or current not in direct:
+                continue
+            seen.add(current)
+            if direct[current] is not None:
+                result[name] = direct[current]
+                break
+            stack.extend(callees[current])
+    return result
+
+
 def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, calls: dict, functions: dict,
           gap) -> dict[int, SecuritySpec]:
     """SecuritySpec per request.security() call; ``gap(message, node)`` reports what cannot be sliced."""
     body = list(script.body)
     infos = [_info(statement, names, calls) for statement in body]
     fn_globals = _function_globals(functions, names, calls)
+    fn_arrays = _function_arrays(functions, names, calls)
     specs: dict[int, SecuritySpec] = {}
     for call in calls_recorded:
         node, expr = call.node, call.expr
@@ -125,8 +151,9 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
                 f"{line}); requesting expressions over local variables is not implemented yet.", node)
             continue
         expr_info = _info(expr, names, calls, top_level=False)
-        if expr_info.arrays:
-            construct, line = expr_info.arrays[0]
+        expr_arrays = expr_info.arrays + [fn_arrays[fn] for fn in sorted(expr_info.functions) if fn in fn_arrays]
+        if expr_arrays:
+            construct, line = expr_arrays[0]
             gap(f"request.security() on line {node.line}: arrays in a requested expression are not implemented yet "
                 f"(`{construct}` on line {line}).", node)
             continue
@@ -156,6 +183,8 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
                 changed = True
         problem = None
         array_uses = [use for index in sorted(included) for use in infos[index].arrays]
+        array_uses += [fn_arrays[fn] for index in sorted(included) for fn in sorted(infos[index].functions)
+                       if fn in fn_arrays]
         if array_uses:
             construct, line = array_uses[0]
             gap(f"request.security() on line {node.line}: arrays in a requested expression are not implemented yet "
