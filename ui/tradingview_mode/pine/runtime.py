@@ -26,7 +26,7 @@ import numpy as np
 from . import ast as A
 from . import values as V
 from .errors import PineRuntimeError
-from .values import NA, Color, is_na, truthy
+from .values import NA, ArraySnapshot, Color, PineArray, is_na, truthy
 
 MISSING = object()
 MAX_LOOP_ITERATIONS = 100_000
@@ -240,6 +240,8 @@ class Runtime:
             value = self.exec_body(self.body, scope)
             if self.results is not None:
                 self.results.set(bar, value)
+            if self.program.uses_arrays:
+                self.snapshot_arrays(bar)
         except PineRuntimeError as exc:
             exc.bar_index = bar
             raise
@@ -249,6 +251,13 @@ class Runtime:
             raise PineRuntimeError("Expression nesting is too deep.", 0, bar) from None
         self.last_bar = bar
         self.executed_bars += 1
+
+    def snapshot_arrays(self, bar: int) -> None:
+        """End of an execution: every array held by a slot on this bar becomes that slot's own immutable snapshot
+        (persistent slots and history keep values, not shared objects - P22_ARRAY_ARCHITECTURE.md)."""
+        for buffer in self.buffers.values():
+            if buffer.bars and buffer.bars[-1] == bar and isinstance(buffer.values[-1], PineArray):
+                buffer.values[-1] = buffer.values[-1].snapshot()
 
     def rollback(self, bar: int) -> None:
         """Undo everything recorded on ``bar`` or later (varip series excepted)."""
@@ -303,6 +312,8 @@ class Runtime:
             buffer = self.buffers[key] = SeriesBuffer(varip=node.mode == "varip")
         if node.mode is not None and (previous := buffer.last()) is not MISSING:
             value = previous                     # var/varip: initialised once, then carried
+            if isinstance(value, ArraySnapshot):  # each slot starts the execution with its own independent array
+                value = value.materialize()
         else:
             value = self.coerce(node.type, self.eval(node.value, scope), node)
         buffer.set(self.bar, value)
@@ -432,13 +443,13 @@ class Runtime:
         if resolved is not None:
             kind, value = resolved
             if kind == "user":
-                return scope.lookup(value).back(n)
+                return _historical(scope.lookup(value).back(n), n)
             if kind == "var":
                 return value.impl(self, self.bar - n) if self.bar - n >= 0 else NA
             return value
         buffer = self.buffer((self.ctx_path, node.id))
         buffer.set(self.bar, self.eval(target, scope))
-        return buffer.back(n)
+        return _historical(buffer.back(n), n)
 
     def eval_unary(self, node: A.Unary, scope: Scope):
         value = self.eval(node.operand, scope)
@@ -499,7 +510,9 @@ class Runtime:
         site = self.site(node.id) if target.stateful else None
         try:
             return target.impl(self, site, args)
-        except PineRuntimeError:
+        except PineRuntimeError as exc:
+            if not exc.line:                        # a built-in's error: report the calling line
+                exc.line = node.line
             raise
         except (TypeError, ValueError, ZeroDivisionError, OverflowError) as exc:
             self.fail(f"`{target.name}()`: {exc}", node)
@@ -525,13 +538,22 @@ class Runtime:
 
     # -- types ---------------------------------------------------------------------------------------------
     def coerce(self, type_ref: A.TypeRef | None, value, node):
-        if type_ref is None or is_na(value):
+        if type_ref is None or is_na(value) or type_ref.array_suffix or type_ref.args or isinstance(value, PineArray):
             return value
         if type_ref.name == "float" and isinstance(value, int) and not isinstance(value, bool):
             return float(value)
         if type_ref.name == "int" and isinstance(value, float):
             self.fail("Cannot assign a float value to an `int` variable (use int()).", node)
         return value
+
+
+def _historical(value, n: int):
+    """A value read with the history operator: an array from an earlier bar is a read-only copy of its snapshot."""
+    if isinstance(value, ArraySnapshot):
+        return value.materialize(readonly=True)
+    if n > 0 and isinstance(value, PineArray):       # defensive: arrays are snapshotted at the end of each bar
+        return value.snapshot().materialize(readonly=True)
+    return value
 
 
 def float_or_na(value):

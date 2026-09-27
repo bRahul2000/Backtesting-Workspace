@@ -1,0 +1,177 @@
+//@version=6
+// Pine P2.2 parity - MANUAL OBSERVATION ORACLE: two persistent array slots explicitly re-aliased
+// (`alias := origin`) on EVERY realtime execution. Real TradingView is the oracle: no expected values, no PASS/FAIL.
+// Setup: BINANCE:BTCUSDT, 1-minute chart, while the current bar receives several realtime ticks.
+// Every value pushed is  code = bar_index * 1,000,000 + execution number  (shown as "b<bar>:<exec>").
+// Reassignment and pushes happen on realtime executions only; historical bars never touch the arrays.
+indicator("m05 live re-alias each tick oracle", overlay=true)
+
+int CAP = 300                                   // an array never exceeds this: the oldest element is dropped first
+
+varip int execs = 0
+execs += 1
+varip int tickInBar = 0
+if barstate.isnew
+    tickInBar := 0
+tickInBar += 1
+bool rt = barstate.isrealtime
+float code = bar_index * 1000000.0 + execs
+
+sz(array<float> x) =>
+    int n = -1
+    if not na(x)
+        n := array.size(x)
+    n
+lst(array<float> x) =>
+    float out = na
+    if not na(x)
+        if array.size(x) > 0
+            out := array.last(x)
+    out
+fmt(float v) => na(v) ? "-" : "b" + str.tostring(math.floor(v / 1000000.0)) + ":" + str.tostring(int(v % 1000000.0))
+s(int n) => str.tostring(n)
+pushCapped(array<float> arr, float v) =>
+    if array.size(arr) >= CAP
+        array.shift(arr)
+    array.push(arr, v)
+
+// ---- the slots under test (each pair starts as two separate arrays) ----
+var array<float> originA = array.new_float()      // A: var origin / var alias
+var array<float> aliasA = array.new_float()
+varip array<float> originB = array.new_float()    // B: varip origin / varip alias
+varip array<float> aliasB = array.new_float()
+var array<float> originC = array.new_float()      // C: var origin / varip alias
+varip array<float> aliasC = array.new_float()
+varip array<float> originD = array.new_float()    // D: varip origin / var alias
+var array<float> aliasD = array.new_float()
+
+// ---- 1. BEFORE reassignment (= what the slots hold at the start of this execution) ----
+int aO0 = sz(originA)
+int aA0 = sz(aliasA)
+int bO0 = sz(originB)
+int bA0 = sz(aliasB)
+int cO0 = sz(originC)
+int cA0 = sz(aliasC)
+int dO0 = sz(originD)
+int dA0 = sz(aliasD)
+float aOL0 = lst(originA)
+float aAL0 = lst(aliasA)
+float bOL0 = lst(originB)
+float bAL0 = lst(aliasB)
+float cOL0 = lst(originC)
+float cAL0 = lst(aliasC)
+float dOL0 = lst(originD)
+float dAL0 = lst(aliasD)
+
+// ---- 2. alias := origin, 3. read, 4. push through the alias, 5. read again (realtime only) ----
+int aO1 = aO0
+int aA1 = aA0
+int bO1 = bO0
+int bA1 = bA0
+int cO1 = cO0
+int cA1 = cA0
+int dO1 = dO0
+int dA1 = dA0
+if rt
+    aliasA := originA
+    aliasB := originB
+    aliasC := originC
+    aliasD := originD
+    aO1 := sz(originA)
+    aA1 := sz(aliasA)
+    bO1 := sz(originB)
+    bA1 := sz(aliasB)
+    cO1 := sz(originC)
+    cA1 := sz(aliasC)
+    dO1 := sz(originD)
+    dA1 := sz(aliasD)
+    pushCapped(aliasA, code)
+    pushCapped(aliasB, code)
+    pushCapped(aliasC, code)
+    pushCapped(aliasD, code)
+int aO2 = sz(originA)
+int aA2 = sz(aliasA)
+int bO2 = sz(originB)
+int bA2 = sz(aliasB)
+int cO2 = sz(originC)
+int cA2 = sz(aliasC)
+int dO2 = sz(originD)
+int dA2 = sz(aliasD)
+
+// ---- first realtime execution of the current bar: what the slots held BEFORE reassignment ----
+varip string fA = "-"
+varip string fB = "-"
+varip string fC = "-"
+varip string fD = "-"
+pair(int o, float ol, int a, float al) => "o " + s(o) + " / " + fmt(ol) + "  a " + s(a) + " / " + fmt(al)
+if rt and barstate.isnew
+    fA := pair(aO0, aOL0, aA0, aAL0)
+    fB := pair(bO0, bOL0, bA0, bAL0)
+    fC := pair(cO0, cOL0, cA0, cAL0)
+    fD := pair(dO0, dOL0, dA0, dAL0)
+
+// ---- log of the last 6 realtime executions (varip strings): per case  BEFORE o/a > after := o/a > after push o/a ----
+steps(int o0, int a0, int o1, int a1, int o2, int a2) => s(o0) + "/" + s(a0) + ">" + s(o1) + "/" + s(a1) + ">" + s(o2) + "/" + s(a2)
+varip string log1 = ""
+varip string log2 = ""
+varip string log3 = ""
+varip string log4 = ""
+varip string log5 = ""
+varip string log6 = ""
+if rt
+    log6 := log5
+    log5 := log4
+    log4 := log3
+    log3 := log2
+    log2 := log1
+    log1 := "bar " + s(bar_index) + " tick " + s(tickInBar) + " exec " + s(execs) + (barstate.isnew ? " NEW" : "") + " | A " + steps(aO0, aA0, aO1, aA1, aO2, aA2) + " | B " + steps(bO0, bA0, bO1, bA1, bO2, bA2) + " | C " + steps(cO0, cA0, cO1, cA1, cO2, cA2) + " | D " + steps(dO0, dA0, dO1, dA1, dO2, dA2)
+
+// ---- table ----
+var table t = table.new(position.top_right, 10, 16, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt, color bg) =>
+    table.cell(t, col, row, txt, text_color=color.black, bgcolor=bg, text_size=size.small)
+row(int r, string name, string decl, int o0, int a0, int o1, int a1, int o2, int a2, float ol, float al, string f) =>
+    put(0, r, name, color.white)
+    put(1, r, decl, color.white)
+    put(2, r, s(o0), color.white)
+    put(3, r, s(a0), color.white)
+    put(4, r, s(o1), color.white)
+    put(5, r, s(a1), color.white)
+    put(6, r, s(o2), color.white)
+    put(7, r, s(a2), color.white)
+    put(8, r, fmt(ol) + " / " + fmt(al), color.white)
+    put(9, r, f, color.white)
+if barstate.islast
+    put(0, 0, "m05 LIVE RE-ALIAS EACH TICK - observation only (no expected values)", color.silver)
+    table.merge_cells(t, 0, 0, 9, 0)
+    put(0, 1, "bar_index " + s(bar_index) + " · isrealtime " + (barstate.isrealtime ? "T" : "F") + " · isnew " + (barstate.isnew ? "T" : "F") + " · tick in bar " + s(tickInBar) + " · executions " + s(execs) + " · cap " + s(CAP), rt ? color.white : color.orange)
+    table.merge_cells(t, 0, 1, 9, 1)
+    put(0, 2, "case", color.silver)
+    put(1, 2, "slots", color.silver)
+    put(2, 2, "origin BEFORE :=", color.silver)
+    put(3, 2, "alias BEFORE :=", color.silver)
+    put(4, 2, "origin after :=", color.silver)
+    put(5, 2, "alias after :=", color.silver)
+    put(6, 2, "origin after push via alias", color.silver)
+    put(7, 2, "alias after push via alias", color.silver)
+    put(8, 2, "last origin / last alias (after push)", color.silver)
+    put(9, 2, "1st tick of this bar, BEFORE := (size / last)", color.silver)
+    row(3, "A", "var origin / var alias", aO0, aA0, aO1, aA1, aO2, aA2, lst(originA), lst(aliasA), fA)
+    row(4, "B", "varip origin / varip alias", bO0, bA0, bO1, bA1, bO2, bA2, lst(originB), lst(aliasB), fB)
+    row(5, "C", "var origin / varip alias", cO0, cA0, cO1, cA1, cO2, cA2, lst(originC), lst(aliasC), fC)
+    row(6, "D", "varip origin / var alias", dO0, dA0, dO1, dA1, dO2, dA2, lst(originD), lst(aliasD), fD)
+    put(0, 7, "LAST 6 REALTIME EXECUTIONS (newest first) - per case: BEFORE origin/alias > after := origin/alias > after push origin/alias", color.silver)
+    table.merge_cells(t, 0, 7, 9, 7)
+    put(0, 8, log1, color.white)
+    table.merge_cells(t, 0, 8, 9, 8)
+    put(0, 9, log2, color.white)
+    table.merge_cells(t, 0, 9, 9, 9)
+    put(0, 10, log3, color.white)
+    table.merge_cells(t, 0, 10, 9, 10)
+    put(0, 11, log4, color.white)
+    table.merge_cells(t, 0, 11, 9, 11)
+    put(0, 12, log5, color.white)
+    table.merge_cells(t, 0, 12, 9, 12)
+    put(0, 13, log6, color.white)
+    table.merge_cells(t, 0, 13, 9, 13)
+plot(close, "close", display=display.none)

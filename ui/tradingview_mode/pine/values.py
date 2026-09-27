@@ -142,3 +142,43 @@ def to_float(value):
     if is_na(value):
         return NA
     return float(value)
+
+
+# ---- arrays (P2.2-A1; see parity/P22_ARRAY_ARCHITECTURE.md) --------------------------------------------------------
+
+class PineArray:
+    """A Pine array during ONE execution: a mutable object shared by every reference (``=``, ``:=``, function
+    parameters). It never outlives the execution: persistent and history slots keep ``ArraySnapshot``s."""
+
+    __slots__ = ("items", "element", "readonly")
+
+    def __init__(self, items: list, element: str, readonly: bool = False):
+        self.items, self.element, self.readonly = items, element, readonly
+
+    def snapshot(self) -> "ArraySnapshot":
+        return ArraySnapshot(tuple(self.items), self.element)
+
+    def __repr__(self) -> str:
+        return f"array<{self.element}>{self.items!r}{' (historical)' if self.readonly else ''}"
+
+
+class ArraySnapshot:
+    """Immutable array contents stored by a persistent or history slot at the end of an execution."""
+
+    __slots__ = ("items", "element")
+
+    def __init__(self, items: tuple, element: str):
+        self.items, self.element = items, element
+
+    def materialize(self, readonly: bool = False) -> PineArray:
+        """A fresh, independent array (read-only when it was retrieved with the history operator)."""
+        return PineArray(list(self.items), self.element, readonly)
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, ArraySnapshot) and self.items == other.items and self.element == other.element
+
+    def __hash__(self) -> int:
+        return hash((self.items, self.element))
+
+    def __repr__(self) -> str:
+        return f"snapshot<{self.element}>{self.items!r}"

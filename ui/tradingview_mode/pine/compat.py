@@ -53,9 +53,14 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
             "Qualifier and type mismatches are reported where the types are known; unknown types are not rejected."),
     Feature("user-defined-types", "types", GAP, "user-defined types (`type`) and object fields"),
     Feature("enums", "types", GAP, "enums (`enum`)"),
-    Feature("generics", "types", GAP, "generic type arguments (`array.new<float>()`)"),
+    Feature("generics", "types", PARTIAL, "generic type arguments (`array.new<float>()`)",
+            "Only `array.new<T>()` and `array<T>` with int/float/bool/string/color elements."),
     # Collections
-    Feature("arrays", "builtins", GAP, "arrays (`array.*`)"),
+    Feature("arrays", "builtins", PARTIAL, "arrays (`array.*`)",
+            "P2.2-A1 core: new_*/new<T>/from, size, get, set, push, pop, shift, unshift, first, last, copy, clear; "
+            "`array<T>` / `T[]` of int/float/bool/string/color; persistent-slot snapshots and read-only history per "
+            "P22_ARRAY_ARCHITECTURE.md. Other array functions, for...in, method syntax and nested arrays are not "
+            "implemented yet."),
     Feature("matrices", "builtins", GAP, "matrices (`matrix.*`)"),
     Feature("maps", "builtins", GAP, "maps (`map.*`)"),
     # Built-in namespaces

@@ -1,0 +1,26 @@
+//@version=6
+// Pine P2.2 parity - OBSERVATION ORACLE, companion E: reassigning an array PARAMETER inside a function.
+// Separate because Pine may not allow `:=` on a parameter; if TradingView reports a compiler error, that exact
+// message IS the result. Any chart works (e.g. BINANCE:BTCUSDT 1m).
+indicator("q5e array parameter reassignment", overlay=true)
+
+reassign(array<float> prm, float val) =>
+    prm := array.new_float()
+    array.push(prm, val)
+    array.size(prm)
+
+array<float> caller = array.new_float()
+array.push(caller, 1)
+int inside = reassign(caller, 2)
+
+var table t = table.new(position.top_right, 2, 4, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int col, int row, string txt) =>
+    table.cell(t, col, row, txt, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, 0, "q5e PARAMETER REASSIGNMENT - observed")
+    table.merge_cells(t, 0, 0, 1, 0)
+    put(0, 1, "size inside the function (after prm := new, push 2)")
+    put(1, 1, str.tostring(inside))
+    put(0, 2, "caller size / last after the call (caller was [1])")
+    put(1, 2, str.tostring(array.size(caller)) + " / " + str.tostring(array.last(caller)))
+plot(close, "close", display=display.none)

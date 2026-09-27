@@ -17,7 +17,7 @@ def only(source):
 @pytest.mark.parametrize("body, line, message", [
     ("ltf = request.security_lower_tf(syminfo.tickerid, '1', close)", 3,
      "`request.security_lower_tf()` is not implemented yet (data requests)."),
-    ("a = array.new_float(0)", 3, "`array.new_float()` is not implemented yet (arrays)."),
+    ("a = array.avg(array.from(1.0, 2.0))", 3, "`array.avg()` is not implemented yet (arrays)."),
     ("l = label.new(bar_index, high, 'x')", 3, "`label.new()` is not implemented yet (drawing objects)."),
     ("type Pivot\n    float price\n    int bar", 3, "User-defined types (`type Pivot`) are not implemented yet."),
     ("method twice(float x) => x * 2", 3, "Methods (`method twice`) are not implemented yet."),

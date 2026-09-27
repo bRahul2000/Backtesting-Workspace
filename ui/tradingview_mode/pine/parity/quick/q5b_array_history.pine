@@ -1,0 +1,62 @@
+//@version=6
+// Pine P2.2 parity - HISTORICAL OBSERVATION ORACLE, companion B: the history operator on arrays (read-only).
+// Separate from q5 because history-referencing an array may be rejected by the compiler; that must not hide q5.
+// Setup: BINANCE:BTCUSDT, 1-minute chart. Pushes only on the 3 historical bars before the last bar (r0..r2).
+indicator("q5b array history [1] (historical)", overlay=true)
+
+int W = 3
+int start = last_bar_index - W
+bool inWin = not barstate.isrealtime and bar_index >= start and bar_index <= last_bar_index - 1
+int r = bar_index - start
+
+sz(array<float> x) =>
+    int n = -1
+    if not na(x)
+        n := array.size(x)
+    n
+lst(array<float> x) =>
+    float out = na
+    if not na(x)
+        if array.size(x) > 0
+            out := array.last(x)
+    out
+s(int n) => str.tostring(n)
+f(float x) => na(x) ? "-" : str.tostring(x)
+tag() => "r" + str.tostring(r) + " (bar " + str.tostring(bar_index) + "): "
+
+var array<float> h = array.new_float()           // var array: one push per window bar
+varip array<float> hp = array.new_float()        // varip array: one push per window bar
+array<float> nv = array.new_float()              // non-var: a fresh array every bar, two pushes per window bar
+if inWin
+    array.push(h, 10 + r)
+    array.push(hp, 20 + r)
+    array.push(nv, 30 + r)
+    array.push(nv, 35 + r)
+
+array<float> hPrev = h[1]
+array<float> hpPrev = hp[1]
+array<float> nvPrev = nv[1]
+
+var string sh = ""
+var string shp = ""
+var string snv = ""
+if inWin
+    sh += tag() + "size(h)=" + s(sz(h)) + " last(h)=" + f(lst(h)) + " | size(h[1])=" + s(sz(hPrev)) + " last(h[1])=" + f(lst(hPrev)) + "\n"
+    shp += tag() + "size(hp)=" + s(sz(hp)) + " last(hp)=" + f(lst(hp)) + " | size(hp[1])=" + s(sz(hpPrev)) + " last(hp[1])=" + f(lst(hpPrev)) + "\n"
+    snv += tag() + "size(nv)=" + s(sz(nv)) + " last(nv)=" + f(lst(nv)) + " | size(nv[1])=" + s(sz(nvPrev)) + " last(nv[1])=" + f(lst(nvPrev)) + "\n"
+
+var table t = table.new(position.top_right, 2, 6, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt, color bg) =>
+    table.cell(t, col, row, txt, text_color=color.black, bgcolor=bg, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, 0, "q5b ARRAY HISTORY [1] (historical) - observed values only", color.silver)
+    table.merge_cells(t, 0, 0, 1, 0)
+    put(0, 1, "window bars " + str.tostring(start) + ".." + str.tostring(last_bar_index - 1) + " · last bar " + str.tostring(last_bar_index) + " · last bar realtime " + (barstate.isrealtime ? "T" : "F"), color.white)
+    table.merge_cells(t, 0, 1, 1, 1)
+    put(0, 2, "Q4 var h, h[1]", color.white)
+    put(1, 2, sh + "LAST BAR: size(h)=" + s(sz(h)) + " size(h[1])=" + s(sz(hPrev)) + " last(h[1])=" + f(lst(hPrev)), color.white)
+    put(0, 3, "Q4 varip hp, hp[1]", color.white)
+    put(1, 3, shp + "LAST BAR: size(hp)=" + s(sz(hp)) + " size(hp[1])=" + s(sz(hpPrev)) + " last(hp[1])=" + f(lst(hpPrev)), color.white)
+    put(0, 4, "non-var nv, nv[1]", color.white)
+    put(1, 4, snv + "LAST BAR: size(nv)=" + s(sz(nv)) + " size(nv[1])=" + s(sz(nvPrev)) + " last(nv[1])=" + f(lst(nvPrev)), color.white)
+plot(close, "close", display=display.none)

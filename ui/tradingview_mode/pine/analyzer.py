@@ -63,12 +63,14 @@ class Program:
     builtins_used: dict[str, list[int]] = field(default_factory=dict)
     int_division: set[int] = field(default_factory=set)   # v5 `const int / const int` nodes (truncating)
     security: dict[int, Any] = field(default_factory=dict)  # request.security() node id -> slicing.SecuritySpec
+    uses_arrays: bool = False     # the runtime snapshots arrays at the end of each execution only when True
 
 
 @dataclass
 class VarInfo:
     type: TypeSpec | None
     function_local: bool
+    is_param: bool = False
 
 
 class Analyzer:
@@ -90,6 +92,7 @@ class Analyzer:
         self.builtins_used: dict[str, list[int]] = {}
         self.int_division: set[int] = set()
         self.security_calls: list = []
+        self.uses_arrays = False
         self.top_index: int | None = None
         self.meta: dict = {}
 
@@ -120,7 +123,7 @@ class Analyzer:
         security = slicing.build(self.script, self.security_calls, self.names, self.calls, self.functions,
                                  lambda message, node: self.gap("request", message, node))
         program = Program(self.script, self.meta, self.functions, self.calls, self.names, self.inputs, self.outputs,
-                          self.features, self.builtins_used, self.int_division, security)
+                          self.features, self.builtins_used, self.int_division, security, self.uses_arrays)
         return program, sorted(self.diagnostics, key=lambda d: (d.line, d.col))
 
     def check_version(self) -> None:
@@ -249,6 +252,9 @@ class Analyzer:
             return None
         if self.function_depth > 0 and not info.function_local:
             self.error(f"Cannot modify global variable `{name}` in a function.", node)
+        if info.is_param and info.type is not None and info.type.base.startswith("array<"):
+            # TradingView CE10175, observed for an array parameter (scalar parameters: not verified, unchanged)
+            self.error(f"Function arguments cannot be mutable (`{name}`).", node)
         if info.type is not None and value_type is not None and not self.assignable(value_type, info.type):
             self.error(f"Cannot assign a value of type `{value_type.base}` to `{name}` of type `{info.type.base}`.", node)
         self.names[node.target.id] = ("user", name)
@@ -275,7 +281,7 @@ class Analyzer:
                 if param.default is not None:
                     self.expr(param.default)
                 spec = self.type_ref(param.type) if param.type is not None else None
-                self.declare(param.name, VarInfo(spec, True), param)
+                self.declare(param.name, VarInfo(spec, True, is_param=True), param)
             for statement in node.body.body:
                 self.statement(statement)
 
@@ -288,6 +294,9 @@ class Analyzer:
         return None
 
     def type_ref(self, ref: A.TypeRef) -> TypeSpec | None:
+        array_type = self.array_type_ref(ref)
+        if array_type is not False:
+            return array_type
         name = "array" if ref.array_suffix else ref.name
         if ref.args or ref.array_suffix:
             self.gap("generics" if ref.args else "arrays", f"The type `{ref.name}{'[]' if ref.array_suffix else '<...>'}` "
@@ -301,6 +310,30 @@ class Analyzer:
             self.gap("user-defined-types", f"The type `{name}` needs user-defined types, which are not implemented yet.", ref)
             return None
         return TypeSpec(ref.qualifier or "series", name)
+
+    def array_type_ref(self, ref: A.TypeRef):
+        """`array<T>` / `T[]` for the A1 element types; False when `ref` is not an array type."""
+        if ref.array_suffix and not ref.args:
+            element = ref.name
+        elif ref.name == "array" and len(ref.args) == 1 and not ref.array_suffix:
+            inner = ref.args[0]
+            if inner.args or inner.array_suffix:
+                self.gap("arrays", "Arrays of arrays / nested collections are not implemented yet.", ref)
+                return None
+            element = inner.name
+        elif ref.name == "array":
+            self.gap("arrays", "`array` needs exactly one element type (`array<float>`).", ref)
+            return None
+        else:
+            return False
+        if element not in BASIC_TYPES:
+            feature = TYPE_GAPS.get(element, "user-defined-types")
+            self.gap(feature if feature != "arrays" else "arrays",
+                     f"Arrays of `{element}` are not implemented yet ({FEATURES[feature].description}).", ref)
+            return None
+        self.uses_arrays = True
+        self.feature("arrays", ref)
+        return TypeSpec(ref.qualifier or "series", f"array<{element}>")
 
     # -- expressions -----------------------------------------------------------------------------------------
     def expr(self, node: A.Node) -> TypeSpec | None:
@@ -400,6 +433,10 @@ class Analyzer:
         qualifier = self.max_qualifier(left, right)
         if node.op in ("and", "or"):
             return TypeSpec(qualifier, "bool")
+        if node.op in ("==", "!=") and any(t is not None and t.base.startswith("array<") for t in (left, right)):
+            self.error(f"Cannot compare arrays with `{node.op}`: array operands are not supported by this operator.",
+                       node)
+            return TypeSpec(qualifier, "bool")
         if node.op in ("==", "!=", "<", ">", "<=", ">="):
             if node.op not in ("==", "!=") and left is not None and right is not None and (
                     left.base not in NUMERIC or right.base not in NUMERIC):
@@ -497,7 +534,19 @@ class Analyzer:
             self.error(f"Recursive calls are not allowed (`{name}` calls itself).", node)
             return None
         if node.generic:
-            self.gap("generics", f"Generic calls (`{name}<...>()`) are not implemented yet.", node)
+            element = node.generic[0].name if len(node.generic) == 1 and not node.generic[0].args \
+                and not node.generic[0].array_suffix else None
+            if name == "array.new" and element in BASIC_TYPES:
+                name = f"array.new_{element}"              # array.new<float>() is array.new_float()
+            elif name == "array.new" and element is not None and element in TYPE_GAPS:
+                feature = TYPE_GAPS[element]
+                self.gap(feature, f"Arrays of `{element}` are not implemented yet ({FEATURES[feature].description}).",
+                         node)
+                for argument in node.args:
+                    self.expr(argument.value)
+                return None
+            else:
+                self.gap("generics", f"Generic calls (`{name}<...>()`) are not implemented yet.", node)
         builtin_ = FUNCTIONS.get(name)
         if builtin_ is None:
             for argument in node.args:
@@ -554,6 +603,9 @@ class Analyzer:
             self.input_def(node, builtin_, binding)
         if builtin_.note:
             self.warn(f"`{builtin_.name}`: {builtin_.note}", node)
+        if builtin_.name.startswith("array."):
+            self.uses_arrays = True
+            return self.array_result(builtin_, binding, arg_types)
         return TypeSpec.parse(builtin_.returns) if builtin_.returns not in ("void", "tuple") else None
 
     def security_call(self, node: A.Call, binding, arg_types: dict) -> TypeSpec | None:
@@ -586,6 +638,36 @@ class Analyzer:
         result = arg_types.get(id(expr))
         return TypeSpec("series", result.base) if result is not None else None
 
+    def array_result(self, builtin_: Builtin, binding, arg_types: dict) -> TypeSpec | None:
+        """Result type of an array builtin (element / same array / array.from), plus the element check."""
+        def arg_type(name):
+            node = binding.nodes.get(name)
+            return arg_types.get(id(node)) if node is not None else None
+
+        array_type = arg_type("id")
+        element = array_type.base[6:-1] if array_type is not None and array_type.base.startswith("array<") else None
+        value_type = arg_type("value")
+        if element is not None and value_type is not None and not self.assignable(value_type, TypeSpec("series", element)):
+            self.error(f"Cannot call `{builtin_.name}` with argument `value`: a `{value_type.base}` was used but the "
+                       f"array holds `{element}`.", binding.nodes["value"])
+        returns = builtin_.returns
+        if returns == "element":
+            return TypeSpec("series", element) if element is not None else None
+        if returns == "same_array":
+            return TypeSpec("series", array_type.base) if array_type is not None else None
+        if returns == "array_from":
+            types = [arg_type("value0")] + [arg_types.get(id(n)) for n in binding.extra]
+            bases = {t.base for t in types if t is not None}
+            if not bases:
+                return None
+            if bases <= NUMERIC:
+                return TypeSpec("series", "array<int>" if bases == {"int"} else "array<float>")
+            if len(bases) == 1 and next(iter(bases)) in BASIC_TYPES:
+                return TypeSpec("series", f"array<{next(iter(bases))}>")
+            self.error("`array.from()` needs values of one type.", binding.nodes.get("value0"))
+            return None
+        return TypeSpec.parse(returns) if returns not in ("void", "tuple") else None
+
     def builtin_feature(self, builtin_: Builtin) -> str:
         if builtin_.kind == "output":
             return {"plot": "plot", "plotshape": "plotshape", "plotchar": "plotchar", "hline": "hline", "fill": "fill",
@@ -610,6 +692,8 @@ class Analyzer:
             return actual.base in NUMERIC
         if expected.base == "bool":
             return actual.base in ("bool", "int", "float")
+        if expected.base == "array":                       # any array<T>
+            return actual.base.startswith("array<")
         return actual.base == expected.base
 
     def check_argument(self, builtin_: Builtin, param, arg: A.Node, actual: TypeSpec | None) -> None:

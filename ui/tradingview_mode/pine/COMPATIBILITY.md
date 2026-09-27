@@ -5,7 +5,7 @@ built-in registries; a test fails if this file is out of date. Compatibility is 
 feature. **No claim of full Pine compatibility is made**: a script runs only if every feature it
 uses is supported, and otherwise fails with the exact feature and line.
 
-Features: 23 supported, 10 partial, 15 not yet implemented. Built-ins: 142 functions, 60 variables, 87 constants.
+Features: 23 supported, 12 partial, 13 not yet implemented. Built-ins: 159 functions, 60 variables, 87 constants.
 
 ## parser
 
@@ -44,13 +44,13 @@ Features: 23 supported, 10 partial, 15 not yet implemented. Built-ins: 142 funct
 | int/float/bool/string/color with const/input/simple/series qualifiers | partial | Qualifier and type mismatches are reported where the types are known; unknown types are not rejected. |
 | user-defined types (`type`) and object fields | gap |  |
 | enums (`enum`) | gap |  |
-| generic type arguments (`array.new<float>()`) | gap |  |
+| generic type arguments (`array.new<float>()`) | partial | Only `array.new<T>()` and `array<T>` with int/float/bool/string/color elements. |
 
 ## builtins
 
 | feature | status | notes |
 |---|---|---|
-| arrays (`array.*`) | gap |  |
+| arrays (`array.*`) | partial | P2.2-A1 core: new_*/new<T>/from, size, get, set, push, pop, shift, unshift, first, last, copy, clear; `array<T>` / `T[]` of int/float/bool/string/color; persistent-slot snapshots and read-only history per P22_ARRAY_ARCHITECTURE.md. Other array functions, for...in, method syntax and nested arrays are not implemented yet. |
 | matrices (`matrix.*`) | gap |  |
 | maps (`map.*`) | gap |  |
 | technical-analysis built-ins (`ta.*`) | partial | See the built-in coverage list. |
@@ -100,7 +100,7 @@ Features: 23 supported, 10 partial, 15 not yet implemented. Built-ins: 142 funct
 | namespace | implemented / known | not implemented yet |
 |---|---|---|
 | `(global)` | 44 / 56 | `box`, `label`, `library`, `line`, `linefill`, `plotarrow`, `plotbar`, `plotcandle`, `polyline`, `strategy`, `table`, `time_tradingday` |
-| `array` | 0 / 55 | `array.abs`, `array.avg`, `array.binary_search`, `array.binary_search_leftmost`, `array.binary_search_rightmost`, `array.clear`, `array.concat`, `array.copy`, `array.covariance`, `array.every`, `array.fill`, `array.first` … (+43) |
+| `array` | 17 / 55 | `array.abs`, `array.avg`, `array.binary_search`, `array.binary_search_leftmost`, `array.binary_search_rightmost`, `array.concat`, `array.covariance`, `array.every`, `array.fill`, `array.includes`, `array.indexof`, `array.insert` … (+26) |
 | `barstate` | 7 / 7 |  |
 | `box` | 0 / 29 | `box.copy`, `box.delete`, `box.get_bottom`, `box.get_left`, `box.get_right`, `box.get_top`, `box.new`, `box.set_bgcolor`, `box.set_border_color`, `box.set_border_style`, `box.set_border_width`, `box.set_bottom` … (+17) |
 | `chart` | 0 / 11 | `chart.bg_color`, `chart.fg_color`, `chart.is_heikinashi`, `chart.is_kagi`, `chart.is_linebreak`, `chart.is_pnf`, `chart.is_range`, `chart.is_renko`, `chart.is_standard`, `chart.left_visible_bar_time`, `chart.right_visible_bar_time` |

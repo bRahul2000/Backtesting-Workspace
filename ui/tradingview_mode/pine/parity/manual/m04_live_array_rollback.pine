@@ -1,0 +1,181 @@
+//@version=6
+// Pine P2.2 parity - MANUAL OBSERVATION ORACLE: realtime array / alias rollback on REAL TradingView.
+// Add to a liquid symbol on the 1-minute chart while the market is live (e.g. BINANCE:BTCUSDT 1m) and watch
+// the table for a few realtime ticks, then across the start of the next bar. Nothing here asserts a result:
+// TradingView's visible behaviour IS the result.
+//
+// Every value pushed is  code = bar_index * 1,000,000 + execution number  (shown as "b<bar>:<exec>"), so the
+// size and last element of each array show exactly which executions' pushes survived.
+// Pushes happen on realtime executions only; historical bars never touch the arrays.
+indicator("m04 live array rollback oracle", overlay=true)
+
+int CAP = 300                                  // arrays never exceed this: the oldest element is dropped first
+
+// ---- execution identifiers (varip scalars: they count every execution, including repeated ticks) ----
+varip int execs = 0
+execs += 1
+varip int tickInBar = 0
+if barstate.isnew
+    tickInBar := 0
+tickInBar += 1
+bool rt = barstate.isrealtime
+float code = bar_index * 1000000.0 + execs
+
+fmt(float v) => na(v) ? "-" : "b" + str.tostring(math.floor(v / 1000000.0)) + ":" + str.tostring(int(v % 1000000.0))
+
+// size (-1 = the variable is na), last element, number of elements pushed during the current bar
+stats(array<float> arr) =>
+    int n = -1
+    float last = na
+    int here = 0
+    if not na(arr)
+        n := array.size(arr)
+        if n > 0
+            last := array.last(arr)
+            for x in arr
+                if math.floor(x / 1000000.0) == bar_index
+                    here += 1
+    [n, last, here]
+
+pushCapped(array<float> arr, float v) =>
+    if array.size(arr) >= CAP
+        array.shift(arr)
+    array.push(arr, v)
+
+// ---- the objects under test ----
+// A: var array, mutated through itself
+var array<float> a = array.new_float()
+// B: varip array, mutated through itself
+varip array<float> b = array.new_float()
+// C: one object created by a VARIP declaration; a VAR variable refers to the SAME object; mutated through the VAR alias
+varip array<float> cOrigin = array.new_float()
+var array<float> cAlias = cOrigin
+// D: one object created by a VAR declaration; a VARIP variable refers to the SAME object; mutated through the VARIP alias
+var array<float> dOrigin = array.new_float()
+varip array<float> dAlias = dOrigin
+// E: a NEW array created on every realtime execution, pushed once, and stored into a varip variable
+varip array<float> e = array.new_float()
+// E2: an array created on the first realtime execution that finds the varip variable na, then pushed every execution
+varip array<float> e2 = na
+
+// ---- BEFORE this execution's mutations (= what survived from the previous execution) ----
+[aN0, aL0, aH0] = stats(a)
+[bN0, bL0, bH0] = stats(b)
+[coN0, coL0, coH0] = stats(cOrigin)
+[caN0, caL0, caH0] = stats(cAlias)
+[doN0, doL0, doH0] = stats(dOrigin)
+[daN0, daL0, daH0] = stats(dAlias)
+[eN0, eL0, eH0] = stats(e)
+[e2N0, e2L0, e2H0] = stats(e2)
+
+// ---- mutations (realtime executions only) ----
+bool e2Created = false
+if rt
+    pushCapped(a, code)
+    pushCapped(b, code)
+    pushCapped(cAlias, code)
+    pushCapped(dAlias, code)
+    array<float> fresh = array.new_float()
+    array.push(fresh, code)
+    e := fresh
+    if na(e2)
+        e2 := array.new_float()
+        e2Created := true
+    pushCapped(e2, code)
+
+// ---- AFTER this execution's mutations ----
+[aN1, aL1, aH1] = stats(a)
+[bN1, bL1, bH1] = stats(b)
+[coN1, coL1, coH1] = stats(cOrigin)
+[caN1, caL1, caH1] = stats(cAlias)
+[doN1, doL1, doH1] = stats(dOrigin)
+[daN1, daL1, daH1] = stats(dAlias)
+[eN1, eL1, eH1] = stats(e)
+[e2N1, e2L1, e2H1] = stats(e2)
+
+// ---- F: what each variable showed at the FIRST realtime execution of the current bar (before pushing) ----
+varip string fA = "-"
+varip string fB = "-"
+varip string fCo = "-"
+varip string fCa = "-"
+varip string fDo = "-"
+varip string fDa = "-"
+varip string fE = "-"
+varip string fE2 = "-"
+cell(int n, float last) => str.tostring(n) + " / " + fmt(last)
+if rt and barstate.isnew
+    fA := cell(aN0, aL0)
+    fB := cell(bN0, bL0)
+    fCo := cell(coN0, coL0)
+    fCa := cell(caN0, caL0)
+    fDo := cell(doN0, doL0)
+    fDa := cell(daN0, daL0)
+    fE := cell(eN0, eL0)
+    fE2 := cell(e2N0, e2L0)
+
+// ---- tick log: the last 6 realtime executions (varip strings; no arrays involved) ----
+varip string log1 = ""
+varip string log2 = ""
+varip string log3 = ""
+varip string log4 = ""
+varip string log5 = ""
+varip string log6 = ""
+if rt
+    log6 := log5
+    log5 := log4
+    log4 := log3
+    log3 := log2
+    log2 := log1
+    log1 := "bar " + str.tostring(bar_index) + " tick " + str.tostring(tickInBar) + " exec " + str.tostring(execs) + (barstate.isnew ? " NEW" : "") + " | A " + str.tostring(aN0) + ">" + str.tostring(aN1) + " | B " + str.tostring(bN0) + ">" + str.tostring(bN1) + " | Co " + str.tostring(coN0) + ">" + str.tostring(coN1) + " Ca " + str.tostring(caN0) + ">" + str.tostring(caN1) + " | Do " + str.tostring(doN0) + ">" + str.tostring(doN1) + " Da " + str.tostring(daN0) + ">" + str.tostring(daN1) + " | E " + fmt(eL0) + ">" + fmt(eL1) + " | E2 " + str.tostring(e2N0) + ">" + str.tostring(e2N1) + (e2Created ? " (E2 created)" : "")
+
+// ---- table ----
+var table t = table.new(position.top_right, 8, 20, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt, color bg) =>
+    table.cell(t, col, row, txt, text_color=color.black, bgcolor=bg, text_size=size.small)
+row(int r, string name, string how, int n0, float l0, int n1, float l1, int h1, string f) =>
+    put(0, r, name, color.white)
+    put(1, r, how, color.white)
+    put(2, r, str.tostring(n0), color.white)
+    put(3, r, fmt(l0), color.white)
+    put(4, r, str.tostring(n1), color.white)
+    put(5, r, fmt(l1), color.white)
+    put(6, r, str.tostring(h1), color.white)
+    put(7, r, f, color.white)
+if barstate.islast
+    put(0, 0, "m04 LIVE ARRAY ROLLBACK - observation only (no expected values)", color.silver)
+    table.merge_cells(t, 0, 0, 7, 0)
+    put(0, 1, "bar_index " + str.tostring(bar_index) + " · isrealtime " + (barstate.isrealtime ? "T" : "F") + " · isnew " + (barstate.isnew ? "T" : "F") + " · tick in bar " + str.tostring(tickInBar) + " · executions " + str.tostring(execs) + " · cap " + str.tostring(CAP), rt ? color.white : color.orange)
+    table.merge_cells(t, 0, 1, 7, 1)
+    put(0, 2, "case", color.silver)
+    put(1, 2, "variable (how the object is reached)", color.silver)
+    put(2, 2, "size BEFORE", color.silver)
+    put(3, 2, "last BEFORE", color.silver)
+    put(4, 2, "size AFTER", color.silver)
+    put(5, 2, "last AFTER", color.silver)
+    put(6, 2, "this-bar elems AFTER", color.silver)
+    put(7, 2, "F: at bar's 1st tick (size / last)", color.silver)
+    row(3, "A", "var a (mutated via a)", aN0, aL0, aN1, aL1, aH1, fA)
+    row(4, "B", "varip b (mutated via b)", bN0, bL0, bN1, bL1, bH1, fB)
+    row(5, "C", "varip cOrigin (read only)", coN0, coL0, coN1, coL1, coH1, fCo)
+    row(6, "C", "var cAlias = cOrigin (mutated via cAlias)", caN0, caL0, caN1, caL1, caH1, fCa)
+    row(7, "D", "var dOrigin (read only)", doN0, doL0, doN1, doL1, doH1, fDo)
+    row(8, "D", "varip dAlias = dOrigin (mutated via dAlias)", daN0, daL0, daN1, daL1, daH1, fDa)
+    row(9, "E", "varip e := new array each exec (1 push)", eN0, eL0, eN1, eL1, eH1, fE)
+    row(10, "E2", "varip e2 created when na, pushed each exec", e2N0, e2L0, e2N1, e2L1, e2H1, fE2)
+    put(0, 11, "E2 created on this execution: " + (e2Created ? "YES" : "no"), color.white)
+    table.merge_cells(t, 0, 11, 7, 11)
+    put(0, 12, "LAST 6 REALTIME EXECUTIONS (newest first; sizes BEFORE>AFTER; E shows last element BEFORE>AFTER)", color.silver)
+    table.merge_cells(t, 0, 12, 7, 12)
+    put(0, 13, log1, color.white)
+    table.merge_cells(t, 0, 13, 7, 13)
+    put(0, 14, log2, color.white)
+    table.merge_cells(t, 0, 14, 7, 14)
+    put(0, 15, log3, color.white)
+    table.merge_cells(t, 0, 15, 7, 15)
+    put(0, 16, log4, color.white)
+    table.merge_cells(t, 0, 16, 7, 16)
+    put(0, 17, log5, color.white)
+    table.merge_cells(t, 0, 17, 7, 17)
+    put(0, 18, log6, color.white)
+    table.merge_cells(t, 0, 18, 7, 18)
+plot(close, "close", display=display.none)

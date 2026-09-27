@@ -1,0 +1,168 @@
+//@version=6
+// Pine P2.2 parity - HISTORICAL OBSERVATION ORACLE: array references, persistent slots, same-execution aliasing,
+// function-local var arrays, function-parameter mutation, array.copy. Real TradingView is the oracle: the table
+// shows observed values only (no expected values, no PASS/FAIL).
+// Setup: BINANCE:BTCUSDT, 1-minute chart. Mutations happen ONLY on the 3 historical bars just before the last bar
+// (window rows r0, r1, r2); realtime executions never mutate anything.
+// History-operator, history-mutation, equality and parameter-reassignment questions are in companion scripts
+// (q5b / q5c / q5d / q5e) so that a compile or runtime error there cannot hide these results.
+indicator("q5 array reference (historical)", overlay=true)
+
+int W = 3
+int start = last_bar_index - W
+bool inWin = not barstate.isrealtime and bar_index >= start and bar_index <= last_bar_index - 1
+int r = bar_index - start                                   // 0, 1, 2 inside the window
+
+sz(array<float> x) =>
+    int n = -1
+    if not na(x)
+        n := array.size(x)
+    n
+lst(array<float> x) =>
+    float out = na
+    if not na(x)
+        if array.size(x) > 0
+            out := array.last(x)
+    out
+s(int n) => str.tostring(n)
+f(float x) => na(x) ? "-" : str.tostring(x)
+tag() => "r" + str.tostring(r) + " (bar " + str.tostring(bar_index) + "): "
+
+// ---- Q1: persistent aliases across historical bars; mutate ONLY the alias ----
+var array<float> q1o = array.new_float()          // Q1a: var origin
+var array<float> q1a = q1o                        //      var alias
+varip array<float> q1bo = array.new_float()       // Q1b: varip origin
+var array<float> q1ba = q1bo                      //      var alias
+var array<float> q1co = array.new_float()         // Q1c: var origin
+varip array<float> q1ca = q1co                    //      varip alias
+var string s1a = ""
+var string s1b = ""
+var string s1c = ""
+if inWin
+    int o0 = sz(q1o)
+    int a0 = sz(q1a)
+    array.push(q1a, 10 + r)
+    s1a += tag() + "BEFORE origin=" + s(o0) + " alias=" + s(a0) + " | AFTER push via alias: origin=" + s(sz(q1o)) + " alias=" + s(sz(q1a)) + " last(origin)=" + f(lst(q1o)) + "\n"
+    int bo0 = sz(q1bo)
+    int ba0 = sz(q1ba)
+    array.push(q1ba, 20 + r)
+    s1b += tag() + "BEFORE origin=" + s(bo0) + " alias=" + s(ba0) + " | AFTER push via alias: origin=" + s(sz(q1bo)) + " alias=" + s(sz(q1ba)) + " last(origin)=" + f(lst(q1bo)) + "\n"
+    int co0 = sz(q1co)
+    int ca0 = sz(q1ca)
+    array.push(q1ca, 30 + r)
+    s1c += tag() + "BEFORE origin=" + s(co0) + " alias=" + s(ca0) + " | AFTER push via alias: origin=" + s(sz(q1co)) + " alias=" + s(sz(q1ca)) + " last(origin)=" + f(lst(q1co)) + "\n"
+
+// ---- Q2: same-execution local alias (declaration) ----
+var array<float> q2a = array.new_float()
+var string s2 = ""
+if inWin and r == 0
+    array<float> x = q2a
+    array.push(x, 41)
+    s2 := "persistent a, local x = a, push via x: size(x)=" + s(sz(x)) + " size(a)=" + s(sz(q2a)) + " last(x)=" + f(lst(x)) + " last(a)=" + f(lst(q2a))
+    array<float> base = array.new_float()
+    array<float> y = base
+    array.push(y, 42)
+    s2 += "\nfresh local base, y = base, push via y: size(y)=" + s(sz(y)) + " size(base)=" + s(sz(base)) + " last(base)=" + f(lst(base))
+
+// ---- Q2b: reassignment alias (:=), same execution and next bars ----
+var array<float> q2bA = array.new_float()
+var array<float> q2bB = array.new_float()
+var string s2b = ""
+if inWin
+    if r == 0
+        q2bB := q2bA
+    int A0 = sz(q2bA)
+    int B0 = sz(q2bB)
+    array.push(q2bB, 50 + r)
+    s2b += tag() + (r == 0 ? "B := A, then " : "") + "push via B | BEFORE A=" + s(A0) + " B=" + s(B0) + " | AFTER A=" + s(sz(q2bA)) + " B=" + s(sz(q2bB)) + " last(A)=" + f(lst(q2bA)) + " last(B)=" + f(lst(q2bB)) + "\n"
+    if r == 0
+        array<float> p = array.new_float()
+        array<float> q = array.new_float()
+        q := p
+        array.push(q, 55)
+        s2b += "   fresh locals: q := p, push via q: size(p)=" + s(sz(p)) + " size(q)=" + s(sz(q)) + " last(p)=" + f(lst(p)) + "\n"
+
+// ---- Q7: function-local var array, two call sites ----
+f7(bool doPush, float val) =>
+    var array<float> localArr = array.new_float()
+    if doPush
+        array.push(localArr, val)
+    [sz(localArr), lst(localArr)]
+[n7a, l7a] = f7(inWin, 70 + r)
+[n7b, l7b] = f7(inWin, 80 + r)
+var string s7 = ""
+if inWin
+    s7 += tag() + "call site 1: size=" + s(n7a) + " last=" + f(l7a) + " | call site 2: size=" + s(n7b) + " last=" + f(l7b) + "\n"
+
+// ---- Q8: function parameter mutation (push) ----
+pushInto(array<float> prm, float val) =>
+    array.push(prm, val)
+    sz(prm)
+var array<float> q8v = array.new_float()
+var string s8 = ""
+if inWin
+    int inside = pushInto(q8v, 90 + r)
+    s8 += tag() + "persistent caller array: size inside=" + s(inside) + " caller size after=" + s(sz(q8v)) + " caller last=" + f(lst(q8v)) + "\n"
+    if r == 0
+        array<float> q8 = array.new_float()
+        int inside2 = pushInto(q8, 99)
+        s8 += "   fresh local caller array: size inside=" + s(inside2) + " caller size after=" + s(sz(q8)) + " caller last=" + f(lst(q8)) + "\n"
+
+// ---- Q9: array.copy versus direct alias ----
+var array<float> q9a = array.new_float()
+var array<float> q9d = q9a
+var array<float> q9c = array.copy(q9a)
+var string s9 = ""
+if inWin
+    int a9 = sz(q9a)
+    int d9 = sz(q9d)
+    int c9 = sz(q9c)
+    array.push(q9d, 110 + r)
+    array.push(q9c, 120 + r)
+    s9 += tag() + "BEFORE a=" + s(a9) + " direct=" + s(d9) + " copied=" + s(c9) + " | AFTER push via direct & via copied: a=" + s(sz(q9a)) + " direct=" + s(sz(q9d)) + " copied=" + s(sz(q9c)) + " last(a)=" + f(lst(q9a)) + "\n"
+    if r == 0
+        array<float> fa = array.new_float()
+        array.push(fa, 1)
+        array<float> fd = fa
+        array<float> fc = array.copy(fa)
+        array.push(fd, 111)
+        array.push(fc, 121)
+        s9 += "   fresh locals (same execution): a=[1], d = a, c = copy(a), push via d & c: size(a)=" + s(sz(fa)) + " size(d)=" + s(sz(fd)) + " size(c)=" + s(sz(fc)) + " last(a)=" + f(lst(fa)) + " last(c)=" + f(lst(fc)) + "\n"
+
+// ---- non-var baseline (inside one bar; history of non-var arrays is in q5b) ----
+array<float> nv = array.new_float()
+var string s0 = ""
+if inWin
+    array.push(nv, 130 + r)
+    array<float> nvAlias = nv
+    array.push(nvAlias, 140 + r)
+    s0 += tag() + "fresh non-var nv, push, nvAlias = nv, push via alias: size(nv)=" + s(sz(nv)) + " last(nv)=" + f(lst(nv)) + "\n"
+
+// ---- table (last bar) ----
+var table t = table.new(position.top_right, 2, 12, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt, color bg) =>
+    table.cell(t, col, row, txt, text_color=color.black, bgcolor=bg, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, 0, "q5 ARRAY REFERENCES (historical) - observed values only", color.silver)
+    table.merge_cells(t, 0, 0, 1, 0)
+    put(0, 1, "window bars " + str.tostring(start) + ".." + str.tostring(last_bar_index - 1) + " · last bar " + str.tostring(last_bar_index) + " · last bar realtime " + (barstate.isrealtime ? "T" : "F") + " · chart " + syminfo.tickerid + " " + timeframe.period, color.white)
+    table.merge_cells(t, 0, 1, 1, 1)
+    put(0, 2, "Q1a var origin / var alias", color.white)
+    put(1, 2, s1a + "LAST BAR (no push): origin=" + s(sz(q1o)) + " alias=" + s(sz(q1a)), color.white)
+    put(0, 3, "Q1b varip origin / var alias", color.white)
+    put(1, 3, s1b + "LAST BAR (no push): origin=" + s(sz(q1bo)) + " alias=" + s(sz(q1ba)), color.white)
+    put(0, 4, "Q1c var origin / varip alias", color.white)
+    put(1, 4, s1c + "LAST BAR (no push): origin=" + s(sz(q1co)) + " alias=" + s(sz(q1ca)), color.white)
+    put(0, 5, "Q2 local alias (same execution)", color.white)
+    put(1, 5, s2, color.white)
+    put(0, 6, "Q2b reassignment alias", color.white)
+    put(1, 6, s2b + "LAST BAR (no push): A=" + s(sz(q2bA)) + " B=" + s(sz(q2bB)), color.white)
+    put(0, 7, "Q7 function-local var array", color.white)
+    put(1, 7, s7 + "LAST BAR (no push): site1=" + s(n7a) + " site2=" + s(n7b), color.white)
+    put(0, 8, "Q8 function parameter push", color.white)
+    put(1, 8, s8, color.white)
+    put(0, 9, "Q9 copy vs direct alias", color.white)
+    put(1, 9, s9 + "LAST BAR (no push): a=" + s(sz(q9a)) + " direct=" + s(sz(q9d)) + " copied=" + s(sz(q9c)), color.white)
+    put(0, 10, "non-var baseline (in-bar alias)", color.white)
+    put(1, 10, s0, color.white)
+plot(close, "close", display=display.none)

@@ -54,12 +54,16 @@ class _StatementInfo:
     writes: set = field(default_factory=set)
     functions: set = field(default_factory=set)
     effects: list = field(default_factory=list)       # (construct, line)
+    arrays: list = field(default_factory=list)        # (construct, line): arrays stay out of security slices
 
 
 def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementInfo:
     info = _StatementInfo()
     if top_level and isinstance(node, A.VarDecl):
         info.writes.add(node.name)
+    for item in A.walk(node):
+        if isinstance(item, A.TypeRef) and (item.array_suffix or item.name == "array"):
+            info.arrays.append(("array type", item.line))
     if top_level and isinstance(node, A.TupleDecl):
         info.writes.update(n for n in node.names if n != "_")
     for item in A.walk(node):
@@ -73,6 +77,8 @@ def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementI
                 info.functions.add(target.name)
             elif target.kind == "output" or target.name in SIDE_EFFECTS or target.name.startswith("log."):
                 info.effects.append((f"{target.name}()", item.line))
+            if kind == "builtin" and target.name.startswith("array."):
+                info.arrays.append((f"{target.name}()", item.line))
     return info
 
 
@@ -119,6 +125,11 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
                 f"{line}); requesting expressions over local variables is not implemented yet.", node)
             continue
         expr_info = _info(expr, names, calls, top_level=False)
+        if expr_info.arrays:
+            construct, line = expr_info.arrays[0]
+            gap(f"request.security() on line {node.line}: arrays in a requested expression are not implemented yet "
+                f"(`{construct}` on line {line}).", node)
+            continue
         need = set(expr_info.reads)
         for fn in expr_info.functions:
             need |= fn_globals.get(fn, set())
@@ -144,6 +155,12 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
                     need |= fn_globals.get(fn, set())
                 changed = True
         problem = None
+        array_uses = [use for index in sorted(included) for use in infos[index].arrays]
+        if array_uses:
+            construct, line = array_uses[0]
+            gap(f"request.security() on line {node.line}: arrays in a requested expression are not implemented yet "
+                f"(`{construct}` on line {line}).", node)
+            continue
         for index in range(position, len(body)):
             late = infos[index].writes & need
             if late:
