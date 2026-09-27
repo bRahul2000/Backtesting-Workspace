@@ -25,6 +25,8 @@ def test_pine_editor_with_real_clicks(app):
     failures = [r for r in results if not r["ok"]]
     assert results and not failures, json.dumps(failures, indent=1) + completed.stderr[-2000:]
     names = {r["name"] for r in results}
-    assert {"script on chart", "second script on its own pane", "gap names request.security() and its line",
-            "undeclared identifier reported", "input edit re-runs the script", "replay: pine output ends at the cursor",
+    assert {"script on chart", "second script on its own pane", "gap names request.security_lower_tf() and its line",
+            "undeclared identifier reported", "input edit re-runs the script",
+            "request.security: one requested context with same-source provenance",
+            "replay: request.security output ends at the cursor", "replay: pine output ends at the cursor",
             "live: only the forming bar is re-executed per poll"} <= names

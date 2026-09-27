@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import ast as A
-from . import catalog
+from . import catalog, slicing
 from .compat import FEATURES, feature_for_builtin
 from .errors import ERROR, GAP, WARNING, Diagnostic
 from .registry import CONSTANTS, FUNCTIONS, QUALIFIER_RANK, VARIABLES, Builtin, TypeSpec, bind, load_all
@@ -62,6 +62,7 @@ class Program:
     features: dict[str, list[int]] = field(default_factory=dict)
     builtins_used: dict[str, list[int]] = field(default_factory=dict)
     int_division: set[int] = field(default_factory=set)   # v5 `const int / const int` nodes (truncating)
+    security: dict[int, Any] = field(default_factory=dict)  # request.security() node id -> slicing.SecuritySpec
 
 
 @dataclass
@@ -88,6 +89,8 @@ class Analyzer:
         self.features: dict[str, list[int]] = {}
         self.builtins_used: dict[str, list[int]] = {}
         self.int_division: set[int] = set()
+        self.security_calls: list = []
+        self.top_index: int | None = None
         self.meta: dict = {}
 
     # -- diagnostics --------------------------------------------------------------------------------
@@ -110,10 +113,14 @@ class Analyzer:
     def analyze(self) -> tuple[Program, list[Diagnostic]]:
         self.check_version()
         self.check_declaration()
-        for statement in self.script.body:
+        for index, statement in enumerate(self.script.body):
+            self.top_index = index
             self.statement(statement)
+        self.top_index = None
+        security = slicing.build(self.script, self.security_calls, self.names, self.calls, self.functions,
+                                 lambda message, node: self.gap("request", message, node))
         program = Program(self.script, self.meta, self.functions, self.calls, self.names, self.inputs, self.outputs,
-                          self.features, self.builtins_used, self.int_division)
+                          self.features, self.builtins_used, self.int_division, security)
         return program, sorted(self.diagnostics, key=lambda d: (d.line, d.col))
 
     def check_version(self) -> None:
@@ -539,6 +546,8 @@ class Analyzer:
             if arg is not None:
                 self.check_argument(builtin_, param, arg, arg_types.get(id(arg)))
         self.calls[node.id] = ("builtin", builtin_, binding)
+        if builtin_.kind == "security":
+            return self.security_call(node, binding, arg_types)
         if builtin_.kind == "output":
             self.outputs.append(node.id)
         elif builtin_.kind == "input":
@@ -546,6 +555,36 @@ class Analyzer:
         if builtin_.note:
             self.warn(f"`{builtin_.name}`: {builtin_.note}", node)
         return TypeSpec.parse(builtin_.returns) if builtin_.returns not in ("void", "tuple") else None
+
+    def security_call(self, node: A.Call, binding, arg_types: dict) -> TypeSpec | None:
+        """request.security(): record the call for slicing; validate literal timeframes now."""
+        from .security import LIMIT, SecurityDataError, parse_timeframe
+
+        expr = binding.nodes.get("expression")
+        local = []
+        for item in A.walk(expr):
+            if isinstance(item, A.Name) and self.names.get(item.id, (None,))[0] == "user":
+                info, depth = self.lookup(item.name)
+                if info is not None and depth != 0:
+                    local.append((item.name, item.line))
+
+        def literal(name):
+            value = binding.nodes.get(name)
+            return value.value if isinstance(value, A.Literal) and value.kind == "string" else None
+
+        timeframe = literal("timeframe")
+        if timeframe is not None and timeframe != "":
+            try:
+                parse_timeframe(timeframe)
+            except SecurityDataError as exc:
+                if exc.message.startswith(LIMIT):
+                    self.gap("request", f"request.security(): {exc.message}", binding.nodes["timeframe"])
+                else:
+                    self.error(f"request.security(): {exc.message}", binding.nodes["timeframe"])
+        self.security_calls.append(slicing.SecurityCall(node, expr, self.top_index, self.function_depth > 0, local,
+                                                        literal("symbol"), timeframe))
+        result = arg_types.get(id(expr))
+        return TypeSpec("series", result.base) if result is not None else None
 
     def builtin_feature(self, builtin_: Builtin) -> str:
         if builtin_.kind == "output":

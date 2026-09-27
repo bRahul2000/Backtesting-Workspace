@@ -143,7 +143,7 @@ async function main() {
   check("load gap example", (await evaluate(`__tv.example("Uses unimplemented features")`)) > 50);
   await click("Compile gap example", ".pine-compile"); await settle();
   const problems = await evaluate("__tv.problems()");
-  check("gap names request.security() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 3 `request.security()` is not implemented yet (data requests)."), JSON.stringify(problems));
+  check("gap names request.security_lower_tf() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 3 `request.security_lower_tf()` is not implemented yet (data requests)."), JSON.stringify(problems));
   check("gap names label.new() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 6 `label.new()` is not implemented yet (drawing objects)."), JSON.stringify(problems));
   check("no 'unsupported indicator' wording", problems.every((t) => !/indicator unsupported/i.test(t)));
   await click("Try adding gap example", ".pine-add"); await settle();
@@ -171,6 +171,19 @@ async function main() {
   await evaluate(`__tv.doc().querySelector(".pine-script[data-script='pine-2'] input[type=checkbox]").click()`); await settle();
   check("re-shown script comes back", await waitFor(`__tv.pine().length === 1`, 15000));
 
+  // 6b. request.security(): a higher-timeframe context, with its provenance in the script row.
+  await evaluate(`__tv.setText("//@version=6\\nindicator('HTF close', overlay=true)\\nplot(request.security(syminfo.tickerid, '60', close), 'H1 close')\\n")`);
+  await click("Add HTF script", ".pine-add"); await settle();
+  check("request.security script on chart", await waitFor(`__tv.pine().length === 2`, 15000), JSON.stringify(await pine()));
+  await click("On chart tab", ".pine-tab", "On chart");
+  const htfMeta = await evaluate(`__tv.text(".pine-script[data-script='pine-3'] .pine-script-meta")`);
+  const htfTitle = await evaluate(`__tv.doc().querySelector(".pine-script[data-script='pine-3'] .pine-script-meta").title`);
+  // The chart's own dataset family serves the request (the default chart is the legacy Bitstamp 15m dataset,
+  // so H1 is aggregated from it; an Exness chart would use the native Exness H1 file).
+  check("request.security: one requested context with same-source provenance",
+    /· 1 requested context$/.test(htfMeta || "") && / 60 · (Bitstamp · aggregated from 15m|Exness MT5 · native) · /.test(htfTitle || ""),
+    `${htfMeta} | ${htfTitle}`);
+
   // 7. Replay: scripts run on revealed bars only.
   await click("Replay", ".mode-btn", "Replay"); await sleep(400);
   await evaluate(`(() => { const i = __tv.doc().querySelector('.popover input[type=date]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '2026-06-10'); i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
@@ -181,6 +194,7 @@ async function main() {
   await click("Next bar", ".replay-bar .rp-btn", "▶︎|"); await settle();
   const next = await evaluate("__tv.lastBar()");
   check("replay step: pine advances with the cursor", next > last && (await pine())[0].plots[0].last.time === next, JSON.stringify({ next, pine: (await pine())[0].plots[0].last }));
+  check("replay: request.security output ends at the cursor", (await pine())[1].plots[0].last.time === next, JSON.stringify((await pine())[1]));
   await click("Exit Replay", ".replay-bar .rp-btn", "✕ Exit"); await settle();
   check("historical again", (await evaluate("__tv.box('.mode-btn', 'Historical')")).active);
 
@@ -189,7 +203,7 @@ async function main() {
     await click("Live", ".mode-btn", "Live"); await settle();
     await click("Go Live", ".go-live"); await settle();
     check("live: LIVE", await waitFor(`__tv.text('.live-state') === 'LIVE'`, 40000), await evaluate("__tv.text('.live-bar')"));
-    check("live: script runs on the live bars", await waitFor(`__tv.pine().length === 1 && __tv.pine()[0].plots[0].n > 1000`, 20000), JSON.stringify(await pine()));
+    check("live: script runs on the live bars", await waitFor(`__tv.pine().length === 2 && __tv.pine()[0].plots[0].n > 1000`, 20000), JSON.stringify(await pine()));
     const start = await evaluate("__tv.win().__tvChart.debugState().stats");
     await sleep(4000);
     const end = await evaluate("__tv.win().__tvChart.debugState().stats");
@@ -203,6 +217,8 @@ async function main() {
     for (let i = 0; i < 8; i++) { const m = await evaluate(`__tv.text(".pine-script[data-script='pine-2'] .pine-script-meta")`); counts.push(m.match(/· (\d+) bars? re-run/)?.[1]); await sleep(600); }
     check("live: a tick re-runs exactly one bar", counts.includes("1") && counts.every((c) => c === "0" || c === "1"), JSON.stringify(counts));
     note("live: script meta", meta);
+    const liveTitle = await evaluate(`__tv.doc().querySelector(".pine-script[data-script='pine-3'] .pine-script-meta").title`);
+    check("live: request.security context comes from Binance (same source family)", / 60 · Binance Futures · native · /.test(liveTitle || ""), liveTitle);
     await click("Exit Live", ".live-bar .rp-btn", "✕ Exit"); await settle();
   }
   ws.close();

@@ -1,0 +1,132 @@
+{
+  "_about": "Zoneflow terminal evidence for P2.1 request.security(): run by the user in THIS terminal's Pine Editor on 2026-09-27. This is NOT TradingView evidence; only q4 (tradingview/quick_results.json) is real-TradingView evidence, and it covers historical semantics only.",
+  "evidence_tiers": {
+    "real_tradingview_verified": [
+      "historical request.security() mapping - q4_security_historical, 134,400 / 134,400 cells, self-test failed exactly 1 cell as designed"
+    ],
+    "zoneflow_terminal_verified": [
+      "Exness historical integration (H1/H4, 2 contexts, no Binance substitution)",
+      "Replay no-future-leak (forming H1 from revealed 15m bars only)",
+      "Binance Live forming requested context",
+      "Binance H1/H4 integrations incl. user functions and RSI",
+      "capability diagnostics: lower timeframe, cross-family"
+    ],
+    "automated_only": [
+      "detailed per-context provenance tooltip text (native Exness H1 / aggregated from 15m) - not visually captured by the user",
+      "incremental == fresh (Replay) and incremental == full (Live) invariants beyond the manual observations",
+      "Exness server-offset boundaries, provider refusal of future bars, payload validator leak check"
+    ]
+  },
+  "checks": {
+    "p21_terminal_exness_history": {
+      "chart": "Historical · Exness · XAUUSDm · 15m",
+      "result": "PASS",
+      "observed": "compiled; H1/H4 outputs rendered; 2 requested contexts; no runtime error; no visible Binance substitution; chart footer showed EXNESS_XAUUSDM_M15 Native (the chart's own dataset)",
+      "not_verified_manually": "the per-context hover tooltip (native H1 / aggregated from 15m) was not captured"
+    },
+    "p21_terminal_replay": {
+      "chart": "Replay · Exness · BTCUSDm · 15m · start 2026-09-10 09:30 UTC",
+      "result": "PASS",
+      "observed_steps": [
+        {
+          "bar": "09:30",
+          "h1_high": 78202.83,
+          "h1_low": 77888.52,
+          "h1_close": 77931.16,
+          "chart_close": 77931.16,
+          "completed_h1_close": 78082.2
+        },
+        {
+          "bar": "09:45",
+          "h1_high": 78202.83,
+          "h1_low": 77888.52,
+          "h1_close": 77956.58,
+          "chart_close": 77956.58
+        },
+        {
+          "bar": "10:00",
+          "h1_high": 78011.69,
+          "h1_low": 77917.48,
+          "h1_close": 77958.85,
+          "chart_close": 77958.85,
+          "completed_h1_close": 77956.58
+        },
+        {
+          "bar": "10:15",
+          "h1_high": 78011.69,
+          "h1_low": 77891.94,
+          "h1_close": 77943.77,
+          "chart_close": 77943.77,
+          "completed_h1_close": 77956.58
+        },
+        {
+          "bar": "10:30",
+          "h1_high": 78019.79,
+          "h1_low": 77785.69,
+          "h1_close": 77967.1,
+          "chart_close": 77967.1,
+          "completed_h1_close": 77956.58
+        },
+        {
+          "bar": "10:45",
+          "h1_high": 78019.79,
+          "h1_low": 77785.69,
+          "h1_close": 77834.76,
+          "chart_close": 77834.76,
+          "completed_h1_close": 77834.76
+        },
+        {
+          "bar": "11:00",
+          "h1_high": 77892.89,
+          "h1_low": 77652.35,
+          "h1_close": 77888.29,
+          "chart_close": 77888.29,
+          "completed_h1_close": 77834.76
+        }
+      ],
+      "conclusion": "the forming H1 state evolved only from revealed 15m bars; no final H1 high/low/close appeared before knowable; the new H1 period reset correctly"
+    },
+    "p21_terminal_binance_live": {
+      "chart": "Live · Binance Futures · BTCUSDT · 15m",
+      "result": "PASS",
+      "observed": [
+        {
+          "h1_high": 84888.0,
+          "h1_low": 84800.0,
+          "h1_close": 84887.9,
+          "chart_close": 84887.9
+        },
+        {
+          "h1_high": 84908.6,
+          "h1_low": 84800.0,
+          "h1_close": 84867.0,
+          "chart_close": 84867.0,
+          "note": "later, same H1"
+        }
+      ],
+      "contexts": 1,
+      "footer": "BINANCE_LIVE:BTCUSDT · Binance Futures live · native",
+      "conclusion": "the forming requested H1 context updated before the H1 close from received live data"
+    },
+    "p21_terminal_binance_history": {
+      "chart": "Live · Binance Futures · BTCUSDT · 15m",
+      "result": "PASS",
+      "observed": "compiled; H1 close, H1 close[1], H1 EMA 5, H4 close, user-function midpoint; 3 requested contexts; no capability/source error"
+    },
+    "p21_terminal_binance_history_pane": {
+      "chart": "Live · Binance Futures · BTCUSDT · 15m",
+      "result": "PASS",
+      "observed": "compiled; own pane; H4 RSI 5 ≈ 74.21 at capture; H1 high-low (user function) ≈ 344.90; 2 requested contexts; no runtime error"
+    },
+    "p21_terminal_gap_lower_tf": {
+      "chart": "Historical · Exness · XAUUSDm · 1h",
+      "result": "PASS",
+      "observed": "request.security() for a lower timeframe (15) than the chart (60) is not implemented yet (request.security_lower_tf() comes later)"
+    },
+    "p21_terminal_gap_cross_family": {
+      "chart": "Historical · Exness",
+      "result": "PASS",
+      "observed": "error naming BINANCE:BTCUSDT, Binance Futures and Exness MT5, stating that requests across data sources are not allowed"
+    }
+  }
+}

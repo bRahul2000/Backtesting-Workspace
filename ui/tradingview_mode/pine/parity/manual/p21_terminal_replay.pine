@@ -1,0 +1,15 @@
+//@version=6
+// P2.1 real-terminal check 2: Replay must not reveal a requested bar's final values early.
+// Chart: Replay · Exness · BTCUSDm · 15m (Replay runs on historical datasets; 1h = 4 chart bars).
+// Yellow background = first chart bar of a requested (1h) bar.
+indicator("P2.1 Replay knowable HTF", overlay=true)
+htf = input.timeframe("60", "Requested timeframe")
+[fh, fl, fc] = request.security(syminfo.tickerid, htf, [high, low, close], lookahead=barmerge.lookahead_on)
+lastClosed = request.security(syminfo.tickerid, htf, close)
+int htfMs = timeframe.in_seconds(htf) * 1000
+plot(fh, "HTF high (lookahead_on)", color=color.green, linewidth=2, style=plot.style_stepline)
+plot(fl, "HTF low (lookahead_on)", color=color.red, linewidth=2, style=plot.style_stepline)
+plot(fc, "HTF close (lookahead_on)", color=color.blue, linewidth=2, style=plot.style_stepline)
+plot(close, "chart close", color=color.gray)
+plot(lastClosed, "HTF close (lookahead_off)", color=color.orange, style=plot.style_stepline)
+bgcolor(time % htfMs == 0 ? color.new(color.yellow, 80) : na, title="requested bar starts")

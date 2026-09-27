@@ -1,0 +1,10 @@
+//@version=6
+// P2.1 real-terminal check 4: Exness provenance. Chart: Historical · Exness · XAUUSDm · 15m.
+// Expected: 1h = native Exness H1 dataset; 4h = aggregated from the Exness M15 dataset. Never Binance.
+indicator("P2.1 Exness provenance", overlay=true)
+[h1c, h1e] = request.security(syminfo.tickerid, "60", [close, ta.ema(close, 5)])
+[h4c, h4e] = request.security(syminfo.tickerid, "240", [close, ta.ema(close, 5)])
+plot(h1c, "H1 close", color=color.blue, style=plot.style_stepline)
+plot(h1e, "H1 EMA 5", color=color.aqua, linewidth=2)
+plot(h4c, "H4 close", color=color.purple, linewidth=2, style=plot.style_stepline)
+plot(h4e, "H4 EMA 5", color=color.fuchsia, linewidth=2)

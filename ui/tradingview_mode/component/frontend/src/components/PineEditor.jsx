@@ -70,6 +70,14 @@ function InputField({ script, input }) {
       onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} /></label>;
 }
 
+// request.security() provenance, one line per requested context (symbol · timeframe · source · bars).
+function contextsTitle(contexts) {
+  if (!contexts?.length) return undefined;
+  return contexts.map((c) => `${c.symbol} ${c.timeframe} · ${c.provider} · `
+    + (c.native ? "native" : `aggregated from ${c.aggregation_base}`) + ` · ${c.bar_count} bars`
+    + (c.forming ? " · forming bar" : "") + ` · ${c.data_identity}`).join("\n");
+}
+
 function ScriptRow({ script, editing, onEdit }) {
   const [open, setOpen] = useState(false);
   const outputs = script.outputs.length;
@@ -84,9 +92,10 @@ function ScriptRow({ script, editing, onEdit }) {
         <button type="button" className="rp-btn" onClick={() => onEdit(script)}>Edit</button>
         <button type="button" className="rp-btn exit" title="Remove from chart" onClick={() => sendEvent("pine_remove", { id: script.id })}>✕</button>
       </div>
-      <div className="pine-script-meta muted mono">
+      <div className="pine-script-meta muted mono" title={contextsTitle(script.contexts)}>
         {script.error ? "error" : `${outputs} output${outputs === 1 ? "" : "s"} · ${script.bars.toLocaleString()} bars · ${script.runtime_ms} ms`
-          + (script.incremental ? ` · ${script.executed} bar${script.executed === 1 ? "" : "s"} re-run` : "")}
+          + (script.incremental ? ` · ${script.executed} bar${script.executed === 1 ? "" : "s"} re-run` : "")
+          + (script.contexts?.length ? ` · ${script.contexts.length} requested context${script.contexts.length === 1 ? "" : "s"}` : "")}
       </div>
       {script.error && <div className="pine-script-error">{script.error.message}{script.error.bar_index !== null && script.error.bar_index !== undefined ? ` (bar ${script.error.bar_index})` : ""}</div>}
       {script.truncated_bars > 0 && <div className="pine-script-note">Runs on the last {script.bars.toLocaleString()} bars ({script.truncated_bars.toLocaleString()} older bars not executed).</div>}

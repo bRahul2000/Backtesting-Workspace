@@ -40,6 +40,7 @@ from . import live as live_model
 from . import providers
 from . import replay as replay_model
 from . import pine_bridge
+from . import security_data
 from . import source_roles
 from . import tester
 from .protocol import (
@@ -76,6 +77,7 @@ TESTER_RESULT_KEY = "tv_terminal_tester_result"
 TESTER_RUNS_KEY = "tv_terminal_tester_runs"
 LIVE_BOOKS_KEY = "tv_terminal_live_books"
 LIVE_TARGET_KEY = "tv_terminal_live_target"
+SECURITY_BINANCE_KEY = "tv_terminal_security_binance"   # request.security() Binance kline cache (per session)
 LIVE_SESSION_KEY = "tv_terminal_live_session"
 AUTHORITY_KEY = "tv_terminal_signal_authority"
 SOURCE_LOG_KEY = "tv_terminal_source_log"
@@ -642,21 +644,32 @@ def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketData
                  replay_status: dict | None, seconds: int, notices: list[dict[str, str]]) -> dict:
     """Run the chart's Pine scripts on exactly the bars this payload shows."""
     streaming = live_status is not None and live_status.get("phase") == "streaming"
+    last_open_ms = int(frame["timestamp"].iloc[-1].timestamp() * 1000) if len(frame) else None
     if streaming:
         ident = live_status["identity"]
         identity = ("live", ident["dataset_key"], live_status["timeframe"])
         symbol, provider = ident["symbol"], ident["source_label"]
         digits = live_status.get("digits")
+        family, mode = ident["source"], "live"
+        knowable_until = last_open_ms                  # the forming bar: only completed bars before it are closed
     else:
         identity = ("replay" if replay_status else "historical", selected.key, state.timeframe)
         symbol, provider = selected.symbol, selected.broker
         digits = price_precision(frame["close"]) if len(frame) else 2
+        family = security_data.family_of_dataset(selected)
+        mode = "replay" if replay_status else "historical"
+        knowable_until = last_open_ms + seconds * 1000 if replay_status and last_open_ms is not None else None
+    binance_provider = st.session_state.get(SECURITY_BINANCE_KEY)
+    if binance_provider is None:
+        binance_provider = st.session_state[SECURITY_BINANCE_KEY] = security_data.BinanceProvider()
     digits = 2 if digits is None else int(digits)
     section = pine_bridge.pine_payload(
         state, frame, st.session_state, identity=identity, timeframe_seconds=seconds, ticker=symbol,
         tickerid=f"{provider.split(' ')[0].upper()}:{symbol}", mintick=10.0 ** -digits, forming_last=streaming,
         kind="cfd" if provider.startswith("Exness") else "crypto",
-        currency="USDT" if symbol.upper().endswith("USDT") else "USD")
+        currency="USDT" if symbol.upper().endswith("USDT") else "USD", chart_family=family, mode=mode,
+        knowable_until=knowable_until,
+        provider=security_data.provider_for(family, binance_provider=binance_provider))
     for script in section["scripts"]:
         if script["error"] and script["enabled"]:
             where = f" (bar {script['error']['bar_index']})" if script["error"].get("bar_index") is not None else ""

@@ -425,7 +425,7 @@ from the code and checked by a test.
 - `pine_set_input {id, index, value}` is validated against the input's type, `minval`/`maxval` and `options`.
 
 A rejected event changes nothing and says why. A capability gap reads, for example,
-"Line 3: `request.security()` is not implemented yet (data requests)."
+"Line 3: `request.security_lower_tf()` is not implemented yet (data requests)."
 
 **Execution:**
 - Scripts run on exactly the bars the payload shows:
@@ -466,6 +466,33 @@ its own script's plots or hlines.
   - `hline` is a price line.
   - `barcolor` recolors the candles.
 - **Updates:** data updates are incremental, as for the rest of the chart.
+
+
+### request.security() (P2.1)
+
+`request.security(symbol, timeframe, expression, gaps, lookahead)` runs `expression` in its **own requested
+context**: a child runtime (`pine/security.py`) executes the call's security slice (the global statements the
+expression depends on, `pine/slicing.py`) over the requested bars, with its own OHLCV, time, `bar_index`,
+history, `var` state and `ta.*` state. Results are never resampled from the chart.
+
+- **Mapping** (confirmed on real TradingView, q4: 134,400 / 134,400 cells): `lookahead_off` = latest requested
+  bar closed by the chart bar's close; `lookahead_on` = requested bar containing the chart bar's open;
+  `gaps_on` = value only where a new requested bar is selected.
+- **Historical** reproduces TradingView's historical semantics, including `lookahead_on`'s final values
+  (a future bias by design). **Replay and Live** are *knowable per bar*: completed requested bars only
+  when closed by that chart bar; the forming requested bar is aggregated from revealed / received chart
+  bars; never a final future bar.
+- **Data** (`component/security_data.py`, locked policy): Exness native M15/M30/H1, else aggregated from the
+  finest Exness dataset on the broker's recorded server-time boundaries; Exness W/M blocked. Binance
+  native public klines, else aggregated from Binance data. Cross-family requests are refused (literal
+  symbols before running, dynamic ones at run time).
+- **Limits** (this engine's): 16 contexts per script, 32 per chart, 10,000 bars per context, nesting 2.
+
+Payload, per script (additive): `contexts: [{provider_family, provider, symbol, timeframe, native,
+aggregation_base, bar_count, max_source_time (epoch s), data_identity, fingerprint, depth, line, forming}]`,
+and at section level `chart_family` and `mode`. The validator refuses more than 16 / 32 contexts, an unknown
+family, a context from another family than the chart's, an invalid timeframe, and - in Replay - any context
+whose `max_source_time` is after the cursor bar's close (computed from the payload's own bars).
 
 ## Chart view (all modes)
 

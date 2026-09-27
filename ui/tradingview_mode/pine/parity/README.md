@@ -118,6 +118,25 @@ What the quick scripts do **not** replace: the plot na-gap visual check (`manual
 it is about how lines are drawn) and the live var / varip check (`manual/m03_live_var_varip_table.pine`,
 it needs ticks of a forming candle). s07 in `q1` covers only historical bars.
 
+## P2.1 — request.security() semantics (historical)
+
+`quick/q4_security_historical.pine` establishes how TradingView maps requested-timeframe values onto
+chart bars on historical bars: every value derives from `time`, the chart computes the value of any
+requested bar itself, and `request.security()` is the value under test. **Result on real TradingView:
+134,400 / 134,400 (PASS)**; the engine, implemented in P2.1, reproduces all 134,400 cells
+(`ours/q4_engine_parity.json`). Contracts: `SECURITY_SEMANTICS.md`.
+
+1. Open **BINANCE:BTCUSDT** on the **1-minute** chart (the table says `WRONG CHART` otherwise).
+2. Paste `quick/q4_security_historical.pine` into the Pine Editor → **Add to chart**.
+3. Send one screenshot of the whole table (it is tall; zoom the browser out if needed).
+
+Read it like the other quick checkers (cases, cells, failed, RESULT, first failures, self-test checkbox).
+The **KEY SEMANTICS** rows are the evidence: for every position inside a requested period they show which
+requested bar TradingView displayed (`C` current, `P` previous, `n` na, `*` mixed) next to the documented
+hypothesis. If a row says `DIFFERENT`, the hypothesis was wrong and the observed pattern is the real rule.
+The second line of the table must show `data gaps 0` and no `NOT ENOUGH HISTORY`; otherwise the run is
+not conclusive. This covers historical bars only — not Replay, not live.
+
 ## TradingView Basic plan — manual parity
 
 The Basic plan has no "Export chart data". Instead, each script in `manual/` shows its values **in a table

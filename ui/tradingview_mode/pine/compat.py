@@ -81,7 +81,10 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     # Drawing objects
     Feature("drawing-objects", "drawings", GAP, "drawing objects (`line.*`, `label.*`, `box.*`, `table.*`, `polyline.*`, `linefill.*`)"),
     # Data requests
-    Feature("request", "request", GAP, "data requests (`request.security()`, `request.security_lower_tf()`, ...)"),
+    Feature("request", "request", PARTIAL, "data requests (`request.security()` for same and higher timeframes)",
+            "Same-source symbols only; expressions over global scalars, ta.*, tuples and user functions; nesting "
+            "<= 2. request.security_lower_tf(), lower timeframes, other request.* and ticker.* are not implemented "
+            "yet."),
     # Strategies
     Feature("strategy", "strategy", GAP, "strategy scripts (`strategy()`, `strategy.*` order simulation)"),
 )}
@@ -116,6 +119,11 @@ PARITY_VALIDATED = (
      "re-evaluated each iteration in v6 and once in v5; `const int / const int` = 3.5 in v6 and 3 in v5; `and` "
      "short-circuits in v6 and evaluates both sides in v5 (fixtures s08, s09)",
      "own TradingView quick checks q2 (v6) and q3 (v5): 180 + 180 cells, 0 failures"),
+    ("request.security() HISTORICAL mapping: same timeframe; 5m and 15m from a 1m chart with gaps on/off x "
+     "lookahead on/off; src[1], arithmetic, ta.sma / ta.ema / ta.rsi, tuples, user functions and scalar var state "
+     "in the requested context (fixture q4)",
+     "own TradingView quick check q4_security_historical: 134,400 cells, 0 failures; this engine reproduces all "
+     "134,400 (Replay / Live knowable-per-bar semantics are engine-defined and not TradingView-verified)"),
     ("plot() default style (plot.style_line) draws across na; plot.style_linebr leaves the gap",
      "own TradingView observation (manual/m02)"),
     ("var keeps its value and varip advances across updates of one realtime bar",

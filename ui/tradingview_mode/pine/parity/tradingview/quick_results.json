@@ -22,5 +22,11 @@
       "s09_loops_v5": "PASS 180/180"
     },
     "note": "Real TradingView: 0 failed; keys for_dynamic_end = 4, div_const = 3, and_stateful @ bar 6 = 0."
+  },
+  "q4_security_historical": {
+    "status": "PASS",
+    "fixtures": {},
+    "note": "Real TradingView, BINANCE:BTCUSDT 1-minute: 134,400 / 134,400 cells, 0 failed; KEY patterns equal the documented hypotheses (5m PPPPC / CCCCC / nnnnC / Cnnnn, 15m likewise, same timeframe C); single-value and tuple calls matched; self-test produced exactly 1 failure and turned the result FAIL. Historical semantics only.",
+    "script_sha256": "0a0095c14a5a74616507aa39174c290c9b2166efbff4bdadc4d9f689407b7f0d"
   }
 }

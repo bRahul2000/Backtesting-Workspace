@@ -223,6 +223,56 @@ Recorded from the summary-table screenshot in `tradingview/quick_results.json`. 
 | `quick/q2_s08_loops_v6.pine` | s08_loops_v6 | 180 | PASS 180/180 | Real TradingView: 0 failed; keys for_dynamic_end = 7, div_const = 3.5, and_stateful @ bar 6 = 1. |
 | `quick/q3_s09_loops_v5.pine` | s09_loops_v5 | 180 | PASS 180/180 | Real TradingView: 0 failed; keys for_dynamic_end = 4, div_const = 3, and_stateful @ bar 6 = 0. |
 
+## P2.1 request.security() semantics (historical)
+
+`quick/q4_security_historical.pine` establishes TradingView's historical request.security() mapping (see `SECURITY_SEMANTICS.md`).
+
+TradingView result: **PASS** — Real TradingView, BINANCE:BTCUSDT 1-minute: 134,400 / 134,400 cells, 0 failed; KEY patterns equal the documented hypotheses (5m PPPPC / CCCCC / nnnnC / Cnnnn, 15m likewise, same timeframe C); single-value and tuple calls matched; self-test produced exactly 1 failure and turned the result FAIL. Historical semantics only.
+
+This engine against the frozen q4 oracle: **134400 / 134400** cells (13 requested contexts).
+
+| mapping | matched / checked |
+|---|---|
+| `tf1` | 14400 / 14400 |
+| `tf5_goff_loff` | 14400 / 14400 |
+| `tf5_goff_lon` | 14400 / 14400 |
+| `tf5_gon_loff` | 14400 / 14400 |
+| `tf5_gon_lon` | 14400 / 14400 |
+| `tf15_goff_loff` | 14400 / 14400 |
+| `tf15_goff_lon` | 14400 / 14400 |
+| `tf15_gon_loff` | 14400 / 14400 |
+| `tf15_gon_lon` | 14400 / 14400 |
+| `single` | 4800 / 4800 |
+
+### Evidence tiers
+
+**Real TradingView verified:** historical request.security() mapping - q4_security_historical, 134,400 / 134,400 cells, self-test failed exactly 1 cell as designed.
+
+**Zoneflow terminal verified** (run by the user in this terminal, `terminal/p21_terminal_results.json`; not TradingView evidence):
+
+- Exness historical integration (H1/H4, 2 contexts, no Binance substitution)
+- Replay no-future-leak (forming H1 from revealed 15m bars only)
+- Binance Live forming requested context
+- Binance H1/H4 integrations incl. user functions and RSI
+- capability diagnostics: lower timeframe, cross-family
+
+**Automated only** (tests, not observed manually):
+
+- detailed per-context provenance tooltip text (native Exness H1 / aggregated from 15m) - not visually captured by the user
+- incremental == fresh (Replay) and incremental == full (Live) invariants beyond the manual observations
+- Exness server-offset boundaries, provider refusal of future bars, payload validator leak check
+
+| terminal check | chart | result |
+|---|---|---|
+| `manual/p21_terminal_exness_history.pine` | Historical · Exness · XAUUSDm · 15m | PASS |
+| `manual/p21_terminal_replay.pine` | Replay · Exness · BTCUSDm · 15m · start 2026-09-10 09:30 UTC | PASS |
+| `manual/p21_terminal_binance_live.pine` | Live · Binance Futures · BTCUSDT · 15m | PASS |
+| `manual/p21_terminal_binance_history.pine` | Live · Binance Futures · BTCUSDT · 15m | PASS |
+| `manual/p21_terminal_binance_history_pane.pine` | Live · Binance Futures · BTCUSDT · 15m | PASS |
+| `manual/p21_terminal_gap_lower_tf.pine` | Historical · Exness · XAUUSDm · 1h | PASS |
+| `manual/p21_terminal_gap_cross_family.pine` | Historical · Exness | PASS |
+
+
 ## Rules under test
 
 | question | TradingView rule | evidence | engine |

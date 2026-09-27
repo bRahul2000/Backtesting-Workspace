@@ -48,7 +48,12 @@ def _time_var(rt, bar):
 @variable("time_close", returns="series int")
 def _time_close(rt, bar):
     t = rt.series_at("time", bar)
-    return NA if t is NA else t + rt.data.timeframe_seconds * 1000
+    if t is NA:
+        return NA
+    close_time = rt.data.close_time                  # requested contexts: exact close (weeks, months)
+    if close_time is not None and 0 <= bar < len(close_time):
+        return int(close_time[bar])
+    return t + rt.data.timeframe_seconds * 1000
 
 
 @variable("last_bar_time", returns="series int")

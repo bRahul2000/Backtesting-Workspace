@@ -57,6 +57,9 @@ class DataContext:
     description: str = ""
     session: str = "24x7"
     confirmed_until: int | None = None   # bars >= this index are realtime (forming); None = all historical
+    close_time: np.ndarray | None = None  # bar close times (ms) when not open + timeframe (requested contexts)
+    knowable: bool = False               # Replay / Live: request.security() uses only information knowable per bar
+    knowable_until: int | None = None    # latest knowable time (ms): the replay cursor bar's close / now (live)
 
     @property
     def size(self) -> int:
@@ -175,10 +178,15 @@ class _Continue(Exception):
 # ---------------------------------------------------------------------------
 
 class Runtime:
-    def __init__(self, program, data: DataContext, input_values: dict[int, Any] | None = None):
+    def __init__(self, program, data: DataContext, input_values: dict[int, Any] | None = None, *,
+                 body=None, capture: bool = False, security=None):
         self.program = program
         self.data = data
         self.input_values = input_values or {}
+        # request.security(): a child runtime executes the call's security slice (``body``) over the requested
+        # bars and ``capture``s the expression's value per bar; ``security`` manages this runtime's own requests.
+        self.body = program.script.body if body is None else body
+        self.security = security
         self.buffers: dict[tuple, SeriesBuffer] = {}
         self.sites: dict[tuple, CallSite] = {}
         self.outputs: dict[int, Any] = {}
@@ -192,6 +200,7 @@ class Runtime:
         self._last_executed = -1        # unlike last_bar, never rewound by the engine's forming-bar rollback
         self.executed_bars = 0          # bar executions (incl. re-runs), for reporting
         self._colors: dict[int, Color] = {}
+        self.results = self.buffer(("__security_result__",)) if capture else None
         # version-dependent semantics (TradingView's v5 -> v6 migration guide)
         version = program.script.version or 5
         self.lazy_bool = version >= 6            # v6 `and`/`or` short-circuit; v5 evaluates both sides
@@ -228,7 +237,9 @@ class Runtime:
         scope = Scope()
         self.global_scope = scope
         try:
-            self.exec_body(self.program.script.body, scope)
+            value = self.exec_body(self.body, scope)
+            if self.results is not None:
+                self.results.set(bar, value)
         except PineRuntimeError as exc:
             exc.bar_index = bar
             raise
@@ -470,6 +481,13 @@ class Runtime:
             return NA
         if target.kind == "input":
             return target.impl(self, node, self.input_values.get(node.id, MISSING))
+        if target.kind == "security":                   # the expression runs in the requested context, not here
+            spec = self.program.security[node.id]
+            args = {param.name: (self.eval(binding.nodes[param.name], scope) if param.name in binding.nodes
+                                 else param.default) for param in binding.params if param.name != "expression"}
+            if self.security is None:
+                self.fail("request.security() has no data source in this run.", node)
+            return self.security.value(self, node, spec, args)
         args = {}
         for param in binding.params:
             arg = binding.nodes.get(param.name)

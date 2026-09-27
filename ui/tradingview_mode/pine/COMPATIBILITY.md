@@ -5,7 +5,7 @@ built-in registries; a test fails if this file is out of date. Compatibility is 
 feature. **No claim of full Pine compatibility is made**: a script runs only if every feature it
 uses is supported, and otherwise fails with the exact feature and line.
 
-Features: 23 supported, 9 partial, 16 not yet implemented. Built-ins: 141 functions, 60 variables, 83 constants.
+Features: 23 supported, 10 partial, 15 not yet implemented. Built-ins: 142 functions, 60 variables, 87 constants.
 
 ## parser
 
@@ -87,7 +87,7 @@ Features: 23 supported, 9 partial, 16 not yet implemented. Built-ins: 141 functi
 
 | feature | status | notes |
 |---|---|---|
-| data requests (`request.security()`, `request.security_lower_tf()`, ...) | gap |  |
+| data requests (`request.security()` for same and higher timeframes) | partial | Same-source symbols only; expressions over global scalars, ta.*, tuples and user functions; nesting <= 2. request.security_lower_tf(), lower timeframes, other request.* and ticker.* are not implemented yet. |
 
 ## strategy
 
@@ -115,7 +115,7 @@ Features: 23 supported, 9 partial, 16 not yet implemented. Built-ins: 141 functi
 | `math` | 24 / 24 |  |
 | `matrix` | 0 / 49 | `matrix.add_col`, `matrix.add_row`, `matrix.avg`, `matrix.col`, `matrix.columns`, `matrix.concat`, `matrix.copy`, `matrix.det`, `matrix.diff`, `matrix.eigenvalues`, `matrix.eigenvectors`, `matrix.elements_count` … (+37) |
 | `polyline` | 0 / 2 | `polyline.delete`, `polyline.new` |
-| `request` | 0 / 11 | `request.currency_rate`, `request.dividends`, `request.earnings`, `request.economic`, `request.financial`, `request.footprint`, `request.quandl`, `request.security`, `request.security_lower_tf`, `request.seed`, `request.splits` |
+| `request` | 1 / 11 | `request.currency_rate`, `request.dividends`, `request.earnings`, `request.economic`, `request.financial`, `request.footprint`, `request.quandl`, `request.security_lower_tf`, `request.seed`, `request.splits` |
 | `runtime` | 1 / 1 |  |
 | `session` | 0 / 7 | `session.isfirstbar`, `session.isfirstbar_regular`, `session.islastbar`, `session.islastbar_regular`, `session.ismarket`, `session.ispostmarket`, `session.ispremarket` |
 | `str` | 15 / 18 | `str.format_time`, `str.match`, `str.split` |
@@ -145,6 +145,7 @@ Compared bar by bar with values produced by TradingView itself (`parity/PARITY_R
 | var / user-function var per call site on historical bars; switch, ternary chains, if / if-without-else expressions, user functions with defaults, tuple returns (fixtures s07, s10); fixture data (s00) | own TradingView quick check q1_main_v6: 210 + 240 + 350 cells, 0 failures (s07: historical bars only) |
 | na handling: na(), nz(), fixnan(), arithmetic / comparison / math.max with na, history of na, ta.change, ta.cum, ta.highest on na bars (fixture s11) | own TradingView quick check q1_main_v6: 216 cells, 0 failures (after the ta.highest/lowest na fix) |
 | loops and version rules: for / for-by / descending for / break / continue / while, loop values; `for` end re-evaluated each iteration in v6 and once in v5; `const int / const int` = 3.5 in v6 and 3 in v5; `and` short-circuits in v6 and evaluates both sides in v5 (fixtures s08, s09) | own TradingView quick checks q2 (v6) and q3 (v5): 180 + 180 cells, 0 failures |
+| request.security() HISTORICAL mapping: same timeframe; 5m and 15m from a 1m chart with gaps on/off x lookahead on/off; src[1], arithmetic, ta.sma / ta.ema / ta.rsi, tuples, user functions and scalar var state in the requested context (fixture q4) | own TradingView quick check q4_security_historical: 134,400 cells, 0 failures; this engine reproduces all 134,400 (Replay / Live knowable-per-bar semantics are engine-defined and not TradingView-verified) |
 | plot() default style (plot.style_line) draws across na; plot.style_linebr leaves the gap | own TradingView observation (manual/m02) |
 | var keeps its value and varip advances across updates of one realtime bar | own TradingView observation (manual/m03, BTCUSDT 1-minute live chart) |
 | ta.sma / ta.ema / ta.rma / ta.wma across an na gap in the source (bars 17-26) | own TradingView capture (s01_averages page 2, columns 2): 50 cells, 0 mismatches after the na fix |

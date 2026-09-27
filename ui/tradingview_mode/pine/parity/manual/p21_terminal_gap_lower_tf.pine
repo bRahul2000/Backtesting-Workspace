@@ -1,0 +1,5 @@
+//@version=6
+// P2.1 real-terminal check 5a (expected ERROR). Chart: Historical · Exness · XAUUSDm · 1h.
+// A lower timeframe than the chart is not supported in P2.1.
+indicator("P2.1 gap: lower timeframe", overlay=true)
+plot(request.security(syminfo.tickerid, "15", close), "15m close")

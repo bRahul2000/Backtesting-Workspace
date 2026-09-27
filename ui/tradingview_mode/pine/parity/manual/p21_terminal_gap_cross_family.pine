@@ -1,0 +1,5 @@
+//@version=6
+// P2.1 real-terminal check 5b (expected ERROR). Chart: Historical · Exness · XAUUSDm · any timeframe.
+// A Binance symbol on an Exness chart is a cross-source request and must be refused before running.
+indicator("P2.1 gap: cross-source", overlay=true)
+plot(request.security("BINANCE:BTCUSDT", "60", close), "Binance close")

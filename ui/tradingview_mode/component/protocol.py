@@ -227,12 +227,49 @@ def _validate_pine(payload: dict[str, Any], bar_times: set[int]) -> None:
                     _require(value is None or (isinstance(value, float) and math.isfinite(value)),
                              f"pine output {output['id']}: values must be finite or null.")
                 previous = point["time"]
+        _validate_contexts(payload, script, bar_times)
         for output in outputs:
             if output["kind"] == "fill":
                 between = output.get("between") or []
                 _require(len(between) == 2 and all(ref in kinds for ref in between)
                          and kinds[between[0]] == kinds[between[1]] and kinds[between[0]] in ("plot", "hline"),
                          "a pine fill must reference two plots or two hlines of the same script.")
+
+
+def _validate_contexts(payload: dict[str, Any], script: dict, bar_times: set[int]) -> None:
+    """request.security() contexts: limits, one data-source family, valid timeframes, and in Replay nothing
+    after the cursor bar's close (checked independently of the engine, from the payload's own bars)."""
+    from ..pine.security import (MAX_BARS_PER_CONTEXT, MAX_CONTEXTS_PER_CHART, MAX_CONTEXTS_PER_SCRIPT,
+                                 SecurityDataError, parse_timeframe)
+
+    contexts = script.get("contexts", [])
+    _require(isinstance(contexts, list) and len(contexts) <= MAX_CONTEXTS_PER_SCRIPT,
+             f"pine script {script.get('id')}: at most {MAX_CONTEXTS_PER_SCRIPT} requested contexts.")
+    family = payload["pine"].get("chart_family")
+    total = sum(len(s.get("contexts") or []) for s in payload["pine"]["scripts"])
+    _require(total <= MAX_CONTEXTS_PER_CHART, f"at most {MAX_CONTEXTS_PER_CHART} requested contexts across the chart.")
+    knowable_limit = None
+    if payload.get("mode") == "replay" and bar_times:
+        ordered = sorted(bar_times)
+        spacing = ordered[-1] - ordered[-2] if len(ordered) > 1 else 0
+        knowable_limit = ordered[-1] + spacing                     # the replay cursor bar's close
+    for context in contexts:
+        _require(context.get("provider_family") in ("exness", "binance", "bitstamp"),
+                 f"unknown request.security() provider family {context.get('provider_family')!r}.")
+        _require(family is None or context["provider_family"] == family,
+                 f"request.security() context from {context['provider_family']} on a {family} chart (cross-family).")
+        try:
+            parse_timeframe(context.get("timeframe"))
+        except SecurityDataError as exc:
+            raise PayloadValidationError(f"request.security() context timeframe: {exc.message}") from None
+        _require(type(context.get("bar_count")) is int and 0 <= context["bar_count"] <= MAX_BARS_PER_CONTEXT + 1,
+                 "request.security() context bar_count is invalid.")
+        max_source = context.get("max_source_time")
+        _require(max_source is None or type(max_source) is int, "request.security() max_source_time must be an int.")
+        if knowable_limit is not None and max_source is not None:
+            _require(max_source <= knowable_limit,
+                     f"request.security() context {context.get('symbol')} {context.get('timeframe')} used data up to "
+                     f"{max_source}, after the replay cursor ({knowable_limit}): future leak refused.")
 
 
 def _validate_sources(payload: dict[str, Any]) -> None:

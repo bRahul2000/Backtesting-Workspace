@@ -59,8 +59,8 @@ plot(signalLine, "Signal", color.orange)
 hline(0, "Zero", color = color.gray)
 """,
     "Uses unimplemented features": """//@version=5
-indicator("Needs request.security and labels", overlay = true)
-daily = request.security(syminfo.tickerid, "D", close)
+indicator("Needs lower-timeframe data and labels", overlay = true)
+daily = request.security_lower_tf(syminfo.tickerid, "1", close)
 plot(daily, "Daily close")
 if ta.crossover(close, daily)
     label.new(bar_index, high, "Cross")

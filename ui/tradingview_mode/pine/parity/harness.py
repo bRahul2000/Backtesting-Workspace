@@ -529,6 +529,7 @@ def report(results: list[FixtureResult]) -> str:
         lines.append(f"| {question} | {observed} | {'yes' if engine else 'no'} | {verdict} |")
     lines += _manual_section()
     lines += _quick_section()
+    lines += _security_section()
     lines += ["", "## Rules under test", "",
               "| question | TradingView rule | evidence | engine |", "|---|---|---|---|",
               "| equal highs/lows inside a pivot window | left tie keeps the pivot, right tie cancels it | third-party "
@@ -600,6 +601,40 @@ def _quick_section() -> list[str]:
     return lines
 
 
+def _security_section() -> list[str]:
+    from .security_fixture import SCRIPT_NAME
+
+    entry = quick_results().get(SCRIPT_NAME, {})
+    lines = ["", "## P2.1 request.security() semantics (historical)", "",
+             f"`quick/{SCRIPT_NAME}.pine` establishes TradingView's historical request.security() mapping "
+             "(see `SECURITY_SEMANTICS.md`).", "",
+             f"TradingView result: **{entry.get('status', 'not run')}**" + (f" — {entry['note']}" if entry.get("note") else ""),
+             ""]
+    path = OURS_DIR / "q4_engine_parity.json"
+    if path.exists():
+        engine = json.loads(path.read_text())
+        lines += [f"This engine against the frozen q4 oracle: **{engine['matched']} / {engine['cells']}** cells "
+                  f"({engine['contexts']} requested contexts).", "", "| mapping | matched / checked |", "|---|---|"]
+        lines += [f"| `{key}` | {m} / {c} |" for key, (m, c) in engine["by_group"].items()]
+        lines.append("")
+    terminal = ROOT / "terminal" / "p21_terminal_results.json"
+    if terminal.exists():
+        record = json.loads(terminal.read_text())
+        tiers = record["evidence_tiers"]
+        lines += ["### Evidence tiers", "",
+                  "**Real TradingView verified:** " + "; ".join(tiers["real_tradingview_verified"]) + ".", "",
+                  "**Zoneflow terminal verified** (run by the user in this terminal, `terminal/p21_terminal_results.json`; "
+                  "not TradingView evidence):", ""]
+        lines += [f"- {item}" for item in tiers["zoneflow_terminal_verified"]]
+        lines += ["", "**Automated only** (tests, not observed manually):", ""]
+        lines += [f"- {item}" for item in tiers["automated_only"]]
+        lines += ["", "| terminal check | chart | result |", "|---|---|---|"]
+        lines += [f"| `manual/{name}.pine` | {check['chart']} | {check['result']} |"
+                  for name, check in record["checks"].items()]
+        lines.append("")
+    return lines
+
+
 def write_all() -> list[FixtureResult]:
     """Regenerate fixtures, fixture data, our outputs and the report (deterministic)."""
     FIXTURE_DIR.mkdir(exist_ok=True)
@@ -618,8 +653,15 @@ def write_all() -> list[FixtureResult]:
             index=False, float_format="%.17g", lineterminator="\n"))
     from .manual import write_manual
     from .quick import write_quick
+    from .security_fixture import write as write_security
     write_manual()
     write_quick()
+    write_security()
+    from .security_fixture import engine_parity
+    parity = engine_parity()
+    (OURS_DIR / "q4_engine_parity.json").write_text(json.dumps(
+        {"matched": parity["matched"], "cells": parity["cells"], "contexts": parity["contexts"],
+         "by_group": parity["by_group"], "first_mismatches": parity["first_mismatches"]}, indent=1) + "\n")
     results = compare_all()
     REPORT.write_text(report(results))
     return results

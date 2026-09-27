@@ -17,6 +17,9 @@ from .outputs import render
 from .parser import parse
 from .registry import load_all
 from .runtime import DataContext, Runtime
+from .security import SecurityManager
+
+MISSING_PROVIDER = object()
 
 MAX_SOURCE_CHARS = 100_000
 
@@ -95,6 +98,7 @@ class RunResult:
     bars: int
     executed: int
     incremental: bool
+    contexts: list = field(default_factory=list)      # request.security() provenance, one entry per context
 
 
 def resolve_inputs(program: Program, overrides: dict[int, Any]) -> tuple[dict[int, Any], list[str]]:
@@ -110,7 +114,8 @@ def resolve_inputs(program: Program, overrides: dict[int, Any]) -> tuple[dict[in
 
 
 def data_context(frame, *, timeframe_seconds: int, ticker: str, tickerid: str, mintick: float, currency: str = "USD",
-                 basecurrency: str = "", kind: str = "crypto", description: str = "", forming_last: bool = False) -> DataContext:
+                 basecurrency: str = "", kind: str = "crypto", description: str = "", forming_last: bool = False,
+                 knowable: bool = False, knowable_until: int | None = None) -> DataContext:
     """A DataContext from an OHLCV frame (UTC ``timestamp`` column)."""
     times = (frame["timestamp"].dt.tz_convert("UTC").dt.tz_localize(None).to_numpy(dtype="datetime64[ms]")
              .astype(np.int64))
@@ -121,7 +126,7 @@ def data_context(frame, *, timeframe_seconds: int, ticker: str, tickerid: str, m
         volume=frame["volume"].to_numpy(dtype=float) if "volume" in frame else np.zeros(size),
         timeframe_seconds=timeframe_seconds, ticker=ticker, tickerid=tickerid, mintick=mintick, currency=currency,
         basecurrency=basecurrency, type=kind, description=description,
-        confirmed_until=size - 1 if forming_last and size else None)
+        confirmed_until=size - 1 if forming_last and size else None, knowable=knowable, knowable_until=knowable_until)
 
 
 class PineExecution:
@@ -131,8 +136,9 @@ class PineExecution:
     (rollback + re-run of the last bar); any change to earlier bars, the
     inputs or the stream identity rebuilds the runtime from the first bar."""
 
-    def __init__(self, program: Program, inputs: dict[int, Any]):
+    def __init__(self, program: Program, inputs: dict[int, Any], provider=None):
         self.program, self.inputs = program, inputs
+        self.provider = provider                      # request.security() data source (see security.py)
         self.runtime: Runtime | None = None
         self.snapshot: np.ndarray | None = None      # OHLCV + time of the bars already executed
         self.identity: tuple | None = None
@@ -140,7 +146,9 @@ class PineExecution:
     def _matrix(self, data: DataContext) -> np.ndarray:
         return np.vstack([data.time.astype(float), data.open, data.high, data.low, data.close, data.volume])
 
-    def run(self, data: DataContext, identity: tuple) -> tuple[Runtime, bool]:
+    def run(self, data: DataContext, identity: tuple, provider=MISSING_PROVIDER) -> tuple[Runtime, bool]:
+        if provider is not MISSING_PROVIDER:
+            self.provider = provider
         matrix = self._matrix(data)
         previous = self.snapshot
         incremental = (self.runtime is not None and self.identity == identity and previous is not None
@@ -154,18 +162,22 @@ class PineExecution:
                 self.runtime.last_bar = last - 1
                 self.runtime.realtime_updates += 1
         else:
-            self.runtime = Runtime(self.program, data, self.inputs)
+            self.runtime = Runtime(self.program, data, self.inputs,
+                                   security=SecurityManager(self.provider) if self.program.security else None)
+        if self.runtime.security is not None:
+            self.runtime.security.set_provider(self.provider)
         self.runtime.data = data
         self.runtime.run()
         self.snapshot, self.identity = matrix, identity
         return self.runtime, incremental
 
 
-def run_script(execution: PineExecution, data: DataContext, identity: tuple, prefix: str) -> RunResult:
+def run_script(execution: PineExecution, data: DataContext, identity: tuple, prefix: str,
+               provider=MISSING_PROVIDER) -> RunResult:
     started = time.perf_counter()
     try:
         before = execution.runtime.executed_bars if execution.runtime is not None else 0
-        runtime, incremental = execution.run(data, identity)
+        runtime, incremental = execution.run(data, identity, provider)
     except PineRuntimeError as exc:
         execution.runtime = None
         return RunResult([], {"message": exc.message, "line": exc.line, "bar_index": exc.bar_index},
@@ -174,4 +186,5 @@ def run_script(execution: PineExecution, data: DataContext, identity: tuple, pre
     times = (data.time // 1000).astype(int).tolist()
     rendered = render(outputs, times, prefix)
     executed = runtime.executed_bars - (before if incremental else 0)
-    return RunResult(rendered, None, (time.perf_counter() - started) * 1000, data.size, executed, incremental)
+    contexts = [c.provenance() for c in runtime.security.all_contexts()] if runtime.security is not None else []
+    return RunResult(rendered, None, (time.perf_counter() - started) * 1000, data.size, executed, incremental, contexts)
