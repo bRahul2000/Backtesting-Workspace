@@ -536,11 +536,10 @@ class Analyzer:
 
     def call(self, node: A.Call) -> TypeSpec | None:
         func = node.func
-        if isinstance(func, A.Attribute) and isinstance(func.target, A.Name) and self.lookup(func.target.name)[0] is not None:
-            for argument in node.args:
-                self.expr(argument.value)
-            self.gap("methods", f"Method calls (`{func.target.name}.{func.name}()`) are not implemented yet.", node)
-            return None
+        if isinstance(func, A.Attribute) and (
+                not isinstance(func.target, (A.Name, A.Attribute))
+                or isinstance(func.target, A.Name) and self.lookup(func.target.name)[0] is not None):
+            return self.method_call(node, func)
         name = func.name if isinstance(func, A.Name) else func.dotted() if isinstance(func, A.Attribute) else None
         if name is None:
             self.error("Only functions can be called.", node)
@@ -586,6 +585,45 @@ class Analyzer:
             return None
         return self.builtin_call(node, builtin_, positional, named)
 
+    def method_call(self, node: A.Call, func: A.Attribute) -> TypeSpec | None:
+        """Built-in method syntax: `a.push(x)` is `array.push(a, x)` (Pine docs: the two forms are equivalent). The
+        receiver becomes the builtin's first argument, so the call reuses the namespace builtin unchanged."""
+        receiver = self.expr(func.target)
+        base = receiver.base if receiver is not None else None
+        inner = self.calls.get(func.target.id) if isinstance(func.target, A.Call) else None
+        if inner is not None and inner[0] == "builtin" and inner[1].returns == "void":
+            for argument in node.args:
+                self.expr(argument.value)
+            self.error(f"Cannot call method `{func.name}()`: `{inner[1].name}()` does not return a value.", node)
+            return None
+        if base is not None and base in NUMERIC | {"bool", "string", "color"}:
+            for argument in node.args:
+                self.expr(argument.value)
+            self.error(f"Could not find method `{func.name}()` for a `{base}` value.", node)
+            return None
+        if base is not None and not base.startswith("array"):
+            for argument in node.args:
+                self.expr(argument.value)
+            self.gap("methods", f"Method calls on `{base}` values (`.{func.name}()`) are not implemented yet.", node)
+            return None
+        # arrays are the only values with built-in methods in this engine; a receiver of unknown type (a user
+        # function's result, an untyped parameter) is dispatched to `array.*` and checked at run time
+        name = f"array.{func.name}"
+        builtin_ = FUNCTIONS.get(name)
+        if builtin_ is None:
+            for argument in node.args:
+                self.expr(argument.value)
+            if catalog.is_known_function(name):
+                feature = feature_for_builtin(name)
+                self.gap(feature, gap_message(name, feature), node)
+            else:
+                self.error(f"Could not find method `{func.name}()` for arrays.", node)
+            return None
+        self.feature("builtin-methods", node)
+        positional = [func.target] + [a.value for a in node.args if a.name is None]
+        named = {a.name: a.value for a in node.args if a.name is not None}
+        return self.builtin_call(node, builtin_, positional, named, receiver=(func.target, receiver))
+
     def user_call(self, node: A.Call, fn: A.FunctionDef, positional: list, named: dict) -> TypeSpec | None:
         params = fn.params
         if len(positional) > len(params):
@@ -604,10 +642,13 @@ class Analyzer:
         self.calls[node.id] = ("user", fn, binding)
         return None
 
-    def builtin_call(self, node: A.Call, builtin_: Builtin, positional: list, named: dict) -> TypeSpec | None:
+    def builtin_call(self, node: A.Call, builtin_: Builtin, positional: list, named: dict,
+                     receiver: tuple | None = None) -> TypeSpec | None:
         self.builtins_used.setdefault(builtin_.name, []).append(node.line)
         self.feature(self.builtin_feature(builtin_), node)
         arg_types = {id(a.value): self.expr(a.value) for a in node.args}
+        if receiver is not None:                  # method syntax: the receiver is the first argument, already typed
+            arg_types[id(receiver[0])] = receiver[1]
         binding, problem = bind(builtin_, positional, named,
                                 lambda param, node: self.fits(param, arg_types.get(id(node))))
         if binding is None:

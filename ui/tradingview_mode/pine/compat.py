@@ -46,7 +46,10 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     Feature("realtime", "runtime", SUPPORTED, "realtime bar re-execution with rollback (varip survives)"),
     Feature("for-in", "runtime", PARTIAL, "`for ... in` loops over arrays (`for x in a`, `for [i, x] in a`)",
             "Maps and matrices are not implemented, so loops over them are gaps."),
-    Feature("methods", "runtime", GAP, "methods (`method` declarations and `obj.method()` calls)"),
+    Feature("builtin-methods", "runtime", PARTIAL, "built-in method syntax (`a.push(x)` for `array.push(a, x)`)",
+            "Arrays only (the engine's only values with built-in methods); unimplemented `array.*` functions stay "
+            "gaps in either form."),
+    Feature("methods", "runtime", GAP, "user-defined methods (`method` declarations)"),
     Feature("function-overloads", "runtime", GAP, "user-defined function overloading"),
     Feature("libraries", "runtime", GAP, "libraries (`import` / `library()`)"),
     # Types

@@ -5,7 +5,7 @@ built-in registries; a test fails if this file is out of date. Compatibility is 
 feature. **No claim of full Pine compatibility is made**: a script runs only if every feature it
 uses is supported, and otherwise fails with the exact feature and line.
 
-Features: 23 supported, 13 partial, 12 not yet implemented. Built-ins: 160 functions, 60 variables, 87 constants.
+Features: 23 supported, 14 partial, 12 not yet implemented. Built-ins: 160 functions, 60 variables, 87 constants.
 
 ## parser
 
@@ -33,7 +33,8 @@ Features: 23 supported, 13 partial, 12 not yet implemented. Built-ins: 160 funct
 | tuple returns and `[a, b] = f()` declarations | supported |  |
 | realtime bar re-execution with rollback (varip survives) | supported |  |
 | `for ... in` loops over arrays (`for x in a`, `for [i, x] in a`) | partial | Maps and matrices are not implemented, so loops over them are gaps. |
-| methods (`method` declarations and `obj.method()` calls) | gap |  |
+| built-in method syntax (`a.push(x)` for `array.push(a, x)`) | partial | Arrays only (the engine's only values with built-in methods); unimplemented `array.*` functions stay gaps in either form. |
+| user-defined methods (`method` declarations) | gap |  |
 | user-defined function overloading | gap |  |
 | libraries (`import` / `library()`) | gap |  |
 
