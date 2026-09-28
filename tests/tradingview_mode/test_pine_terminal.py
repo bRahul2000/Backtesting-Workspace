@@ -67,7 +67,7 @@ def test_scripts_with_gaps_or_errors_are_not_added_and_say_why():
     state, session = TerminalState(dataset_key="EXNESS_XAUUSDM_M15", timeframe="15m"), {}
     same, log = PB.handle_pine_event(ev("pine_add", source=GAPS), state, session)
     assert same == state and log.level == "error"
-    assert log.message == ("Rejected: Pine script not added. Line 3: `request.security_lower_tf()` is not implemented "
+    assert log.message == ("Rejected: Pine script not added. Line 3: `request.dividends()` is not implemented "
                            "yet (data requests).")
     editor = session[PB.EDITOR_KEY]
     assert editor["ok"] is False and {d["kind"] for d in editor["diagnostics"]} == {"gap"}

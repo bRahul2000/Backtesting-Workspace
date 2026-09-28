@@ -90,10 +90,11 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     # Drawing objects
     Feature("drawing-objects", "drawings", GAP, "drawing objects (`line.*`, `label.*`, `box.*`, `table.*`, `polyline.*`, `linefill.*`)"),
     # Data requests
-    Feature("request", "request", PARTIAL, "data requests (`request.security()` for same and higher timeframes)",
+    Feature("request", "request", PARTIAL,
+            "data requests (`request.security()` for same and higher timeframes, `request.security_lower_tf()`)",
             "Same-source symbols only; expressions over global scalars, ta.*, tuples and user functions; nesting "
-            "<= 2. request.security_lower_tf(), lower timeframes, other request.* and ticker.* are not implemented "
-            "yet."),
+            "<= 2; at most 10,000 intrabars per lower-timeframe request (TradingView: 100K-200K). `currency`, "
+            "seconds/tick/range timeframes, other request.* and ticker.* are not implemented yet."),
     # Strategies
     Feature("strategy", "strategy", GAP, "strategy scripts (`strategy()`, `strategy.*` order simulation)"),
 )}

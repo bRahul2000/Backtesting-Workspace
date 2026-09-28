@@ -24,6 +24,12 @@ Modes:
   revealed / received so far. ``lookahead_on`` therefore shows the forming value, never a final future one,
   and an incremental run equals a fresh run on the same bars.
 
+``request.security_lower_tf()`` (P2.2-A4, P22_LOWER_TF_RESEARCH.md) uses the same contexts over intrabars (a
+timeframe lower than or equal to the chart's). Each chart bar gets **new arrays** of the values captured on the
+intrabars it owns: those whose close time is in ``(chart open, chart close]`` (TradingView q7). Historical runs use
+every provider intrabar; Replay only intrabars closed by the chart bar's close (knowable at the cursor); Live adds,
+on the forming chart bar, the intrabars this terminal has received, the forming one last (TradingView R1).
+
 Resource limits are this engine's (not TradingView's): see ``MAX_CONTEXTS_PER_SCRIPT`` etc.
 """
 from __future__ import annotations
@@ -37,7 +43,7 @@ from typing import Any, Protocol
 import numpy as np
 
 from .errors import PineRuntimeError
-from .values import NA, is_na
+from .values import NA, Color, PineArray, is_na
 
 MAX_CONTEXTS_PER_SCRIPT = 16
 MAX_CONTEXTS_PER_CHART = 32
@@ -192,8 +198,19 @@ class Requested:
     base: Bars | None = None    # knowable mode, other symbol: its bars at the parent timeframe (for forming bars)
 
 
+@dataclass
+class ReceivedBars:
+    """Live: bars of one symbol/timeframe this terminal has actually received (ascending, the forming one last)."""
+
+    rows: list                  # (open_ms, close_ms, open, high, low, close, volume)
+    forming: bool               # the last row is still forming
+
+
 class SecurityProvider(Protocol):
-    """Resolves and serves requested data. Implemented outside the Pine package (component/security_data.py)."""
+    """Resolves and serves requested data. Implemented outside the Pine package (component/security_data.py).
+
+    ``request(..., lower=True)`` is asked for lower-timeframe contexts (a provider may fetch more bars); a provider
+    may also offer ``received(symbol, timeframe) -> ReceivedBars | None`` for Live lower-timeframe requests."""
 
     family: str
 
@@ -265,6 +282,8 @@ class Context:
     forming: bool = False                          # the last store row is a forming (partial) bar
     max_source_time: int | None = None
     stale: bool = False                            # re-ask the provider on the next advance (new run)
+    lower: bool = False                            # a request.security_lower_tf() context
+    limit: int = MAX_BARS_PER_CONTEXT              # provider bars kept (lower: minus room for received bars)
 
     @property
     def size(self) -> int:
@@ -305,65 +324,87 @@ class SecurityManager:
         return out
 
     def value(self, rt, node, spec, args: dict):
-        """The value of one request.security() call on the parent runtime's current bar."""
+        """The value of one request.security() / request.security_lower_tf() call on the parent's current bar."""
+        label = "request.security_lower_tf()" if spec.lower else "request.security()"
         if self.provider is None:
-            raise PineRuntimeError("request.security() has no data source in this run.", node.line)
+            raise PineRuntimeError(f"{label} has no data source in this run.", node.line)
         if self.depth + 1 > MAX_DEPTH:
-            raise PineRuntimeError(f"{LIMIT}: request.security() can be nested at most {MAX_DEPTH} levels deep.",
-                                   node.line)
+            raise PineRuntimeError(f"{LIMIT}: {label} can be nested at most {MAX_DEPTH} levels deep.", node.line)
         if not is_na(args.get("currency", NA)):
-            raise PineRuntimeError("request.security() with a `currency` conversion is not implemented yet.", node.line)
+            raise PineRuntimeError(f"{label} with a `currency` conversion is not implemented yet.", node.line)
         data = rt.data
         try:
             timeframe = parse_timeframe(args["timeframe"], data.timeframe_seconds)
         except SecurityDataError as exc:
-            raise PineRuntimeError(f"request.security(): {exc.message}", node.line) from None
-        if timeframe.seconds < data.timeframe_seconds:
-            raise PineRuntimeError(
-                f"request.security() for a lower timeframe ({timeframe.text}) than the chart "
-                f"({_from_seconds(data.timeframe_seconds).text}) is not implemented yet "
-                "(request.security_lower_tf() comes later).", node.line)
+            raise PineRuntimeError(f"{label}: {exc.message}", node.line) from None
+        chart = _from_seconds(data.timeframe_seconds).text
+        if spec.lower and timeframe.seconds > data.timeframe_seconds:
+            if args.get("ignore_invalid_timeframe") is True:
+                return _na_like(spec)                        # an na array (TradingView R2), not an empty one
+            raise PineRuntimeError(f"{label}: the timeframe {timeframe.text} is higher than the chart's ({chart}); "
+                                   "only lower or equal timeframes can be requested.", node.line)
+        if not spec.lower and timeframe.seconds < data.timeframe_seconds:
+            raise PineRuntimeError(                          # wording frozen in the P2.1 terminal evidence
+                f"request.security() for a lower timeframe ({timeframe.text}) than the chart ({chart}) is not "
+                "implemented yet (request.security_lower_tf() comes later).", node.line)
         symbol = args["symbol"]
         symbol = data.tickerid if is_na(symbol) or symbol == "" else str(symbol)
         key = (node.id, rt.ctx_path, symbol, timeframe.text)
         context = self.contexts.get(key)
         try:
             if context is None:
-                context = self._open(rt, node, spec, key, symbol, timeframe)
-            self._advance(rt, context)
+                context = self._open(rt, node, spec, key, symbol, timeframe, args)
+            if context.lower:
+                self._advance_lower(rt, context)
+            else:
+                self._advance(rt, context)
         except SecurityDataError as exc:
             if exc.kind == "unknown_symbol" and args.get("ignore_invalid_symbol") is True:
                 return _na_like(spec)
-            raise PineRuntimeError(f"request.security(): {exc.message}", node.line) from None
+            raise PineRuntimeError(f"{label}: {exc.message}", node.line) from None
+        if context.lower:
+            return self._select_lower(rt, spec, context)
         return self._select(rt, node, spec, context, args)
 
     # -- context lifecycle ---------------------------------------------------------------------------------------------
-    def _ask(self, rt, symbol: str, timeframe: Timeframe) -> Requested:
+    def _ask(self, rt, symbol: str, timeframe: Timeframe, lower: bool = False,
+             limit: int = MAX_BARS_PER_CONTEXT) -> Requested:
         data = rt.data
+        extra = {"lower": True} if lower else {}
+        chart_end = int(data.time[-1]) if data.size else None
+        if lower and chart_end is not None:          # intrabars of the last chart bar open after its open time
+            chart_end = _bar_close(data, data.size - 1) - 1
         try:
             requested = self.provider.request(
                 symbol, timeframe, parent_tickerid=data.tickerid, parent_seconds=data.timeframe_seconds,
                 knowable=data.knowable, until_ms=data.knowable_until if data.knowable else None,
-                chart_end_ms=int(data.time[-1]) if data.size else None)
+                chart_end_ms=chart_end, **extra)
         except SecurityDataError:
             raise
         except Exception as exc:                      # network / file problems: an explicit script error, never a crash
             raise SecurityDataError(f"the {getattr(self.provider, 'family', 'data')} data source is unavailable "
                                     f"({type(exc).__name__}: {exc}).", "unavailable") from None
-        if requested.bars.size > MAX_BARS_PER_CONTEXT:
-            requested.bars = requested.bars.tail(MAX_BARS_PER_CONTEXT)
+        if requested.bars.size > limit:
+            requested.bars = requested.bars.tail(limit)
         if data.knowable and data.knowable_until is not None and requested.bars.size \
                 and int(requested.bars.close_time[-1]) > data.knowable_until:
             raise SecurityDataError("the data source returned bars after the knowable time (refused).", "future")
         return requested
 
-    def _open(self, rt, node, spec, key, symbol, timeframe) -> Context:
+    def _open(self, rt, node, spec, key, symbol, timeframe, args: dict) -> Context:
         if self.budget.used >= self.budget.limit:
             raise PineRuntimeError(f"{LIMIT}: at most {self.budget.limit} requested contexts per script.", node.line)
-        requested = self._ask(rt, symbol, timeframe)
+        limit = MAX_BARS_PER_CONTEXT
+        if spec.lower:
+            # engine limitation (TradingView: 100K-200K intrabars); room is kept for the received live intrabars
+            limit -= rt.data.timeframe_seconds // timeframe.seconds + 2
+            calc = args.get("calc_bars_count")
+            if not is_na(calc) and calc is not None and int(calc) > 0:
+                limit = min(limit, int(calc))
+        requested = self._ask(rt, symbol, timeframe, spec.lower, limit)
         self.budget.used += 1
         context = Context(key, node.line, self.depth + 1, symbol, requested, timeframe,
-                          self._child(rt, spec, requested, timeframe))
+                          self._child(rt, spec, requested, timeframe), lower=spec.lower, limit=limit)
         self.contexts[key] = context
         return context
 
@@ -380,14 +421,17 @@ class SecurityManager:
         return Runtime(rt.program, child_data, rt.input_values, body=spec.body, capture=True,
                        security=SecurityManager(self.provider, self.depth + 1, self.budget))
 
-    def _advance(self, rt, context: Context) -> None:
-        """Bring the requested bars (and the child runtime) to what the parent's current bar may see."""
+    def _refresh(self, rt, context: Context) -> None:
         if context.stale:
             context.stale = False
-            fresh = self._ask(rt, context.symbol, context.timeframe)
+            fresh = self._ask(rt, context.symbol, context.timeframe, context.lower, context.limit)
             if not _same_prefix(context.requested.bars, fresh.bars, context.n_provider):
                 self._reset(context, rt)
             context.requested = fresh
+
+    def _advance(self, rt, context: Context) -> None:
+        """Bring the requested bars (and the child runtime) to what the parent's current bar may see."""
+        self._refresh(rt, context)
         data, bar = rt.data, rt.bar
         bars = context.requested.bars
         if not data.knowable:
@@ -397,6 +441,35 @@ class SecurityManager:
             n_provider, tail, forming, max_source = self._knowable(rt, context, data, bar)
         self._apply(context, n_provider, tail, forming)
         context.max_source_time = max_source
+
+    def _advance_lower(self, rt, context: Context) -> None:
+        """Lower timeframe: historical = every provider intrabar; knowable (Replay/Live) = the intrabars closed by the
+        chart bar's close, and on the forming Live bar the received ones after them (the forming intrabar last)."""
+        self._refresh(rt, context)
+        data, bar = rt.data, rt.bar
+        bars = context.requested.bars
+        n_provider, tail, forming = bars.size, [], False
+        if data.knowable:
+            confirmed = data.confirmed_until is None or bar < data.confirmed_until
+            cutoff = _bar_close(data, bar) if confirmed else int(data.time[bar])
+            n_provider = int(np.searchsorted(bars.close_time, cutoff, side="right"))
+            if not confirmed:
+                tail, forming = self._received(context, int(bars.close_time[n_provider - 1]) if n_provider else None)
+        max_source = int(bars.close_time[n_provider - 1]) if n_provider else None
+        if tail:
+            last = tail[-1]
+            max_source = max(max_source or 0, last[0] if forming else last[1])
+        self._apply(context, n_provider, tail, forming)
+        context.max_source_time = max_source
+
+    def _received(self, context: Context, covered: int | None) -> tuple[list, bool]:
+        """Received live intrabars after the provider's coverage (none without a received source)."""
+        source = getattr(self.provider, "received", None)
+        received = source(context.symbol, context.timeframe) if source is not None else None
+        if received is None or not received.rows:
+            return [], False
+        rows = [tuple(row) for row in received.rows if covered is None or int(row[1]) > covered]
+        return rows, bool(rows) and received.forming
 
     def _knowable(self, rt, context: Context, data, bar: int):
         t_open, t_close = int(data.time[bar]), _bar_close(data, bar)
@@ -484,6 +557,22 @@ class SecurityManager:
         context.store, context.n_provider, context.tail = _Store(), 0, []
         context.tail_start, context.last_bucket_start, context.forming = -1, 0, False
 
+    # -- lower-timeframe mapping (TradingView q7: intrabars belong to the chart bar in which they close) ----------------
+    def _select_lower(self, rt, spec, context: Context):
+        data, bar, store = rt.data, rt.bar, context.store
+        values: list = []
+        if store.n:
+            closes = store.view("close_time")
+            first = bisect_right(closes, int(data.time[bar]))            # first intrabar closing after the chart open
+            last = bisect_right(closes, _bar_close(data, bar))           # past the last closing by the chart close
+            results = context.runtime.results.values
+            values = results[first:min(last, len(results))]
+        if spec.tuple_size:
+            columns = list(zip(*values)) if values else [()] * spec.tuple_size
+            return tuple(_intrabar_array(column, spec.elements[k] if k < len(spec.elements) else None)
+                         for k, column in enumerate(columns))
+        return _intrabar_array(values, spec.elements[0] if spec.elements else None)
+
     # -- mapping (TradingView q4 semantics) ---------------------------------------------------------------------------
     def _select(self, rt, node, spec, context: Context, args: dict):
         from .runtime import MISSING
@@ -515,6 +604,17 @@ def _same_prefix(old: Bars, new: Bars, n: int) -> bool:
         return False
     return all(np.array_equal(getattr(old, c)[:n], getattr(new, c)[:n], equal_nan=True)
                for c in ("time", "close_time", "open", "high", "low", "close", "volume"))
+
+
+def _intrabar_array(values, element: str | None) -> PineArray:
+    """A new execution-local array of intrabar values (A1: snapshots and history are the runtime's)."""
+    from .builtins.arrays import coerce_element
+
+    if element is None:                                  # type unknown at analysis time: from the values
+        sample = next((v for v in values if not is_na(v)), None)
+        element = ("bool" if isinstance(sample, bool) else "int" if isinstance(sample, int) else
+                   "string" if isinstance(sample, str) else "color" if isinstance(sample, Color) else "float")
+    return PineArray([coerce_element(v, element, "request.security_lower_tf") for v in values], element)
 
 
 def _na_like(spec):

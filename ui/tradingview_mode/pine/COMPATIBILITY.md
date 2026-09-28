@@ -5,7 +5,7 @@ built-in registries; a test fails if this file is out of date. Compatibility is 
 feature. **No claim of full Pine compatibility is made**: a script runs only if every feature it
 uses is supported, and otherwise fails with the exact feature and line.
 
-Features: 23 supported, 14 partial, 12 not yet implemented. Built-ins: 160 functions, 60 variables, 87 constants.
+Features: 23 supported, 14 partial, 12 not yet implemented. Built-ins: 161 functions, 60 variables, 87 constants.
 
 ## parser
 
@@ -88,7 +88,7 @@ Features: 23 supported, 14 partial, 12 not yet implemented. Built-ins: 160 funct
 
 | feature | status | notes |
 |---|---|---|
-| data requests (`request.security()` for same and higher timeframes) | partial | Same-source symbols only; expressions over global scalars, ta.*, tuples and user functions; nesting <= 2. request.security_lower_tf(), lower timeframes, other request.* and ticker.* are not implemented yet. |
+| data requests (`request.security()` for same and higher timeframes, `request.security_lower_tf()`) | partial | Same-source symbols only; expressions over global scalars, ta.*, tuples and user functions; nesting <= 2; at most 10,000 intrabars per lower-timeframe request (TradingView: 100K-200K). `currency`, seconds/tick/range timeframes, other request.* and ticker.* are not implemented yet. |
 
 ## strategy
 
@@ -116,7 +116,7 @@ Features: 23 supported, 14 partial, 12 not yet implemented. Built-ins: 160 funct
 | `math` | 24 / 24 |  |
 | `matrix` | 0 / 49 | `matrix.add_col`, `matrix.add_row`, `matrix.avg`, `matrix.col`, `matrix.columns`, `matrix.concat`, `matrix.copy`, `matrix.det`, `matrix.diff`, `matrix.eigenvalues`, `matrix.eigenvectors`, `matrix.elements_count` … (+37) |
 | `polyline` | 0 / 2 | `polyline.delete`, `polyline.new` |
-| `request` | 1 / 11 | `request.currency_rate`, `request.dividends`, `request.earnings`, `request.economic`, `request.financial`, `request.footprint`, `request.quandl`, `request.security_lower_tf`, `request.seed`, `request.splits` |
+| `request` | 2 / 11 | `request.currency_rate`, `request.dividends`, `request.earnings`, `request.economic`, `request.financial`, `request.footprint`, `request.quandl`, `request.seed`, `request.splits` |
 | `runtime` | 1 / 1 |  |
 | `session` | 0 / 7 | `session.isfirstbar`, `session.isfirstbar_regular`, `session.islastbar`, `session.islastbar_regular`, `session.ismarket`, `session.ispostmarket`, `session.ispremarket` |
 | `str` | 15 / 18 | `str.format_time`, `str.match`, `str.split` |

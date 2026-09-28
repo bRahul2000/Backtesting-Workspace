@@ -1,0 +1,23 @@
+//@version=6
+// Pine P2.2-A4 parity - QUICK HISTORICAL ORACLE: lower timeframe that does NOT divide the chart timeframe.
+// Real TradingView is the oracle: no expected values, no PASS/FAIL.
+// Setup: BINANCE:BTCUSDT, 15-minute chart; historical bars only (no need to wait for ticks).
+// A 10-minute intrabar can straddle two 15-minute chart bars (e.g. 00:10-00:20). Each row lists, for one
+// confirmed chart bar, the open time of every intrabar in its array, in minutes from the chart bar's open
+// (a negative value = the intrabar opened in the previous chart bar), plus each intrabar's close offset.
+indicator("q7 lower-tf straddle", overlay=true)
+[tA, tcA] = request.security_lower_tf(syminfo.tickerid, "10", [time, time_close])
+
+string opens = ""
+string closes = ""
+for [i, t0] in tA
+    opens += str.tostring((t0 - time) / 60000) + " "
+    closes += str.tostring((array.get(tcA, i) - time) / 60000) + " "
+string row = str.format_time(time, "yyyy-MM-dd HH:mm", "UTC") + " | n=" + str.tostring(array.size(tA)) + " | opens: " + opens + "| closes: " + closes
+
+var table t = table.new(position.top_right, 1, 10, bgcolor=color.white, border_color=color.gray, border_width=1)
+if barstate.islast
+    table.cell(t, 0, 0, "q7 10-minute intrabars on a 15-minute chart (minutes from each chart bar's open, UTC)", text_color=color.black, bgcolor=color.silver, text_size=size.small)
+    for k = 1 to 8
+        table.cell(t, 0, k, row[k], text_color=color.black, text_size=size.small, text_halign=text.align_left)
+plot(close, "close", display=display.none)

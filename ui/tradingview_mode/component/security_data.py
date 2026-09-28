@@ -15,6 +15,10 @@ Locked data policy (see pine/parity/SECURITY_SEMANTICS.md):
   builds the forming requested bar from the chart bars revealed / received so far.
 * Every answer carries provenance: family, provider, symbol, timeframe, native or aggregated (and from what),
   data identity and fingerprint.
+* **Lower timeframes** (``request.security_lower_tf()``, ``lower=True``) follow the same rules: Exness only from its
+  authoritative datasets (nothing below the finest, today M15), Binance from public klines (up to the engine's
+  per-context limit). In Live the forming chart bar's intrabars come from ``received``: bars this terminal has
+  actually received (the MT5 snapshot, a Binance kline stream), never fetched or synthesised.
 """
 from __future__ import annotations
 
@@ -28,12 +32,13 @@ import time as _time
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from services.market_datasets import MarketDataset, all_datasets
 from utils.data_validation import load_ohlcv_csv
 
-from ..pine.security import (BarGrid, Bars, LIMIT, Requested, SecurityDataError, Timeframe, _aggregate,
-                             parse_timeframe)
+from ..pine.security import (MAX_BARS_PER_CONTEXT, BarGrid, Bars, LIMIT, ReceivedBars, Requested,
+                             SecurityDataError, Timeframe, _aggregate, parse_timeframe)
 from . import binance
 
 FAMILY_LABELS = {"exness": "Exness MT5", "binance": "Binance Futures", "bitstamp": "Bitstamp"}
@@ -43,6 +48,8 @@ BINANCE_SYMBOLS = tuple(binance.CONTRACTS)
 BINANCE_NATIVE = {60: "1m", 180: "3m", 300: "5m", 900: "15m", 1800: "30m", 3600: "1h", 7200: "2h", 14400: "4h",
                   21600: "6h", 28800: "8h", 43200: "12h", 86400: "1d"}
 BINANCE_FETCH_BARS = 3000          # requested bars fetched per Binance context (<= the engine's 10,000 limit)
+BINANCE_LOWER_FETCH_BARS = MAX_BARS_PER_CONTEXT   # lower-timeframe contexts: up to the engine's limit
+BINANCE_MAX_BASE_BARS = 12_000     # 8 REST pages of 1,500
 BINANCE_REFRESH_S = 5.0            # at most one refresh of a (symbol, interval) per 5 seconds
 
 
@@ -146,7 +153,7 @@ class DatasetProvider:
         return resolve_symbol(self.family, symbol)
 
     def request(self, symbol, timeframe: Timeframe, *, parent_tickerid, parent_seconds, knowable, until_ms,
-                chart_end_ms) -> Requested:
+                chart_end_ms, lower: bool = False) -> Requested:
         canonical = self.check_symbol(symbol)
         entries = self.datasets(canonical)
         if not entries:
@@ -285,19 +292,20 @@ class BinanceProvider:
         return resolve_symbol("binance", symbol)
 
     def request(self, symbol, timeframe: Timeframe, *, parent_tickerid, parent_seconds, knowable, until_ms,
-                chart_end_ms) -> Requested:
+                chart_end_ms, lower: bool = False) -> Requested:
         canonical = self.check_symbol(symbol)
         grid = BarGrid(timeframe)                       # Binance klines: UTC, weeks from Monday, calendar months
         interval = self._native(timeframe)
+        fetch = BINANCE_LOWER_FETCH_BARS if lower else BINANCE_FETCH_BARS
         if interval is not None:
-            bars = self._klines(canonical, interval, _interval_ms(timeframe), until_ms, BINANCE_FETCH_BARS)
+            bars = self._klines(canonical, interval, _interval_ms(timeframe), until_ms, fetch)
             provenance = self._provenance(canonical, interval, None, bars)
         else:
             base_seconds = self._aggregation_base(timeframe)
             base_interval = BINANCE_NATIVE[base_seconds]
             ratio = timeframe.seconds // base_seconds
             base = self._klines(canonical, base_interval, base_seconds * 1000, until_ms,
-                                min(10_000, BINANCE_FETCH_BARS * ratio))
+                                min(BINANCE_MAX_BASE_BARS if lower else 10_000, fetch * ratio))
             bars = _rows_to_bars(_aggregate(base, 0, base.size, grid))
             if bars.size and bars.close_time[-1] > (until_ms or math.inf):
                 bars = bars.upto_close(until_ms)       # an incomplete last bucket is not a completed bar
@@ -334,7 +342,7 @@ class BinanceProvider:
     def _klines(self, symbol: str, interval: str, interval_ms: int, until_ms: int | None, count: int) -> Bars:
         """Completed klines (close <= now, and <= until_ms when given), cached per (symbol, interval)."""
         now_ms = int(self._clock() * 1000)
-        key = (symbol, interval)
+        key = (symbol, interval, count)
         with self._lock:
             cached = self._cache.get(key)
         wanted_close = min(until_ms, now_ms) if until_ms is not None else now_ms
@@ -380,8 +388,47 @@ def _interval_ms(timeframe: Timeframe) -> int:
     return timeframe.seconds * 1000
 
 
-def provider_for(family: str, *, binance_provider: BinanceProvider | None = None):
-    """The provider for a chart's source family."""
-    if family == "binance":
-        return binance_provider or BinanceProvider()
-    return DatasetProvider(family)
+class ReceivingProvider:
+    """A family provider plus the Live received-bars source for lower-timeframe requests."""
+
+    def __init__(self, inner, received):
+        self._inner, self._received = inner, received
+        self.family = inner.family
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def request(self, *args, **kwargs) -> Requested:
+        return self._inner.request(*args, **kwargs)
+
+    def received(self, symbol: str, timeframe: Timeframe) -> ReceivedBars | None:
+        return self._received(self._inner.check_symbol(symbol), timeframe)
+
+
+def provider_for(family: str, *, binance_provider: BinanceProvider | None = None, received=None):
+    """The provider for a chart's source family; ``received(symbol, timeframe) -> ReceivedBars | None`` adds the
+    Live bars this terminal has received (lower-timeframe requests on the forming chart bar)."""
+    provider = (binance_provider or BinanceProvider()) if family == "binance" else DatasetProvider(family)
+    return ReceivingProvider(provider, received) if received is not None else provider
+
+
+def received_from_frame(frame, seconds: int, grid: BarGrid | None = None) -> ReceivedBars | None:
+    """Received live bars (``timestamp, open, high, low, close, volume`` and optionally ``final``) of one
+    timeframe -> ReceivedBars; with ``grid`` they are aggregated into that coarser timeframe first. A bar is
+    complete when it is final (or, without a ``final`` column, when it is not the last row)."""
+    if frame is None or not len(frame):
+        return None
+    stamps = pd.to_datetime(frame["timestamp"], utc=True)          # any datetime resolution (pandas 2 and 3)
+    times = ((stamps - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(milliseconds=1)).to_numpy(dtype=np.int64)
+    final = np.asarray(frame["final"], dtype=bool) if "final" in frame else np.r_[np.ones(len(frame) - 1, bool), False]
+    base = Bars(times.astype(np.int64), times.astype(np.int64) + seconds * 1000,
+                *(np.asarray(frame[c], dtype=float) for c in ("open", "high", "low", "close", "volume")))
+    if grid is None:
+        rows = [(int(base.time[i]), int(base.close_time[i]), float(base.open[i]), float(base.high[i]),
+                 float(base.low[i]), float(base.close[i]), float(base.volume[i])) for i in range(base.size)]
+        return ReceivedBars(rows, not bool(final[-1]))
+    rows = _aggregate(base, 0, base.size, grid)
+    if not rows:
+        return None
+    forming = not bool(final[-1]) or int(base.close_time[-1]) < rows[-1][1]
+    return ReceivedBars(rows, forming)

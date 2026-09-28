@@ -55,6 +55,9 @@ CONTRACTS: dict[str, dict[str, str]] = {
 }
 #: Native Binance kline intervals used by Live mode.
 INTERVALS: dict[str, int] = {"15m": 900, "30m": 1800, "1h": 3600}
+#: Intervals a kline stream may use: the chart intervals plus lower ones for Pine request.security_lower_tf()
+#: on the forming chart bar (received intrabars, P2.2-A4).
+STREAM_INTERVALS: dict[str, int] = {"1m": 60, "3m": 180, "5m": 300, **INTERVALS}
 SEED_BARS = 2000               # initial history (15m: ~21 days), fetched in pages
 KLINES_PAGE = 1000             # bars per REST request (Binance allows up to 1500)
 HISTORY_PAGE = 1000            # older bars fetched per "load older history" request
@@ -181,7 +184,7 @@ def parse_contract(exchange_info: Any, symbol: str) -> ContractSpec:
 
 def _make_bar(interval: str, open_ms: Any, close_ms: Any, o: Any, h: Any, l: Any, c: Any, v: Any, final: bool,
               where: str) -> Bar:
-    seconds = INTERVALS[interval]
+    seconds = STREAM_INTERVALS[interval]
     open_ms, close_ms = _int(open_ms, f"{where} open time"), _int(close_ms, f"{where} close time")
     if open_ms % (seconds * 1000):
         raise BinanceDataError(f"{where}: open time not aligned to {interval}.")
@@ -274,7 +277,7 @@ class KlineBook:
 
     def __init__(self, symbol: str, interval: str, limit: int = MAX_LIVE_BARS):
         self.symbol, self.interval, self.limit = symbol, interval, limit
-        self.seconds = INTERVALS[interval]
+        self.seconds = STREAM_INTERVALS[interval]
         self.bars: list[Bar] = []
         self.last_event_ms = 0
         self.forming_asof_ms = 0      # a REST snapshot of the forming bar is as of this server time
@@ -617,7 +620,7 @@ class KlineStream(_Worker):
                  connect: Callable[[str], Any] = _default_connect, clock: Callable[[], float] = time.time,
                  max_age_s: float = MAX_CONNECTION_AGE_S, silence_s: float = SILENCE_RECONNECT_S,
                  idle_timeout_s: float = IDLE_TIMEOUT_S, backoff: tuple[float, ...] = BACKOFF_S):
-        if symbol not in CONTRACTS or interval not in INTERVALS:
+        if symbol not in CONTRACTS or interval not in STREAM_INTERVALS:
             raise ValueError(f"unsupported Binance live stream {symbol} {interval}")
         super().__init__(clock, idle_timeout_s)
         self.symbol, self.interval = symbol, interval
@@ -821,6 +824,11 @@ class BinanceHub:
 
     def kline(self, session_id: str, symbol: str, interval: str) -> KlineStream:
         return self._lease(session_id, "kline", ("kline", symbol, interval),
+                           lambda: self._kline_factory(symbol, interval))  # type: ignore[return-value]
+
+    def lower_kline(self, session_id: str, symbol: str, interval: str) -> KlineStream:
+        """A kline stream for Pine lower-timeframe requests: its own lease, so it never replaces the chart's."""
+        return self._lease(session_id, f"lower:{interval}", ("kline", symbol, interval),
                            lambda: self._kline_factory(symbol, interval))  # type: ignore[return-value]
 
     def quotes(self, session_id: str) -> QuoteBoard:

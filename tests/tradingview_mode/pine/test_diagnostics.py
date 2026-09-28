@@ -15,8 +15,8 @@ def only(source):
 
 
 @pytest.mark.parametrize("body, line, message", [
-    ("ltf = request.security_lower_tf(syminfo.tickerid, '1', close)", 3,
-     "`request.security_lower_tf()` is not implemented yet (data requests)."),
+    ("d = request.dividends(syminfo.tickerid)", 3,
+     "`request.dividends()` is not implemented yet (data requests)."),
     ("a = array.avg(array.from(1.0, 2.0))", 3, "`array.avg()` is not implemented yet (arrays)."),
     ("l = label.new(bar_index, high, 'x')", 3, "`label.new()` is not implemented yet (drawing objects)."),
     ("type Pivot\n    float price\n    int bar", 3, "User-defined types (`type Pivot`) are not implemented yet."),
@@ -93,7 +93,7 @@ def test_compatibility_matrix_is_by_feature_and_makes_no_blanket_claim():
     statuses = {f["id"]: f["status"] for group in m["features"].values() for f in group}
     # request.security() is implemented (P2.1); the rest of request.* stays a gap inside the partial feature
     assert statuses["request"] == "partial" and statuses["drawing-objects"] == "gap" and statuses["strategy"] == "gap"
-    assert "request.security_lower_tf" in m["builtins"]["by_namespace"]["request"]["missing"]
+    assert "request.dividends" in m["builtins"]["by_namespace"]["request"]["missing"]
     assert statuses["functions"] == "supported" and statuses["ta"] == "partial"
     ta = m["builtins"]["by_namespace"]["ta"]
     assert 0 < ta["implemented"] < ta["known"] and "ta.percentile_nearest_rank" in ta["missing"]

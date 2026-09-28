@@ -184,6 +184,60 @@ class BinanceFuturesProvider:
         return LiveView(frame, status, ident)
 
 
+# ---------------------------------------------------------------------------
+# Received bars for Pine request.security_lower_tf() on the forming Live bar (P2.2-A4)
+# ---------------------------------------------------------------------------
+
+def lower_tf_received(source: str, *, now: float, session_id: str | None = None,
+                      hub: binance.BinanceHub | None = None, books: dict | None = None, folder: Path | None = None):
+    """``received(symbol, timeframe) -> ReceivedBars | None``: the lower-timeframe bars this terminal has actually
+    received from the chart's own source family — never fetched, synthesised or taken from the other family.
+
+    * Binance: a public kline stream at the requested interval (a lower native interval, or the largest one that
+      divides a custom interval, aggregated on UTC boundaries), leased separately from the chart's stream.
+    * Exness: the MT5 bridge snapshot, which carries received M15 / M30 / H1 bars (the forming one included)."""
+    from ..pine.security import BarGrid
+    from .security_data import received_from_frame
+
+    def from_binance(symbol, timeframe):
+        streams = {seconds: name for name, seconds in binance.STREAM_INTERVALS.items()}
+        interval, grid = streams.get(timeframe.seconds), None
+        if interval is None:                                  # e.g. 10m: aggregated from a received 5m/1m stream
+            base = next((sec for sec in sorted(streams, reverse=True)
+                         if sec < timeframe.seconds and timeframe.seconds % sec == 0), None)
+            if base is None or not timeframe.intraday:
+                return None
+            interval, grid = streams[base], BarGrid(timeframe)
+        if symbol not in binance.CONTRACTS:
+            return None
+        snap = (hub or binance.hub()).lower_kline(session_id or "", symbol, interval).snapshot(now)
+        return received_from_frame(snap["frame"], binance.STREAM_INTERVALS[interval], grid)
+
+    def from_exness(symbol, timeframe):
+        periods = {seconds: key for key, (_, seconds) in mt5.LIVE_TIMEFRAMES.items()}
+        key = periods.get(timeframe.seconds)
+        if key is None or books is None:
+            return None
+        book = books.get((symbol, key)) or mt5.empty_book(symbol, key)
+        feed = mt5.read_feed(folder or mt5.common_files_dir(), symbol, key)
+        if feed.snapshot is not None and feed.error is None:
+            book, _ = mt5.apply_snapshot(book, feed.snapshot, feed.seed)
+        books[(symbol, key)] = book
+        if book.bars.empty:
+            return None
+        snapshot = book.snapshot
+        forming = mt5.forming_bar_time(book.bars, timeframe.seconds, snapshot.tick_time_ms) if snapshot else None
+        frame = pd.DataFrame({
+            "timestamp": pd.to_datetime(book.bars["time"].astype("int64"), unit="s", utc=True),
+            "open": book.bars["open"].astype(float), "high": book.bars["high"].astype(float),
+            "low": book.bars["low"].astype(float), "close": book.bars["close"].astype(float),
+            "volume": book.bars["tick_volume"].astype(float),
+            "final": book.bars["time"].astype("int64") != (forming if forming is not None else -1)})
+        return received_from_frame(frame, timeframe.seconds)
+
+    return from_binance if source == "binance" else from_exness
+
+
 def binance_watch_quote(board: binance.QuoteBoard, symbol: str, now: float) -> dict[str, Any] | None:
     top = board.quote(symbol, now)
     return None if top is None else {"status": "LIVE", "bid": top.bid, "ask": top.ask, "event_ms": top.event_ms}

@@ -202,7 +202,8 @@ def test_lower_timeframe_requests_fail_explicitly():
     data = data_context(frame, timeframe_seconds=300, ticker="BTCUSDT", tickerid="BINANCE:BTCUSDT", mintick=0.1)
     out = run_script(PineExecution(result.program, {}, FakeBinance()), data, ("t",), "t", FakeBinance())
     assert "lower timeframe (1) than the chart (5) is not implemented yet" in out.error["message"]
-    assert compile_script(script('x = request.security_lower_tf(syminfo.tickerid, "1", close)')).diagnostics[0].kind == "gap"
+    # P2.2-A4: request.security_lower_tf() is the supported way to read lower timeframes (test_lower_tf.py)
+    assert compile_script(script('x = request.security_lower_tf(syminfo.tickerid, "1", close)\nplot(x.size())')).ok
 
 
 # ---- I. dependency slicing -------------------------------------------------------------------------------------------

@@ -59,10 +59,10 @@ plot(signalLine, "Signal", color.orange)
 hline(0, "Zero", color = color.gray)
 """,
     "Uses unimplemented features": """//@version=5
-indicator("Needs lower-timeframe data and labels", overlay = true)
-daily = request.security_lower_tf(syminfo.tickerid, "1", close)
-plot(daily, "Daily close")
-if ta.crossover(close, daily)
+indicator("Needs dividend data and labels", overlay = true)
+dividends = request.dividends(syminfo.tickerid)
+plot(dividends, "Dividends")
+if ta.crossover(close, dividends)
     label.new(bar_index, high, "Cross")
 """,
 }

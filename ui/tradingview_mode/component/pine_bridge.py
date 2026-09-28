@@ -128,14 +128,15 @@ def _contexts(run_contexts: list[dict]) -> list[dict]:
 
 
 def _literal_problem(result: CompileResult, provider) -> dict | None:
-    """A literal request.security() symbol from another data source is refused before anything runs."""
+    """A literal request.security() / request.security_lower_tf() symbol from another data source is refused before
+    anything runs."""
     for spec in result.program.security.values():
         if spec.symbol_literal:
             try:
                 provider.check_symbol(spec.symbol_literal)
             except SecurityDataError as exc:
-                return {"message": f"Line {spec.line}: request.security(): {exc.message}", "line": spec.line,
-                        "bar_index": None}
+                label = "request.security_lower_tf()" if getattr(spec, "lower", False) else "request.security()"
+                return {"message": f"Line {spec.line}: {label}: {exc.message}", "line": spec.line, "bar_index": None}
     return None
 
 

@@ -93,6 +93,7 @@ class Analyzer:
         self.builtins_used: dict[str, list[int]] = {}
         self.int_division: set[int] = set()
         self.security_calls: list = []
+        self.tuple_types: dict[int, list] = {}   # TupleExpr node id -> item types (lower-timeframe element types)
         self.uses_arrays = False
         self.top_index: int | None = None
         self.meta: dict = {}
@@ -122,7 +123,7 @@ class Analyzer:
             self.statement(statement)
         self.top_index = None
         security = slicing.build(self.script, self.security_calls, self.names, self.calls, self.functions,
-                                 lambda message, node: self.gap("request", message, node))
+                                 lambda message, node: self.gap("request", message, node), self.error)
         program = Program(self.script, self.meta, self.functions, self.calls, self.names, self.inputs, self.outputs,
                           self.features, self.builtins_used, self.int_division, security, self.uses_arrays)
         return program, sorted(self.diagnostics, key=lambda d: (d.line, d.col))
@@ -376,8 +377,7 @@ class Analyzer:
             return self.merge(then, otherwise, condition)
         if isinstance(node, A.TupleExpr):
             self.feature("tuples", node)
-            for item in node.items:
-                self.expr(item)
+            self.tuple_types[node.id] = [self.expr(item) for item in node.items]
             return None
         if isinstance(node, A.If):
             self.feature("if", node)
@@ -675,9 +675,12 @@ class Analyzer:
         return TypeSpec.parse(builtin_.returns) if builtin_.returns not in ("void", "tuple") else None
 
     def security_call(self, node: A.Call, binding, arg_types: dict) -> TypeSpec | None:
-        """request.security(): record the call for slicing; validate literal timeframes now."""
+        """request.security() / request.security_lower_tf(): record the call for slicing; validate literal
+        timeframes now."""
         from .security import LIMIT, SecurityDataError, parse_timeframe
 
+        lower = self.calls[node.id][1].name == "request.security_lower_tf"
+        label = "request.security_lower_tf()" if lower else "request.security()"
         expr = binding.nodes.get("expression")
         local = []
         for item in A.walk(expr):
@@ -696,13 +699,38 @@ class Analyzer:
                 parse_timeframe(timeframe)
             except SecurityDataError as exc:
                 if exc.message.startswith(LIMIT):
-                    self.gap("request", f"request.security(): {exc.message}", binding.nodes["timeframe"])
+                    self.gap("request", f"{label}: {exc.message}", binding.nodes["timeframe"])
                 else:
-                    self.error(f"request.security(): {exc.message}", binding.nodes["timeframe"])
-        self.security_calls.append(slicing.SecurityCall(node, expr, self.top_index, self.function_depth > 0, local,
-                                                        literal("symbol"), timeframe))
+                    self.error(f"{label}: {exc.message}", binding.nodes["timeframe"])
         result = arg_types.get(id(expr))
+        elements = None
+        if lower:
+            elements = self.lower_tf_elements(expr, result, label)
+        self.security_calls.append(slicing.SecurityCall(node, expr, self.top_index, self.function_depth > 0, local,
+                                                        literal("symbol"), timeframe, lower, elements))
+        if lower:
+            self.uses_arrays = True                   # the results are arrays: end-of-execution snapshots (A1)
+            if isinstance(expr, A.TupleExpr):
+                return None
+            return TypeSpec("series", f"array<{elements[0]}>") if elements and elements[0] else None
         return TypeSpec("series", result.base) if result is not None else None
+
+    def lower_tf_elements(self, expr: A.Node, result: TypeSpec | None, label: str) -> tuple:
+        """Element type of each result array (None = decided at run time from the values); a collection result is
+        rejected (Pine manual). Direct references to mutable variables are rejected by slicing.build()."""
+        types = self.tuple_types.get(expr.id) if isinstance(expr, A.TupleExpr) else [result]
+        elements = []
+        for spec in types or [None]:
+            base = spec.base if spec is not None else None
+            if base is not None and base.startswith("array"):
+                self.error(f"{label}: the expression cannot be a collection (arrays of arrays are not supported).",
+                           expr)
+                base = None
+            elif base is not None and base not in BASIC_TYPES:
+                self.gap("request", f"{label}: `{base}` results are not implemented yet.", expr)
+                base = None
+            elements.append(base)
+        return tuple(elements)
 
     def array_result(self, builtin_: Builtin, binding, arg_types: dict) -> TypeSpec | None:
         """Result type of an array builtin (element / same array / array.from), plus the element check."""

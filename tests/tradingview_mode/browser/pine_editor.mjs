@@ -143,7 +143,7 @@ async function main() {
   check("load gap example", (await evaluate(`__tv.example("Uses unimplemented features")`)) > 50);
   await click("Compile gap example", ".pine-compile"); await settle();
   const problems = await evaluate("__tv.problems()");
-  check("gap names request.security_lower_tf() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 3 `request.security_lower_tf()` is not implemented yet (data requests)."), JSON.stringify(problems));
+  check("gap names request.dividends() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 3 `request.dividends()` is not implemented yet (data requests)."), JSON.stringify(problems));
   check("gap names label.new() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 6 `label.new()` is not implemented yet (drawing objects)."), JSON.stringify(problems));
   check("no 'unsupported indicator' wording", problems.every((t) => !/indicator unsupported/i.test(t)));
   await click("Try adding gap example", ".pine-add"); await settle();
