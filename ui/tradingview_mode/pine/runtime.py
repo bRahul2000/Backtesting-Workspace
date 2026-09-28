@@ -26,8 +26,9 @@ import numpy as np
 from . import ast as A
 from . import values as V
 from .builtins.arrays import RE10052
+from .drawings import DrawingStore
 from .errors import PineRuntimeError
-from .values import NA, ArraySnapshot, Color, PineArray, is_na, truthy
+from .values import NA, ArraySnapshot, Color, DrawingRef, PineArray, is_na, truthy
 
 MISSING = object()
 MAX_LOOP_ITERATIONS = 100_000
@@ -202,6 +203,9 @@ class Runtime:
         self.executed_bars = 0          # bar executions (incl. re-runs), for reporting
         self._colors: dict[int, Color] = {}
         self.results = self.buffer(("__security_result__",)) if capture else None
+        # P2.3a drawing objects: one store per runtime; the current values of scalar `var` slots are its GC roots
+        self._var_slots: list[SeriesBuffer] = []
+        self.drawings = DrawingStore((program.meta or {}).get("drawing_limits"), roots=self._drawing_roots)
         # version-dependent semantics (TradingView's v5 -> v6 migration guide)
         version = program.script.version or 5
         self.lazy_bool = version >= 6            # v6 `and`/`or` short-circuit; v5 evaluates both sides
@@ -236,6 +240,8 @@ class Runtime:
             self.rollback(bar)
         self.bar = bar
         self.ctx_path = ()
+        # journal the last data bar (the only one that can be re-executed incrementally); a new bar commits the last
+        self.drawings.begin(bar, record=bar == self.data.size - 1)
         scope = Scope()
         self.global_scope = scope
         try:
@@ -268,6 +274,11 @@ class Runtime:
                 buffer.truncate(bar)
         for site in self.sites.values():
             site.truncate(bar)
+        self.drawings.rollback(bar)
+
+    def _drawing_roots(self) -> set[int]:
+        """GC roots: the drawing IDs currently held by scalar `var` variables (global and function-local)."""
+        return {value.oid for slot in self._var_slots if isinstance(value := slot.current(), DrawingRef)}
 
     # -- helpers used by built-ins ------------------------------------------------------------------
     def site(self, node_id: int) -> CallSite:
@@ -312,6 +323,8 @@ class Runtime:
         buffer = self.buffers.get(key)
         if buffer is None:
             buffer = self.buffers[key] = SeriesBuffer(varip=node.mode == "varip")
+            if node.mode == "var":
+                self._var_slots.append(buffer)
         if node.mode is not None and (previous := buffer.last()) is not MISSING:
             value = previous                     # var/varip: initialised once, then carried
             if isinstance(value, ArraySnapshot):  # each slot starts the execution with its own independent array
@@ -522,6 +535,8 @@ class Runtime:
         kind, target, binding = self.program.calls[node.id]
         if kind == "user":
             return self.call_user(node, target, binding, scope)
+        if kind == "dispatch":
+            return self.call_dispatch(node, target, binding, scope)
         if target.kind == "declaration":
             return NA
         if target.kind == "input":
@@ -539,6 +554,34 @@ class Runtime:
             args[param.name] = self.eval(arg, scope) if arg is not None else param.default
         if binding.extra:
             args["*"] = [self.eval(arg, scope) for arg in binding.extra]
+        return self._invoke(node, target, args)
+
+    def call_dispatch(self, node: A.Call, options: dict, receiver: A.Node, scope: Scope):
+        """A built-in method whose receiver type was unknown at analysis time and whose name exists in several
+        namespaces (e.g. `.copy()`): the receiver's value picks the namespace (P2.3a). It is evaluated once."""
+        value = self.eval(receiver, scope)
+        method = node.func.name
+        if isinstance(value, PineArray):
+            namespace = "array"
+        elif isinstance(value, DrawingRef):
+            namespace = value.kind                          # dead refs keep their kind; the builtin applies na rules
+        elif is_na(value):
+            self.fail(f"Cannot call method `{method}()` on an na value of unknown type: it exists for "
+                      f"{', '.join(options)}. Declare the variable's type.", node)
+        else:
+            self.fail(f"Cannot call method `{method}()` on a `{type(value).__name__}` value.", node)
+        if namespace not in options:
+            self.fail(f"Could not find method `{method}()` for {namespace} values.", node)
+        target, binding = options[namespace]
+        args = {}
+        for param in binding.params:
+            arg = binding.nodes.get(param.name)
+            args[param.name] = value if arg is receiver else self.eval(arg, scope) if arg is not None else param.default
+        if binding.extra:
+            args["*"] = [self.eval(arg, scope) for arg in binding.extra]
+        return self._invoke(node, target, args)
+
+    def _invoke(self, node: A.Call, target, args: dict):
         if target.kind == "output":
             return target.impl(self, node, args)
         site = self.site(node.id) if target.stateful else None

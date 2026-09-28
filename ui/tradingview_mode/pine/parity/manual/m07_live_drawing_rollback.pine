@@ -1,0 +1,89 @@
+//@version=6
+// Pine P2.3 parity - MANUAL OBSERVATION ORACLE: drawing objects on the realtime bar (rollback and commit).
+// Real TradingView is the oracle: no expected values, no PASS/FAIL.
+// Setup: BINANCE:BTCUSDT, 1-minute chart. Watch while the current bar receives several realtime ticks AND at least one
+// new bar opens (2-3 minutes). Every value is read at the START of an execution, before the execution changes
+// anything, so it shows exactly what rollback kept from the previous tick. Drawing IDs cannot be `varip` (CE10128).
+// One drawing type per question, so each count is not mixed with the others:
+//   LINES  A: `var line` created on the first bar; each realtime execution sets y2 = execution number (mutation)
+//          N: on each realtime execution a plain `line n = line.new()` then `n := line.new()` (two creations and a
+//             reassignment of a plain reference): creation rollback, repeated creation, commit at bar close
+//   LABELS R: `var label` created on the first bar with text "0"; each realtime execution reassigns it to a NEW label
+//             whose text is the execution number (reassignment of a var reference + creation)
+//   BOXES  D: `var box` created on the first bar, deleted on realtime executions (deletion)
+indicator("m07 live drawing rollback oracle", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+varip int execs = 0
+varip int tickInBar = 0
+bool rt = barstate.isrealtime
+if rt
+    execs += 1
+    if barstate.isnew
+        tickInBar := 0
+    tickInBar += 1
+
+var line lineA = line.new(0, 0.0, 1, 0.0)
+var label labelR = label.new(0, 0.0, "0")
+var box boxD = box.new(0, 1.0, 1, 0.0)
+
+// ---- BEFORE: what the previous execution left after rollback ----
+float aBefore = line.get_y2(lineA)
+string rBefore = label.get_text(labelR)      // which object the var reference points to
+int linesBefore = array.size(line.all)       // A + N lines kept
+int labelsBefore = array.size(label.all)     // R labels kept
+int boxesBefore = array.size(box.all)        // 1 if D exists, 0 if its deletion was kept
+
+// ---- this execution's changes (realtime only) ----
+if rt
+    line.set_y2(lineA, execs)
+    line n = line.new(bar_index, close, bar_index + 1, close)
+    n := line.new(bar_index, open, bar_index + 1, open)
+    labelR := label.new(bar_index, close, str.tostring(execs))
+    if boxesBefore > 0
+        box.delete(boxD)
+
+s(v) => str.tostring(v)
+string state = "A.y2=" + s(aBefore) + " R.text=" + rBefore + " lines=" + s(linesBefore) + " labels=" + s(labelsBefore) + " boxes=" + s(boxesBefore)
+
+// ---- log of the last 10 realtime executions (newest first) ----
+varip string log1 = ""
+varip string log2 = ""
+varip string log3 = ""
+varip string log4 = ""
+varip string log5 = ""
+varip string log6 = ""
+varip string log7 = ""
+varip string log8 = ""
+varip string log9 = ""
+varip string log10 = ""
+if rt
+    log10 := log9
+    log9 := log8
+    log8 := log7
+    log7 := log6
+    log6 := log5
+    log5 := log4
+    log4 := log3
+    log3 := log2
+    log2 := log1
+    log1 := "bar " + s(bar_index) + " tick " + s(tickInBar) + " exec " + s(execs) + (barstate.isnew ? " NEW" : "") + " | BEFORE " + state
+
+var table t = table.new(position.top_right, 1, 14, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int row, string txt, color bg) =>
+    table.cell(t, 0, row, txt, text_color=color.black, bgcolor=bg, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, "m07 LIVE DRAWING ROLLBACK - observation only", color.silver)
+    put(1, "bar_index " + s(bar_index) + " · isrealtime " + (rt ? "T" : "F") + " · tick in bar " + s(tickInBar) + " · executions " + s(execs), rt ? color.white : color.orange)
+    put(2, "NOW (read at the start of this execution): " + state, color.white)
+    put(3, "LOG - last 10 realtime executions, newest first: bar / tick / exec | BEFORE values", color.silver)
+    put(4, log1, color.white)
+    put(5, log2, color.white)
+    put(6, log3, color.white)
+    put(7, log4, color.white)
+    put(8, log5, color.white)
+    put(9, log6, color.white)
+    put(10, log7, color.white)
+    put(11, log8, color.white)
+    put(12, log9, color.white)
+    put(13, log10, color.white)
+plot(close, "close", display=display.none)

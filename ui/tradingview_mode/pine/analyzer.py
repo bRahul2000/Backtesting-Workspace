@@ -17,15 +17,16 @@ from . import catalog, slicing
 from .compat import FEATURES, feature_for_builtin
 from .errors import ERROR, GAP, WARNING, Diagnostic
 from .registry import CONSTANTS, FUNCTIONS, QUALIFIER_RANK, VARIABLES, Builtin, TypeSpec, bind, load_all
-from .values import NA, Color
+from .values import DRAWING_KINDS, NA, Color
 
 BASIC_TYPES = {"int", "float", "bool", "string", "color"}
 NUMERIC = {"int", "float"}
 DECLARATIONS = {"indicator", "strategy", "library"}
 SOURCE_NAMES = ("open", "high", "low", "close", "volume", "hl2", "hlc3", "ohlc4", "hlcc4")
-TYPE_GAPS = {"line": "drawing-objects", "label": "drawing-objects", "box": "drawing-objects", "table": "drawing-objects",
-             "linefill": "drawing-objects", "polyline": "drawing-objects", "array": "arrays", "matrix": "matrices",
+TYPE_GAPS = {"table": "drawing-objects", "polyline": "drawing-objects", "array": "arrays", "matrix": "matrices",
              "map": "maps", "chart.point": "drawing-objects"}
+DRAWING_TYPES = set(DRAWING_KINDS)          # P2.3a: line, label, box, linefill
+METHOD_NAMESPACES = ("array", "line", "label", "box", "linefill")
 
 
 @dataclass
@@ -169,7 +170,17 @@ class Analyzer:
             title = "Untitled"
         self.meta = {"kind": kind, "title": title, "shorttitle": arg("shorttitle") or title,
                      "overlay": bool(arg("overlay", False)), "precision": arg("precision"),
-                     "format": arg("format"), "max_bars_back": arg("max_bars_back"), "version": self.script.version or 5}
+                     "format": arg("format"), "max_bars_back": arg("max_bars_back"), "version": self.script.version or 5,
+                     "drawing_limits": self.drawing_limits(arg)}
+
+    def drawing_limits(self, arg) -> dict:
+        """max_lines_count / max_labels_count / max_boxes_count (default ~50, at most 500; no linefill count)."""
+        limits = {}
+        for kind in ("lines", "labels", "boxes"):
+            value = arg(f"max_{kind}_count")
+            if value is not None:
+                limits[{"lines": "line", "labels": "label", "boxes": "box"}[kind]] = max(1, min(500, int(value)))
+        return limits
 
     # -- scopes -----------------------------------------------------------------------------------------
     def lookup(self, name: str) -> tuple[VarInfo | None, int]:
@@ -237,6 +248,9 @@ class Analyzer:
         spec = declared or value_type
         if spec is not None and node.mode:
             spec = TypeSpec("series", spec.base)
+        if node.mode == "varip" and spec is not None and spec.base in DRAWING_TYPES:
+            # TradingView CE10128, observed for `varip line` (m07 revision 1)
+            self.error(f'Variables with varip modifier cannot have type "series {spec.base}".', node)
         self.declare(node.name, VarInfo(spec, self.function_depth > 0), node)
         return spec
 
@@ -257,8 +271,10 @@ class Analyzer:
         if info.loop_item:
             # TradingView CE10174, observed for both `for [i, x] in` variables (q6c_i, q6c_x)
             self.error(f'Variable "{name}" cannot be mutable: `for ... in` loop variables are read-only.', node)
-        if info.is_param and info.type is not None and info.type.base.startswith("array<"):
-            # TradingView CE10175, observed for an array parameter (scalar parameters: not verified, unchanged)
+        if info.is_param and info.type is not None and (info.type.base.startswith("array<")
+                                                         or info.type.base in DRAWING_TYPES):
+            # TradingView CE10175, observed for an array parameter (q5e) and a line parameter (q8c); scalar
+            # parameters: not verified, unchanged
             self.error(f"Function arguments cannot be mutable (`{name}`).", node)
         if info.type is not None and value_type is not None and not self.assignable(value_type, info.type):
             self.error(f"Cannot assign a value of type `{value_type.base}` to `{name}` of type `{info.type.base}`.", node)
@@ -307,6 +323,9 @@ class Analyzer:
             self.gap("generics" if ref.args else "arrays", f"The type `{ref.name}{'[]' if ref.array_suffix else '<...>'}` "
                      f"is not implemented yet ({FEATURES[TYPE_GAPS.get(name, 'generics')].description}).", ref)
             return None
+        if name in DRAWING_TYPES:
+            self.feature("drawings-core", ref)
+            return TypeSpec(ref.qualifier or "series", name)
         if name in TYPE_GAPS:
             feature = TYPE_GAPS[name]
             self.gap(feature, f"Variables of type `{name}` are not implemented yet ({FEATURES[feature].description}).", ref)
@@ -331,6 +350,9 @@ class Analyzer:
             return None
         else:
             return False
+        if element in DRAWING_TYPES:
+            self.gap("drawings-core", f"Arrays of drawing IDs (`array<{element}>`) are not implemented yet.", ref)
+            return None
         if element not in BASIC_TYPES:
             feature = TYPE_GAPS.get(element, "user-defined-types")
             self.gap(feature if feature != "arrays" else "arrays",
@@ -562,6 +584,11 @@ class Analyzer:
                 and not node.generic[0].array_suffix else None
             if name == "array.new" and element in BASIC_TYPES:
                 name = f"array.new_{element}"              # array.new<float>() is array.new_float()
+            elif name == "array.new" and element in DRAWING_TYPES:
+                self.gap("drawings-core", f"Arrays of drawing IDs (`array<{element}>`) are not implemented yet.", node)
+                for argument in node.args:
+                    self.expr(argument.value)
+                return None
             elif name == "array.new" and element is not None and element in TYPE_GAPS:
                 feature = TYPE_GAPS[element]
                 self.gap(feature, f"Arrays of `{element}` are not implemented yet ({FEATURES[feature].description}).",
@@ -587,7 +614,10 @@ class Analyzer:
 
     def method_call(self, node: A.Call, func: A.Attribute) -> TypeSpec | None:
         """Built-in method syntax: `a.push(x)` is `array.push(a, x)` (Pine docs: the two forms are equivalent). The
-        receiver becomes the builtin's first argument, so the call reuses the namespace builtin unchanged."""
+        receiver becomes the builtin's first argument, so the call reuses the namespace builtin unchanged. A known
+        receiver type picks the namespace statically (array, line, label, box, linefill); for an unknown type the
+        method name decides when exactly one namespace has it (A3), otherwise the call is dispatched at run time on
+        the receiver's value (P2.3a)."""
         receiver = self.expr(func.target)
         base = receiver.base if receiver is not None else None
         inner = self.calls.get(func.target.id) if isinstance(func.target, A.Call) else None
@@ -601,28 +631,54 @@ class Analyzer:
                 self.expr(argument.value)
             self.error(f"Could not find method `{func.name}()` for a `{base}` value.", node)
             return None
-        if base is not None and not base.startswith("array"):
-            for argument in node.args:
-                self.expr(argument.value)
-            self.gap("methods", f"Method calls on `{base}` values (`.{func.name}()`) are not implemented yet.", node)
-            return None
-        # arrays are the only values with built-in methods in this engine; a receiver of unknown type (a user
-        # function's result, an untyped parameter) is dispatched to `array.*` and checked at run time
-        name = f"array.{func.name}"
-        builtin_ = FUNCTIONS.get(name)
-        if builtin_ is None:
-            for argument in node.args:
-                self.expr(argument.value)
-            if catalog.is_known_function(name):
-                feature = feature_for_builtin(name)
-                self.gap(feature, gap_message(name, feature), node)
-            else:
-                self.error(f"Could not find method `{func.name}()` for arrays.", node)
-            return None
-        self.feature("builtin-methods", node)
+        if base is not None:
+            namespace = "array" if base.startswith("array") else base if base in DRAWING_TYPES else None
+            if namespace is None:
+                for argument in node.args:
+                    self.expr(argument.value)
+                self.gap("methods", f"Method calls on `{base}` values (`.{func.name}()`) are not implemented yet.", node)
+                return None
+            candidates = [namespace]
+        else:
+            candidates = [ns for ns in METHOD_NAMESPACES if f"{ns}.{func.name}" in FUNCTIONS] or ["array"]
         positional = [func.target] + [a.value for a in node.args if a.name is None]
         named = {a.name: a.value for a in node.args if a.name is not None}
-        return self.builtin_call(node, builtin_, positional, named, receiver=(func.target, receiver))
+        if len(candidates) == 1:
+            name = f"{candidates[0]}.{func.name}"
+            builtin_ = FUNCTIONS.get(name)
+            if builtin_ is None:
+                for argument in node.args:
+                    self.expr(argument.value)
+                known = name if catalog.is_known_function(name) else next(
+                    (f"{ns}.{func.name}" for ns in METHOD_NAMESPACES if base is None
+                     and catalog.is_known_function(f"{ns}.{func.name}")), None)
+                if known is not None:
+                    feature = feature_for_builtin(known)
+                    self.gap(feature, gap_message(known, feature), node)
+                else:
+                    target = "arrays" if candidates[0] == "array" else f"`{candidates[0]}` objects"
+                    self.error(f"Could not find method `{func.name}()` for {target}.", node)
+                return None
+            self.feature("builtin-methods", node)
+            return self.builtin_call(node, builtin_, positional, named, receiver=(func.target, receiver))
+        # several namespaces have this method and the receiver's type is unknown: dispatch on its value at run time
+        self.feature("builtin-methods", node)
+        for argument in node.args:
+            self.expr(argument.value)
+        options, problem = {}, None
+        for ns in candidates:
+            builtin_ = FUNCTIONS[f"{ns}.{func.name}"]
+            binding, problem = bind(builtin_, positional, named)
+            if binding is not None:
+                options[ns] = (builtin_, binding)
+                self.builtins_used.setdefault(builtin_.name, []).append(node.line)
+        if not options:
+            self.error(f"Cannot call method `{func.name}()`: {problem}.", node)
+            return None
+        if "array" in options:
+            self.uses_arrays = True
+        self.calls[node.id] = ("dispatch", options, func.target)
+        return None
 
     def user_call(self, node: A.Call, fn: A.FunctionDef, positional: list, named: dict) -> TypeSpec | None:
         params = fn.params
@@ -703,6 +759,8 @@ class Analyzer:
                 else:
                     self.error(f"{label}: {exc.message}", binding.nodes["timeframe"])
         result = arg_types.get(id(expr))
+        if result is not None and result.base in DRAWING_TYPES and not lower:
+            self.gap("request", f"{label}: requested expressions returning drawing IDs are not implemented yet.", node)
         elements = None
         if lower:
             elements = self.lower_tf_elements(expr, result, label)

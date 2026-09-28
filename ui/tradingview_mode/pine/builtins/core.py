@@ -7,7 +7,7 @@ import time as _time
 from ..errors import PineRuntimeError
 from ..registry import Param as P, builtin, constant, variable
 from ..runtime import MISSING, float_or_na
-from ..values import NA, Color, is_na, truthy
+from ..values import DrawingRef, NA, Color, is_na, truthy
 
 ANY = "series any"
 
@@ -73,7 +73,10 @@ constant("na", NA, "float")
 
 @builtin("na", P("x", ANY), returns="series bool")
 def _na(rt, site, a):
-    return is_na(a["x"])
+    x = a["x"]
+    if isinstance(x, DrawingRef):                    # a deleted / collected drawing's ID reads as na (q8, q8g)
+        return not rt.drawings.alive(x)
+    return is_na(x)
 
 
 @builtin("nz", P("source", ANY), P("replacement", ANY, 0))

@@ -59,10 +59,10 @@ plot(signalLine, "Signal", color.orange)
 hline(0, "Zero", color = color.gray)
 """,
     "Uses unimplemented features": """//@version=5
-indicator("Needs dividend data and labels", overlay = true)
+indicator("Needs dividend data and polylines", overlay = true)
 dividends = request.dividends(syminfo.tickerid)
 plot(dividends, "Dividends")
 if ta.crossover(close, dividends)
-    label.new(bar_index, high, "Cross")
+    polyline.new(na)
 """,
 }

@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from . import ast as A
 
 SIDE_EFFECTS = {"alert", "alertcondition", "runtime.error"}
+DRAWING_NAMESPACES = ("line.", "label.", "box.", "linefill.")   # P2.3a: drawings never run in a requested context
 
 
 @dataclass
@@ -80,9 +81,17 @@ def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementI
             info.reads.add(item.name)
         elif isinstance(item, A.Call) and item.id in calls:
             kind, target = calls[item.id][0], calls[item.id][1]
+            if kind == "dispatch":                          # a method resolved at run time: every candidate counts
+                for ns, (builtin_, _binding) in target.items():
+                    if ns == "array":
+                        info.arrays.append((f"{builtin_.name}()", item.line))
+                    else:
+                        info.effects.append((f"{builtin_.name}()", item.line))
+                continue
             if kind == "user":
                 info.functions.add(target.name)
-            elif target.kind == "output" or target.name in SIDE_EFFECTS or target.name.startswith("log."):
+            elif target.kind == "output" or target.name in SIDE_EFFECTS or target.name.startswith("log.") \
+                    or target.name.startswith(DRAWING_NAMESPACES):
                 info.effects.append((f"{target.name}()", item.line))
             if kind == "builtin" and (target.name.startswith("array.") or target.name == "request.security_lower_tf"):
                 info.arrays.append((f"{target.name}()", item.line))          # lower-timeframe results are arrays
@@ -119,12 +128,14 @@ def _function_globals(functions: dict, names: dict, calls: dict) -> dict[str, se
     return result
 
 
-def _function_arrays(functions: dict, names: dict, calls: dict) -> dict[str, tuple]:
-    """First array use (construct, line) in each user function, including the functions it calls."""
+def _function_arrays(functions: dict, names: dict, calls: dict, what: str = "arrays") -> dict[str, tuple]:
+    """First array use (or side effect, ``what="effects"``) as (construct, line) in each user function, including the
+    functions it calls."""
     direct, callees = {}, {}
     for name, fn in functions.items():
         info = _info(fn, names, calls, top_level=False)
-        direct[name], callees[name] = (info.arrays[0] if info.arrays else None), info.functions
+        found = getattr(info, what)
+        direct[name], callees[name] = (found[0] if found else None), info.functions
     result = {}
     for name in functions:
         seen, stack = set(), [name]
@@ -168,6 +179,7 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
     infos = [_info(statement, names, calls) for statement in body]
     fn_globals = _function_globals(functions, names, calls)
     fn_arrays = _function_arrays(functions, names, calls)
+    fn_effects = _function_arrays(functions, names, calls, "effects")
     specs: dict[int, SecuritySpec] = {}
     for call in calls_recorded:
         node, expr = call.node, call.expr
@@ -186,6 +198,12 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
                 f"{line}); requesting expressions over local variables is not implemented yet.", node)
             continue
         expr_info = _info(expr, names, calls, top_level=False)
+        expr_effects = expr_info.effects + [fn_effects[fn] for fn in sorted(expr_info.functions) if fn in fn_effects]
+        if expr_effects:
+            construct, line = expr_effects[0]
+            gap(f"{label} on line {node.line}: the requested expression calls `{construct}` (line {line}), a side effect "
+                "or drawing that cannot run in a requested context; this is not supported.", node)
+            continue
         expr_arrays = expr_info.arrays + [fn_arrays[fn] for fn in sorted(expr_info.functions) if fn in fn_arrays]
         if expr_arrays:
             construct, line = expr_arrays[0]
@@ -233,8 +251,10 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
                 break
         if problem is None:
             for index in sorted(included):
-                if infos[index].effects:
-                    construct, line = infos[index].effects[0]
+                included_effects = infos[index].effects + [fn_effects[fn] for fn in sorted(infos[index].functions)
+                                                            if fn in fn_effects]
+                if included_effects:
+                    construct, line = included_effects[0]
                     problem = (f"{label} on line {node.line} depends on line {body[index].line}, which "
                                f"also calls `{construct}` (a side effect); this is not supported yet.")
                     break

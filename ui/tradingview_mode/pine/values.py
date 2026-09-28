@@ -182,3 +182,21 @@ class ArraySnapshot:
 
     def __repr__(self) -> str:
         return f"snapshot<{self.element}>{self.items!r}"
+
+
+# ---- drawing objects (P2.3a; see parity/P23_DRAWING_RESEARCH.md §15) -------------------------------------------------
+
+DRAWING_KINDS = ("line", "label", "box", "linefill")
+
+
+@dataclass(frozen=True)
+class DrawingRef:
+    """The ID of a drawing object: an opaque, immutable value that variables, history and aliases hold. The object
+    itself lives in the runtime's DrawingStore; a ref whose object was deleted or collected stays a valid value
+    (``na()`` of it is true there). ``==`` / ``!=`` compare identity (TradingView q8e)."""
+
+    kind: str
+    oid: int
+
+    def __repr__(self) -> str:
+        return f"{self.kind}#{self.oid}"

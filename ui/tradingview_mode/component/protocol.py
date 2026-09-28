@@ -228,12 +228,52 @@ def _validate_pine(payload: dict[str, Any], bar_times: set[int]) -> None:
                              f"pine output {output['id']}: values must be finite or null.")
                 previous = point["time"]
         _validate_contexts(payload, script, bar_times)
+        _validate_drawings(script, len(bar_times))
         for output in outputs:
             if output["kind"] == "fill":
                 between = output.get("between") or []
                 _require(len(between) == 2 and all(ref in kinds for ref in between)
                          and kinds[between[0]] == kinds[between[1]] and kinds[between[0]] in ("plot", "hline"),
                          "a pine fill must reference two plots or two hlines of the same script.")
+
+
+DRAWING_LISTS = {"lines": "line", "labels": "label", "boxes": "box", "linefills": "linefill"}
+MAX_DRAWINGS_PER_KIND = 1000          # declared limits <= 500; rooted objects may exceed them (P2.3a GC model)
+
+
+def _validate_drawings(script: dict, bar_count: int) -> None:
+    """P2.3a drawings: raw Pine coordinates, stable unique keys, and every object created on a bar the chart has
+    (so a Replay payload cannot carry a drawing from a bar after the cursor)."""
+    drawings = script.get("drawings")
+    if drawings is None:
+        return
+    _require(isinstance(drawings, dict), "pine drawings must be an object.")
+    first = drawings.get("first_bar_index")
+    _require(type(first) is int and first >= 0, "pine drawings need a non-negative first_bar_index.")
+    keys: dict[str, str] = {}
+    for name, kind in DRAWING_LISTS.items():
+        items = drawings.get(name) or []
+        _require(isinstance(items, list) and len(items) <= MAX_DRAWINGS_PER_KIND, f"pine drawings.{name} is invalid.")
+        for item in items:
+            key = item.get("key")
+            _require(isinstance(key, str) and key not in keys and item.get("kind") == kind,
+                     f"pine drawing keys must be unique and match their list ({key!r}).")
+            keys[key] = kind
+            bar = item.get("bar")
+            _require(type(bar) is int and 0 <= first + bar < bar_count,
+                     f"pine drawing {key} was created on bar {bar!r}, which the chart does not have.")
+            if kind == "linefill":
+                continue
+            _require(item.get("xloc") in ("bar_index", "bar_time"), f"pine drawing {key}: invalid xloc.")
+            xs = {"line": ("x1", "x2"), "label": ("x",), "box": ("left", "right")}[kind]
+            ys = {"line": ("y1", "y2"), "label": ("y",), "box": ("top", "bottom")}[kind]
+            _require(all(item.get(x) is None or type(item.get(x)) is int for x in xs),
+                     f"pine drawing {key}: x-coordinates must be integers or null.")
+            _require(all(item.get(y) is None or (isinstance(item.get(y), float) and math.isfinite(item[y])) for y in ys),
+                     f"pine drawing {key}: y-coordinates must be finite numbers or null.")
+    for item in drawings.get("linefills") or []:
+        _require(keys.get(item.get("line1")) == "line" and keys.get(item.get("line2")) == "line",
+                 f"pine linefill {item.get('key')} must reference two lines of the same script.")
 
 
 def _validate_contexts(payload: dict[str, Any], script: dict, bar_times: set[int]) -> None:

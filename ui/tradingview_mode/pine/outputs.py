@@ -118,3 +118,27 @@ def render(outputs: list[Output], times: list[int], prefix: str) -> list[dict]:
                     data.append({"time": time, "color": color})
             result.append({"id": out_id, "kind": output.kind, "title": output.title, "data": data})
     return result
+
+
+# ---- drawing objects (P2.3a) ------------------------------------------------------------------------------------------
+
+DRAWING_LISTS = {"line": "lines", "label": "labels", "box": "boxes", "linefill": "linefills"}
+
+
+def render_drawings(store, prefix: str) -> dict:
+    """The live drawing objects of a run, with their raw Pine coordinates (``xloc`` + x as a bar index or a UNIX time
+    in ms, y as a price): the browser maps them onto the chart. Keys are stable across realtime ticks."""
+    result = {name: [] for name in DRAWING_LISTS.values()}
+    for drawing in store.objects():
+        item = {"key": f"{prefix}:{drawing.kind}:{drawing.oid}", "kind": drawing.kind, "bar": drawing.created_bar}
+        for name, value in drawing.props.items():
+            if drawing.kind == "linefill" and name in ("line1", "line2"):
+                item[name] = f"{prefix}:line:{value}"
+            elif isinstance(value, Color):
+                item[name] = css(value)
+            elif isinstance(value, float):
+                item[name] = _number(value)
+            else:
+                item[name] = None if is_na(value) else value
+        result[DRAWING_LISTS[drawing.kind]].append(item)
+    return result

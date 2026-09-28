@@ -88,7 +88,12 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     Feature("bgcolor", "outputs", SUPPORTED, "bgcolor()"),
     Feature("barcolor", "outputs", SUPPORTED, "barcolor()"),
     # Drawing objects
-    Feature("drawing-objects", "drawings", GAP, "drawing objects (`line.*`, `label.*`, `box.*`, `table.*`, `polyline.*`, `linefill.*`)"),
+    Feature("drawings-core", "drawings", PARTIAL, "drawing objects (`line.*`, `label.*`, `box.*`, `linefill.*`)",
+            "P2.3a object core per P23_DRAWING_RESEARCH.md: IDs, aliasing, history, copy, delete, garbage collection "
+            "(roots: scalar `var` variables), realtime rollback, x/y constructors, setters/getters, methods. Arrays of "
+            "drawing IDs, `*.all`, `chart.point` overloads, `force_overlay`, fonts and text formatting are not "
+            "implemented yet."),
+    Feature("drawing-objects", "drawings", GAP, "tables, polylines and chart points (`table.*`, `polyline.*`, `chart.point.*`)"),
     # Data requests
     Feature("request", "request", PARTIAL,
             "data requests (`request.security()` for same and higher timeframes, `request.security_lower_tf()`)",
@@ -152,8 +157,8 @@ DOCUMENTED_ONLY = (
 #: Built-in namespace -> feature id (for "not implemented yet" messages).
 NAMESPACE_FEATURE = {
     "request": "request", "ticker": "request", "array": "arrays", "matrix": "matrices", "map": "maps",
-    "line": "drawing-objects", "label": "drawing-objects", "box": "drawing-objects", "table": "drawing-objects",
-    "polyline": "drawing-objects", "linefill": "drawing-objects", "chart.point": "drawing-objects",
+    "line": "drawings-core", "label": "drawings-core", "box": "drawings-core", "table": "drawing-objects",
+    "polyline": "drawing-objects", "linefill": "drawings-core", "chart.point": "drawing-objects",
     "strategy": "strategy", "log": "logging", "ta": "ta", "math": "math", "str": "strings", "input": "inputs",
     "timeframe": "chart-info", "syminfo": "chart-info", "barstate": "chart-info", "session": "time", "": "core",
 }

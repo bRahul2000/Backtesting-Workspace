@@ -13,7 +13,7 @@ from .analyzer import InputDef, Program, analyze
 from .builtins.inputs import coerce_input
 from .compat import FEATURES
 from .errors import ERROR, GAP, WARNING, Diagnostic, PineError, PineRuntimeError
-from .outputs import render
+from .outputs import render, render_drawings
 from .parser import parse
 from .registry import load_all
 from .runtime import DataContext, Runtime
@@ -99,6 +99,7 @@ class RunResult:
     executed: int
     incremental: bool
     contexts: list = field(default_factory=list)      # request.security() provenance, one entry per context
+    drawings: dict | None = None                       # P2.3a live drawing objects (outputs.render_drawings)
 
 
 def resolve_inputs(program: Program, overrides: dict[int, Any]) -> tuple[dict[int, Any], list[str]]:
@@ -187,4 +188,6 @@ def run_script(execution: PineExecution, data: DataContext, identity: tuple, pre
     rendered = render(outputs, times, prefix)
     executed = runtime.executed_bars - (before if incremental else 0)
     contexts = [c.provenance() for c in runtime.security.all_contexts()] if runtime.security is not None else []
-    return RunResult(rendered, None, (time.perf_counter() - started) * 1000, data.size, executed, incremental, contexts)
+    drawings = render_drawings(runtime.drawings, prefix) if runtime.drawings.live else None
+    return RunResult(rendered, None, (time.perf_counter() - started) * 1000, data.size, executed, incremental, contexts,
+                     drawings)

@@ -1,0 +1,14 @@
+//@version=6
+// Pine P2.3 parity - COMPILE ORACLE: reassigning a drawing-object PARAMETER inside a function (`l := line.new(...)`).
+// Arrays: TradingView rejects this (CE10175). If this script does not compile, the exact compiler message IS the
+// result; if it compiles, the table shows which line the caller sees. Any chart works.
+indicator("q8c drawing parameter reassignment", overlay=true)
+f(line l) =>
+    l := line.new(bar_index, 2.0, bar_index + 1, 2.0)
+    l
+var table t = table.new(position.top_right, 1, 2, bgcolor=color.white)
+if barstate.islast
+    line a = line.new(bar_index, 1.0, bar_index + 1, 1.0)
+    line r = f(a)
+    table.cell(t, 0, 0, "compiled; caller's line y1 = " + str.tostring(line.get_y1(a)) + ", returned line y1 = " + str.tostring(line.get_y1(r)), text_color=color.black)
+plot(close, "close", display=display.none)

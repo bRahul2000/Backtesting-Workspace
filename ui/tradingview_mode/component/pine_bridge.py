@@ -165,7 +165,7 @@ def pine_payload(state: TerminalState, frame, session, *, identity: tuple, timef
                  "source_hash": result.source_hash, "overlay": bool(result.meta.get("overlay")),
                  "shorttitle": result.meta.get("shorttitle") or instance.title, "inputs": _input_rows(result, instance),
                  "outputs": [], "error": None, "runtime_ms": 0.0, "bars": 0, "executed": 0, "incremental": False,
-                 "truncated_bars": truncated, "contexts": []}
+                 "truncated_bars": truncated, "contexts": [], "drawings": None}
         if not result.ok:
             entry["error"] = {"message": _first_problem(result), "line": result.errors[0].line, "bar_index": None}
         elif result.program.security and provider is not None and (problem := _literal_problem(result, provider)):
@@ -178,11 +178,12 @@ def pine_payload(state: TerminalState, frame, session, *, identity: tuple, timef
                 cached = executions[instance.id] = (key, PineExecution(result.program, values))
             run = run_script(cached[1], data, identity + (chart_family, mode), instance.id, provider)
             entry.update(outputs=run.outputs, error=run.error, runtime_ms=round(run.runtime_ms, 1), bars=run.bars,
-                         executed=run.executed, incremental=run.incremental, contexts=_contexts(run.contexts))
+                         executed=run.executed, incremental=run.incremental, contexts=_contexts(run.contexts),
+                         drawings=None if run.drawings is None else {**run.drawings, "first_bar_index": truncated})
             total_contexts += len(entry["contexts"])
             if total_contexts > MAX_CHART_CONTEXTS:
                 total_contexts -= len(entry["contexts"])
-                entry.update(outputs=[], contexts=[], error={
+                entry.update(outputs=[], contexts=[], drawings=None, error={
                     "message": f"{LIMIT}: at most {MAX_CHART_CONTEXTS} requested contexts across the chart.",
                     "line": None, "bar_index": None})
         scripts.append(entry)

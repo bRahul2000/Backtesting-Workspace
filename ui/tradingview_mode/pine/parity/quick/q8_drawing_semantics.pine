@@ -1,0 +1,94 @@
+//@version=6
+// Pine P2.3 parity - QUICK HISTORICAL ORACLE: drawing-object identity, history, copy, delete, functions, limits.
+// Real TradingView is the oracle: the table shows observed values only (no expected values, no PASS/FAIL).
+// Setup: any chart (BINANCE:BTCUSDT 1m is fine); historical bars are enough. Choose ONE case in the settings; only that
+// case runs on the last bar, so an error in one case cannot hide the others. If the chart shows a runtime error, its
+// exact text IS the result for that case. Case 0 holds the questions that cannot stop the script.
+indicator("q8 drawing semantics", overlay=true, max_lines_count=500, max_boxes_count=500)
+caseSel = input.int(0, "Case: 0 safe table · 1 get after delete · 2 delete twice · 3 set after delete · 4 linefill after line delete · 5 set through history · 6 x beyond bar_index+500 · 7 get a garbage-collected label", options=[0, 1, 2, 3, 4, 5, 6, 7])
+s(v) => str.tostring(v)
+
+// Created on every case so their histories exist on the last bar.
+var line h = line.new(0, 0.0, 1, 0.0)           // one object for the whole chart, mutated every bar
+line.set_y2(h, bar_index)
+line p = line.new(bar_index, 0.0, bar_index + 1, 1.0)   // a new object every bar
+var label firstLabel = label.new(0, 0.0, "first")      // the oldest label; 1 label per bar below, default label limit
+label.new(bar_index, high, "g")
+
+// Function semantics (boxes are used only here, so box.all counts them alone)
+mkBox(float y) =>
+    var box bx = box.new(0, y + 1, 1, y)                // function-local var: one per call site?
+    bx
+setTop(box b, float v) =>
+    box.set_top(b, v)                                   // mutation through a parameter
+    b
+box b1 = mkBox(10.0)
+box b2 = mkBox(20.0)
+
+// Case 6 runs on ONE historical bar (K), not on the last bar: an error there is reported as "Error on bar K"; if it
+// does not fail, the var string records it for the last-bar table. x2 = last_bar_index + 501 exceeds the documented
+// +500 future limit whether it counts from the executing bar or from the chart's last bar.
+int K = last_bar_index - 3
+var string case6 = "case 6 probe not reached"
+if caseSel == 6 and bar_index == K
+    line.new(bar_index, close, last_bar_index + 501, close)
+    case6 := "line with x2 = last_bar_index + 501 created on historical bar " + s(bar_index) + " (no error)"
+
+var table t = table.new(position.top_right, 2, 12, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int row, string k, string v) =>
+    table.cell(t, 0, row, k, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 1, row, v, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+
+if barstate.islast
+    put(0, "q8 DRAWING SEMANTICS - case " + s(caseSel), "observed")
+    if caseSel == 0
+        line al = line.new(bar_index, 1.0, bar_index + 1, 1.0)
+        line al2 = al
+        line.set_y1(al2, 55)
+        line cp = line.copy(al)
+        line.set_y1(cp, 77)
+        line l1 = line.new(bar_index, 2.0, bar_index + 1, 2.0)
+        line l2 = line.new(bar_index, 3.0, bar_index + 1, 3.0)
+        linefill.new(l1, l2, color.red)
+        linefill.new(l1, l2, color.blue)
+        box r = setTop(b1, 99.0)
+        line nl = na
+        line.delete(nl)
+        put(1, "alias: set y1=55 through the alias; y1 of the original", s(line.get_y1(al)))
+        put(2, "copy: y1 of copy (set 77) / of original", s(line.get_y1(cp)) + " / " + s(line.get_y1(al)))
+        put(3, "history: y2 of h[1] (h mutated every bar; now y2=bar_index=" + s(bar_index) + ")", s(line.get_y2(h[1])))
+        put(4, "history: x1 of p[1] (a new line per bar; bar_index-1=" + s(bar_index - 1) + ")", s(line.get_x1(p[1])))
+        put(5, "garbage collection: label.all size (default limit) / x of its oldest", s(array.size(label.all)) + " / " + s(label.get_x(array.first(label.all))))
+        put(6, "linefill.new twice on the same two lines: linefill.all size", s(array.size(linefill.all)))
+        put(7, "functions: box.all size (two call sites of a function-local var box)", s(array.size(box.all)))
+        put(8, "functions: top of b1 after setTop(b1, 99) / top of the returned box / b2 top", s(box.get_top(b1)) + " / " + s(box.get_top(r)) + " / " + s(box.get_top(b2)))
+        put(9, "line.delete(na)", "completed")
+        put(10, "line.all size (h + p lines kept + al, cp, l1, l2)", s(array.size(line.all)))
+    else
+        line x = line.new(bar_index, 4.0, bar_index + 1, 4.0)
+        string result = "?"
+        if caseSel == 1
+            line.delete(x)
+            result := "get_y1 after delete = " + s(line.get_y1(x))
+        if caseSel == 2
+            line.delete(x)
+            line.delete(x)
+            result := "second delete completed"
+        if caseSel == 3
+            line.delete(x)
+            line.set_y1(x, 5)
+            result := "set after delete completed; get_y1 = " + s(line.get_y1(x))
+        if caseSel == 4
+            line y = line.new(bar_index, 6.0, bar_index + 1, 6.0)
+            linefill lf = linefill.new(x, y, color.red)
+            line.delete(x)
+            result := "linefill.all size after deleting line1 = " + s(array.size(linefill.all)) + "; na(get_line1) = " + (na(linefill.get_line1(lf)) ? "true" : "false")
+        if caseSel == 5
+            line.set_y1(p[1], 5)
+            result := "set through p[1] completed; get_y1(p[1]) = " + s(line.get_y1(p[1]))
+        if caseSel == 6
+            result := case6
+        if caseSel == 7
+            result := "x of the first (garbage-collected?) label = " + s(label.get_x(firstLabel))
+        put(1, "case " + s(caseSel), result)
+plot(close, "close", display=display.none)

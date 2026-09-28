@@ -1,9 +1,10 @@
 // Renders Pine script outputs (Python's render protocol) on the chart.
 // Knows output KINDS (plot, shape, char, hline, fill, bgcolor, barcolor), never
-// any particular indicator. Drawing objects (line/label/box/table) will be one
-// more kind handled here.
+// any particular indicator, and the P2.3a drawing objects (line, label, box,
+// linefill) that Python keeps: presentation only, from their raw Pine coordinates.
 import { AreaSeries, HistogramSeries, LineSeries, LineStyle, LineType } from "lightweight-charts";
 import { diffSeries, indexOfTime } from "./chartView.js";
+import { dashFor, extendBox, extendSegment, labelPrice, logicalOf } from "./drawingGeometry.js";
 import { firstColor, seriesData } from "./pineData.js";
 
 const SIZE_PX = { tiny: 7, small: 10, normal: 14, large: 20, huge: 28, auto: 10 };
@@ -190,6 +191,138 @@ function drawShape(ctx, style, x, y, size, color, text, textcolor) {
   }
 }
 
+// Drawing objects of one script (P2.3a): linefills, boxes, lines, then labels.
+class DrawingsPrimitive extends Primitive {
+  constructor(engine) { super("top"); this.engine = engine; }
+
+  renderer() {
+    const self = this;
+    return {
+      draw(target) {
+        const d = self.data;
+        if (!self.chart || !self.series || !d) return;
+        target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+          const scale = self.chart.timeScale();
+          const bars = self.engine.bars || [];
+          const times = bars.map((b) => b.time);
+          const px = (x, xloc) => {
+            const logical = logicalOf(x, xloc, d.first_bar_index, times);
+            return logical === null ? null : scale.logicalToCoordinate(logical);
+          };
+          const py = (price) => (price === null || price === undefined ? null : self.series.priceToCoordinate(price));
+          const lines = new Map();
+          for (const l of d.lines || []) {
+            const x1 = px(l.x1, l.xloc), x2 = px(l.x2, l.xloc), y1 = py(l.y1), y2 = py(l.y2);
+            if ([x1, x2, y1, y2].some((v) => v === null)) continue;
+            lines.set(l.key, extendSegment({ x: x1, y: y1 }, { x: x2, y: y2 }, l.extend, mediaSize.width));
+          }
+          for (const f of d.linefills || []) {
+            const a = lines.get(f.line1), b = lines.get(f.line2);
+            if (!a || !b || !f.color) continue;
+            context.fillStyle = f.color;
+            context.beginPath();
+            context.moveTo(a[0].x, a[0].y); context.lineTo(a[1].x, a[1].y);
+            context.lineTo(b[1].x, b[1].y); context.lineTo(b[0].x, b[0].y);
+            context.closePath();
+            context.fill();
+          }
+          for (const box of d.boxes || []) {
+            const l = px(box.left, box.xloc), r = px(box.right, box.xloc), t = py(box.top), bt = py(box.bottom);
+            if ([l, r, t, bt].some((v) => v === null)) continue;
+            const [x1, x2] = extendBox(l, r, box.extend, mediaSize.width);
+            const top = Math.min(t, bt), height = Math.abs(bt - t);
+            if (box.bgcolor) { context.fillStyle = box.bgcolor; context.fillRect(x1, top, x2 - x1, height); }
+            if (box.border_color && (box.border_width || 0) > 0) {
+              context.strokeStyle = box.border_color;
+              context.lineWidth = box.border_width;
+              context.setLineDash(dashFor(box.border_style, box.border_width));
+              context.strokeRect(x1, top, x2 - x1, height);
+              context.setLineDash([]);
+            }
+            if (box.text) {
+              const size = SIZE_PX[box.text_size] || SIZE_PX.normal;
+              context.font = `${size}px sans-serif`;
+              context.fillStyle = box.text_color || "#131722";
+              context.textAlign = box.text_halign === "left" ? "left" : box.text_halign === "right" ? "right" : "center";
+              context.textBaseline = box.text_valign === "top" ? "top" : box.text_valign === "bottom" ? "bottom" : "middle";
+              const tx = context.textAlign === "left" ? x1 + 4 : context.textAlign === "right" ? x2 - 4 : (x1 + x2) / 2;
+              const ty = context.textBaseline === "top" ? top + 4 : context.textBaseline === "bottom" ? top + height - 4 : top + height / 2;
+              context.fillText(box.text, tx, ty);
+            }
+          }
+          for (const l of d.lines || []) {
+            const seg = lines.get(l.key);
+            if (!seg || !l.color) continue;
+            context.strokeStyle = l.color;
+            context.lineWidth = Math.max(1, l.width || 1);
+            context.setLineDash(dashFor(l.style, l.width));
+            context.beginPath();
+            context.moveTo(seg[0].x, seg[0].y); context.lineTo(seg[1].x, seg[1].y);
+            context.stroke();
+            context.setLineDash([]);
+            if (l.style === "arrow_right" || l.style === "arrow_both") arrow(context, seg[0], seg[1], l.color);
+            if (l.style === "arrow_left" || l.style === "arrow_both") arrow(context, seg[1], seg[0], l.color);
+          }
+          for (const label of d.labels || []) {
+            const logical = logicalOf(label.x, label.xloc, d.first_bar_index, times);
+            const x = logical === null ? null : scale.logicalToCoordinate(logical);
+            const bar = logical !== null && Number.isInteger(logical) ? bars[logical] : null;
+            const y = py(labelPrice(label, bar));
+            if (x === null || y === null) continue;
+            drawLabel(context, label, x, y);
+          }
+        });
+      },
+    };
+  }
+}
+
+function arrow(ctx, from, to, color) {
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(to.x, to.y);
+  ctx.lineTo(to.x - 8 * Math.cos(angle - 0.4), to.y - 8 * Math.sin(angle - 0.4));
+  ctx.lineTo(to.x - 8 * Math.cos(angle + 0.4), to.y - 8 * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Pine label styles: glyph styles reuse the plotshape glyphs; label_* styles are text bubbles.
+function drawLabel(ctx, label, x, y) {
+  const style = label.style || "label_down";
+  const size = SIZE_PX[label.size] || SIZE_PX.normal;
+  const text = label.text || "";
+  const color = label.color || null;
+  if (style === "label_up" || style === "label_down") {
+    if (color) drawShape(ctx, style === "label_up" ? "labelup" : "labeldown", x, y, size, color, text, label.textcolor);
+    else if (text) { ctx.fillStyle = label.textcolor || "#131722"; ctx.textAlign = "center"; ctx.fillText(text, x, y); }
+    return;
+  }
+  if (!style.startsWith("label_") && style !== "none" && style !== "text_outline") {
+    if (color) drawShape(ctx, style, x, y, size, color);
+    if (text) {
+      ctx.fillStyle = label.textcolor || color || "#131722";
+      ctx.font = "11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(text, x, y - size / 2 - 2);
+    }
+    return;
+  }
+  ctx.font = "11px sans-serif";
+  const w = ctx.measureText(text).width + 8, h = 16;
+  const left = style.endsWith("left") ? x : style.endsWith("right") ? x - w : x - w / 2;
+  const top = style.includes("upper") ? y - h : style.includes("lower") ? y : y - h / 2;
+  if (color && style !== "none" && style !== "text_outline") { ctx.fillStyle = color; ctx.fillRect(left, top, w, h); }
+  if (text) {
+    ctx.fillStyle = label.textcolor || "#131722";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, left + w / 2, top + h / 2);
+  }
+}
+
 // ---- layer --------------------------------------------------------------------------------
 
 export class PineLayer {
@@ -232,7 +365,7 @@ export class PineLayer {
   build(script, pane) {
     const entry = { id: script.id, title: script.shorttitle || script.title, overlay: script.overlay, pane,
                     plots: new Map(), primitives: [], priceLines: [], hlines: new Map(), fills: new Map(), shapes: new Map(),
-                    bg: null, host: null, hostOwned: false };
+                    bg: null, host: null, hostOwned: false, drawings: null };
     let stack = 0;
     for (const output of script.outputs) {
       if (output.kind !== "plot") continue;
@@ -293,6 +426,9 @@ export class PineLayer {
         entry.shapes.set(output.id, primitive);
       }
     }
+    entry.drawings = new DrawingsPrimitive(this.engine);
+    entry.host.attachPrimitive(entry.drawings);
+    entry.primitives.push([entry.host, entry.drawings]);
     if (!script.overlay) {
       const panes = this.chart.panes();
       if (panes[pane]) panes[pane].setStretchFactor(1);
@@ -330,6 +466,7 @@ export class PineLayer {
       }
     }
     for (const [id, primitive] of entry.bg || []) primitive.set(byId.get(id).data);
+    entry.drawings.set(script.drawings || null);
     for (const [id, primitive] of entry.shapes) {
       const output = byId.get(id);
       const reference = entry.overlay ? null : entry.plots.values().next().value;

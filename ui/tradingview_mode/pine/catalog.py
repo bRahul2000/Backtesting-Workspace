@@ -78,6 +78,7 @@ _VARIABLES = {
         target_price_date target_price_estimates target_price_high target_price_low target_price_median ticker
         tickerid timezone type volumetype""",
     "session": "isfirstbar isfirstbar_regular islastbar islastbar_regular ismarket ispostmarket ispremarket",
+    "line": "all", "label": "all", "box": "all", "linefill": "all", "polyline": "all", "table": "all",
     "chart": "bg_color fg_color is_heikinashi is_kagi is_linebreak is_pnf is_range is_renko is_standard left_visible_bar_time right_visible_bar_time",
     "strategy": """account_currency avg_losing_trade avg_losing_trade_percent avg_trade avg_trade_percent avg_winning_trade
         avg_winning_trade_percent closedtrades equity eventrades grossloss grossloss_percent grossprofit
@@ -109,12 +110,12 @@ NAMESPACE_FEATURES = {
     "array": ("arrays", "arrays"),
     "matrix": ("matrices", "matrices"),
     "map": ("maps", "maps"),
-    "line": ("drawing-objects", "drawing objects (lines)"),
-    "label": ("drawing-objects", "drawing objects (labels)"),
-    "box": ("drawing-objects", "drawing objects (boxes)"),
+    "line": ("drawings-core", "drawing objects (lines)"),
+    "label": ("drawings-core", "drawing objects (labels)"),
+    "box": ("drawings-core", "drawing objects (boxes)"),
     "table": ("drawing-objects", "drawing objects (tables)"),
     "polyline": ("drawing-objects", "drawing objects (polylines)"),
-    "linefill": ("drawing-objects", "drawing objects (linefills)"),
+    "linefill": ("drawings-core", "drawing objects (linefills)"),
     "chart.point": ("drawing-objects", "chart points"),
     "strategy": ("strategy", "strategy scripts"),
     "ticker": ("request", "ticker construction"),

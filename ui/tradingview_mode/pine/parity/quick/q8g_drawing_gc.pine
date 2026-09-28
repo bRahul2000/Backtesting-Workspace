@@ -1,0 +1,87 @@
+//@version=6
+// Pine P2.3 parity - QUICK HISTORICAL ORACLE (revision 4): drawing-object garbage collection.
+// Real TradingView is the oracle: the table shows observed values only (no expected values, no PASS/FAIL).
+// Setup: any chart with more than 60 bars (BINANCE:BTCUSDT 1m is fine); historical bars only, no waiting.
+// Revision 1 kept every ID in a `var` array and nothing was collected (8 alive with a limit of 5). Revision 2 creates
+// 40 objects per type on 40 historical bars with all limits = 5, in three populations (one per type, so the counts are
+// not mixed):
+//   LABELS U1..U40: no reference kept                      -> does the limit evict unreferenced objects, and which?
+//   LINES  R1..R40: every ID kept in a `var` array          -> are objects whose IDs are stored protected?
+//   BOXES  "first" (kept in a `var`, created first) + B1..B40 unreferenced -> is a referenced OLD object evicted?
+// Boxes have no text getter, so each box is identified by its top: first = 1000, Bn = 100 + n (bottom = top - 1).
+// Creation order differs from left-to-right position. The probe runs on bar last_bar_index - 3; the table first shows
+// whether eviction happened (the *.all contents), then what the kept `first` box ID returns.
+// Revision 3 proved that R1..R30 were collected although their IDs stay in keptLines, so keptLines.get(0) (R1) is a
+// garbage-collected ID. Revision 4 probes it: Case 0 reads only; Case 1 calls line.set_y1(deadLine, 999) first;
+// Case 2 calls line.delete(deadLine) first. Each reports na(deadLine), its y1 and line.all before/after.
+indicator("q8g drawing garbage collection r4", overlay=true, max_labels_count=5, max_lines_count=5, max_boxes_count=5)
+caseSel = input.int(0, "Case: 0 read only · 1 line.set_y1 on the collected R1 ID · 2 line.delete on the collected R1 ID", options=[0, 1, 2])
+s(v) => str.tostring(v)
+int L = last_bar_index
+var array<line> keptLines = array.new<line>()
+var box firstBox = na
+
+// creation: ordinal n = 1..40 on bars L-45 .. L-6; x offsets alternate so creation order != x order
+int n = bar_index - (L - 46)
+if n == 0
+    firstBox := box.new(L - 200, 1000.0, L - 199, 999.0)
+if n >= 1 and n <= 40
+    int x = L - 100 + (n % 2 == 0 ? n : -n)
+    label.new(x, 1.0, "U" + s(n))
+    keptLines.push(line.new(x, n, x + 1, n))
+    box.new(x, 100.0 + n, x + 1, 99.0 + n)
+
+// probe on a historical bar
+var string rLabels = "probe not reached"
+var string rLines = ""
+var string rBoxes = ""
+var string rFirst = ""
+var string rAction = "none"
+var string rDead = ""
+if bar_index == L - 3
+    line deadLine = keptLines.get(0)                   // R1: collected (revision 3), ID still stored
+    int linesBefore = line.all.size()
+    if caseSel == 1
+        line.set_y1(deadLine, 999)
+        rAction := "line.set_y1(deadLine, 999) completed"
+    if caseSel == 2
+        line.delete(deadLine)
+        rAction := "line.delete(deadLine) completed"
+    bool reappeared = false
+    for id in line.all
+        reappeared := reappeared or id.get_y1() == 999.0 or id.get_y1() == 1.0
+    rDead := "na(deadLine): " + (na(deadLine) ? "yes" : "no") + "; get_y1: " + s(line.get_y1(deadLine)) + "; line.all size before/after: " + s(linesBefore) + "/" + s(line.all.size()) + "; R1 (y1 1 or 999) in line.all: " + (reappeared ? "YES" : "no")
+    string lt = ""
+    for id in label.all
+        lt += id.get_text() + " "
+    rLabels := "label.all size " + s(label.all.size()) + ": " + lt
+    string ly = ""
+    for id in line.all
+        ly += s(id.get_y1()) + " "
+    int keptAlive = 0
+    for id in keptLines
+        keptAlive += na(id.get_y1()) ? 0 : 1
+    rLines := "line.all size " + s(line.all.size()) + ", kept IDs still readable " + s(keptAlive) + "/40: y1 " + ly
+    string bt = ""
+    bool firstListed = false
+    for id in box.all
+        float bTop = box.get_top(id)
+        bt += (bTop == 1000.0 ? "first" : "B" + s(bTop - 100.0)) + " "
+        firstListed := firstListed or bTop == 1000.0
+    rBoxes := "box.all size " + s(box.all.size()) + ": " + bt
+    float top = box.get_top(firstBox)
+    rFirst := "first listed in box.all: " + (firstListed ? "yes" : "NO (evicted)") + "; id na: " + (na(firstBox) ? "yes" : "no") + "; get_top: " + s(top)
+
+var table t = table.new(position.top_right, 2, 7, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int row, string k0, string v) =>
+    table.cell(t, 0, row, k0, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 1, row, v, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, "q8g r4 GC - case " + s(caseSel), "observed at bar last_bar_index - 3")
+    put(1, "action", rAction)
+    put(2, "LABELS U1..U40, unreferenced, limit 5", rLabels)
+    put(3, "LINES R1..R40, IDs kept in a var array, limit 5", rLines)
+    put(4, "BOXES first (kept) + B1..B40 (unreferenced), limit 5", rBoxes)
+    put(5, "kept first box ID", rFirst)
+    put(6, "collected R1 line ID (keptLines.get(0))", rDead)
+plot(close, "close", display=display.none)
