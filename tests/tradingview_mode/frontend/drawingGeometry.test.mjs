@@ -1,7 +1,7 @@
 // P2.3a drawing geometry: raw Pine coordinates -> chart logical indices and canvas geometry.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dashFor, extendBox, extendSegment, labelPrice, logicalFromTime, logicalOf }
+import { dashFor, extendBox, extendSegment, labelPrice, logicalFromTime, logicalOf, tableLayout }
   from "../../../ui/tradingview_mode/component/frontend/src/chart/drawingGeometry.js";
 
 const times = [1000, 1060, 1120, 1300];            // seconds; the last gap is a session gap
@@ -38,4 +38,24 @@ test("label anchors and line dashes", () => {
   assert.equal(labelPrice({ yloc: "belowbar", y: 5 }, { high: 9, low: 1 }), 1);
   assert.deepEqual(dashFor("solid", 2), []);
   assert.deepEqual(dashFor("dashed", 2), [8, 6]);
+});
+
+test("P2.3b tables: top-right layout sized by the largest cell of each column and row", () => {
+  const measure = (text, px) => text.length * px / 2;                     // deterministic stand-in for canvas
+  const table = { columns: 2, rows: 3, cells: [
+    { column: 0, row: 0, text: "key", text_size: "small" },
+    { column: 1, row: 0, text: "a longer value", text_size: "small" },
+    { column: 0, row: 2, text: "two\nlines", text_size: "normal" },
+  ] };
+  const layout = tableLayout(table, measure, 500, { small: 10, normal: 14 }, { pad: 4, margin: 8 });
+  const [a, b, c] = layout.cells;
+  assert.equal(a.w, Math.max(3 * 5, 5 * 7) + 8);                          // column 0: widest of "key", "lines"
+  assert.equal(b.w, 14 * 5 + 8);
+  assert.equal(layout.width, a.w + b.w);
+  assert.equal(layout.x + layout.width, 500 - 8);                          // anchored at the top-right corner
+  assert.equal(layout.y, 8);
+  assert.equal(a.y, 8);
+  assert.equal(c.y, 8 + 10 * 1.25 + 8);                                    // row 1 is empty: it takes no space
+  assert.equal(c.h, 2 * 14 * 1.25 + 8);
+  assert.deepEqual(c.lines, ["two", "lines"]);
 });

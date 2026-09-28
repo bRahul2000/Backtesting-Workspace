@@ -5,7 +5,7 @@ built-in registries; a test fails if this file is out of date. Compatibility is 
 feature. **No claim of full Pine compatibility is made**: a script runs only if every feature it
 uses is supported, and otherwise fails with the exact feature and line.
 
-Features: 23 supported, 15 partial, 12 not yet implemented. Built-ins: 226 functions, 60 variables, 128 constants.
+Features: 23 supported, 17 partial, 12 not yet implemented. Built-ins: 243 functions, 64 variables, 129 constants.
 
 ## parser
 
@@ -82,8 +82,10 @@ Features: 23 supported, 15 partial, 12 not yet implemented. Built-ins: 226 funct
 
 | feature | status | notes |
 |---|---|---|
-| drawing objects (`line.*`, `label.*`, `box.*`, `linefill.*`) | partial | P2.3a object core per P23_DRAWING_RESEARCH.md: IDs, aliasing, history, copy, delete, garbage collection (roots: scalar `var` variables), realtime rollback, x/y constructors, setters/getters, methods. Arrays of drawing IDs, `*.all`, `chart.point` overloads, `force_overlay`, fonts and text formatting are not implemented yet. |
-| tables, polylines and chart points (`table.*`, `polyline.*`, `chart.point.*`) | gap |  |
+| drawing objects (`line.*`, `label.*`, `box.*`, `linefill.*`) | partial | P2.3a object core per P23_DRAWING_RESEARCH.md: IDs, aliasing, history, copy, delete, garbage collection (roots: scalar `var` variables), realtime rollback, x/y and `chart.point` constructors, setters/getters, methods. P2.3b (P23B_COLLECTIONS_RESEARCH.md): arrays of drawing IDs, `*.all` (a fresh array per read), current/superseded linefills. `*.all[n]`, `force_overlay`, fonts and text formatting are not implemented yet. |
+| chart points (`chart.point.*`, `p.time` / `p.index` / `p.price`) | partial | Constructors, shared references (aliases, history, arrays), field writes with realtime rollback and `varip` persistence. `==` on points and points in `request.*` (engine limit) are not implemented. |
+| P2.3b oracle-support tables-core (`table.new`, `table.cell`) | partial | Only the subset the frozen parity oracles use: `position.top_right`, cell text, colors, size and horizontal alignment, realtime rollback of cell writes. Not TradingView table parity (P2.4). |
+| polylines and the rest of the table API (`polyline.*`, `table.*`) | gap |  |
 
 ## request
 
@@ -102,16 +104,16 @@ Features: 23 supported, 15 partial, 12 not yet implemented. Built-ins: 226 funct
 | namespace | implemented / known | not implemented yet |
 |---|---|---|
 | `(global)` | 44 / 56 | `box`, `label`, `library`, `line`, `linefill`, `plotarrow`, `plotbar`, `plotcandle`, `polyline`, `strategy`, `table`, `time_tradingday` |
-| `array` | 18 / 55 | `array.abs`, `array.avg`, `array.binary_search`, `array.binary_search_leftmost`, `array.binary_search_rightmost`, `array.concat`, `array.covariance`, `array.every`, `array.fill`, `array.includes`, `array.indexof`, `array.insert` … (+25) |
+| `array` | 22 / 55 | `array.abs`, `array.avg`, `array.binary_search`, `array.binary_search_leftmost`, `array.binary_search_rightmost`, `array.concat`, `array.covariance`, `array.every`, `array.fill`, `array.includes`, `array.indexof`, `array.insert` … (+21) |
 | `barstate` | 7 / 7 |  |
-| `box` | 23 / 30 | `box.all`, `box.set_bottom_right_point`, `box.set_text_font_family`, `box.set_text_formatting`, `box.set_text_wrap`, `box.set_top_left_point`, `box.set_xloc` |
+| `box` | 26 / 30 | `box.set_text_font_family`, `box.set_text_formatting`, `box.set_text_wrap`, `box.set_xloc` |
 | `chart` | 0 / 11 | `chart.bg_color`, `chart.fg_color`, `chart.is_heikinashi`, `chart.is_kagi`, `chart.is_linebreak`, `chart.is_pnf`, `chart.is_range`, `chart.is_renko`, `chart.is_standard`, `chart.left_visible_bar_time`, `chart.right_visible_bar_time` |
-| `chart.point` | 0 / 5 | `chart.point.copy`, `chart.point.from_index`, `chart.point.from_time`, `chart.point.new`, `chart.point.now` |
+| `chart.point` | 5 / 5 |  |
 | `color` | 7 / 7 |  |
 | `input` | 9 / 13 | `input.enum`, `input.session`, `input.symbol`, `input.time` |
-| `label` | 18 / 22 | `label.all`, `label.set_point`, `label.set_text_font_family`, `label.set_text_formatting` |
-| `line` | 19 / 22 | `line.all`, `line.set_first_point`, `line.set_second_point` |
-| `linefill` | 5 / 6 | `linefill.all` |
+| `label` | 20 / 22 | `label.set_text_font_family`, `label.set_text_formatting` |
+| `line` | 22 / 22 |  |
+| `linefill` | 6 / 6 |  |
 | `log` | 0 / 3 | `log.error`, `log.info`, `log.warning` |
 | `map` | 0 / 11 | `map.clear`, `map.contains`, `map.copy`, `map.get`, `map.keys`, `map.new`, `map.put`, `map.put_all`, `map.remove`, `map.size`, `map.values` |
 | `math` | 24 / 24 |  |
@@ -127,7 +129,7 @@ Features: 23 supported, 15 partial, 12 not yet implemented. Built-ins: 226 funct
 | `strategy.risk` | 0 / 6 | `strategy.risk.allow_entry_in`, `strategy.risk.max_cons_loss_days`, `strategy.risk.max_drawdown`, `strategy.risk.max_intraday_filled_orders`, `strategy.risk.max_intraday_loss`, `strategy.risk.max_position_size` |
 | `syminfo` | 15 / 38 | `syminfo.country`, `syminfo.employees`, `syminfo.expiration_date`, `syminfo.industry`, `syminfo.main_tickerid`, `syminfo.mincontract`, `syminfo.recommendations_buy`, `syminfo.recommendations_buy_strong`, `syminfo.recommendations_date`, `syminfo.recommendations_hold`, `syminfo.recommendations_sell`, `syminfo.recommendations_sell_strong` … (+11) |
 | `ta` | 53 / 67 | `ta.cog`, `ta.iii`, `ta.max`, `ta.min`, `ta.mode`, `ta.nvi`, `ta.percentile_linear_interpolation`, `ta.percentile_nearest_rank`, `ta.pivot_point_levels`, `ta.pvi`, `ta.pvt`, `ta.rci` … (+2) |
-| `table` | 0 / 23 | `table.all`, `table.cell`, `table.cell_set_bgcolor`, `table.cell_set_height`, `table.cell_set_text`, `table.cell_set_text_color`, `table.cell_set_text_font_family`, `table.cell_set_text_formatting`, `table.cell_set_text_halign`, `table.cell_set_text_size`, `table.cell_set_text_valign`, `table.cell_set_tooltip` … (+11) |
+| `table` | 2 / 23 | `table.all`, `table.cell_set_bgcolor`, `table.cell_set_height`, `table.cell_set_text`, `table.cell_set_text_color`, `table.cell_set_text_font_family`, `table.cell_set_text_formatting`, `table.cell_set_text_halign`, `table.cell_set_text_size`, `table.cell_set_text_valign`, `table.cell_set_tooltip`, `table.cell_set_width` … (+9) |
 | `ticker` | 0 / 9 | `ticker.heikinashi`, `ticker.inherit`, `ticker.kagi`, `ticker.linebreak`, `ticker.modify`, `ticker.new`, `ticker.pointfigure`, `ticker.renko`, `ticker.standard` |
 | `timeframe` | 14 / 14 |  |
 

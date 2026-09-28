@@ -237,8 +237,9 @@ def _validate_pine(payload: dict[str, Any], bar_times: set[int]) -> None:
                          "a pine fill must reference two plots or two hlines of the same script.")
 
 
-DRAWING_LISTS = {"lines": "line", "labels": "label", "boxes": "box", "linefills": "linefill"}
+DRAWING_LISTS = {"lines": "line", "labels": "label", "boxes": "box", "linefills": "linefill", "tables": "table"}
 MAX_DRAWINGS_PER_KIND = 1000          # declared limits <= 500; rooted objects may exceed them (P2.3a GC model)
+MAX_TABLE_CELLS = 10_000              # P2.3b oracle-support tables-core: columns x rows per table
 
 
 def _validate_drawings(script: dict, bar_count: int) -> None:
@@ -264,6 +265,9 @@ def _validate_drawings(script: dict, bar_count: int) -> None:
                      f"pine drawing {key} was created on bar {bar!r}, which the chart does not have.")
             if kind == "linefill":
                 continue
+            if kind == "table":
+                _validate_table(key, item)
+                continue
             _require(item.get("xloc") in ("bar_index", "bar_time"), f"pine drawing {key}: invalid xloc.")
             xs = {"line": ("x1", "x2"), "label": ("x",), "box": ("left", "right")}[kind]
             ys = {"line": ("y1", "y2"), "label": ("y",), "box": ("top", "bottom")}[kind]
@@ -274,6 +278,26 @@ def _validate_drawings(script: dict, bar_count: int) -> None:
     for item in drawings.get("linefills") or []:
         _require(keys.get(item.get("line1")) == "line" and keys.get(item.get("line2")) == "line",
                  f"pine linefill {item.get('key')} must reference two lines of the same script.")
+
+
+def _validate_table(key: str, item: dict) -> None:
+    """P2.3b oracle-support tables-core: a top-right grid whose cells are text with optional colours."""
+    columns, rows = item.get("columns"), item.get("rows")
+    _require(item.get("position") == "top_right", f"pine table {key}: only position top_right is supported.")
+    _require(type(columns) is int and type(rows) is int and columns >= 1 and rows >= 1
+             and columns * rows <= MAX_TABLE_CELLS, f"pine table {key}: invalid size.")
+    cells = item.get("cells")
+    _require(isinstance(cells, list) and len(cells) <= columns * rows, f"pine table {key}: invalid cells.")
+    seen = set()
+    for cell in cells:
+        column, row = cell.get("column"), cell.get("row")
+        _require(type(column) is int and type(row) is int and 0 <= column < columns and 0 <= row < rows
+                 and (column, row) not in seen, f"pine table {key}: cell ({column!r}, {row!r}) is invalid.")
+        seen.add((column, row))
+        _require(isinstance(cell.get("text"), str), f"pine table {key}: cell text must be a string.")
+        _require(all(cell.get(name) is None or isinstance(cell.get(name), str)
+                     for name in ("text_color", "bgcolor", "text_size", "text_halign")),
+                 f"pine table {key}: cell styles must be strings or null.")
 
 
 def _validate_contexts(payload: dict[str, Any], script: dict, bar_times: set[int]) -> None:

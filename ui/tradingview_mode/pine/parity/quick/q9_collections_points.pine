@@ -1,0 +1,143 @@
+//@version=6
+// Pine P2.3b parity - QUICK HISTORICAL ORACLE (revision 2): *.all arrays, arrays of drawing IDs, linefill bookkeeping,
+// chart.point. Revision 1 did not compile: `==` on linefill IDs is CE10123; revision 2 uses na() and line identity only.
+// Real TradingView is the oracle: the table shows observed values only (no expected values, no PASS/FAIL).
+// Setup: any chart with more than 60 bars (BINANCE:BTCUSDT 1m is fine); historical bars are enough. Choose ONE case in
+// the settings. Case 0 holds every question that cannot stop the script. Cases 1 and 2 may stop with a runtime error:
+// if the chart shows an error, its exact text IS the result for that case.
+// Visual question (Case 0 only): look at the two shaded bands described in the table rows "band A" and "band C".
+indicator("q9 collections and chart points", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+caseSel = input.int(0, "Case: 0 safe table · 1 assign a field of a historical chart.point · 2 push into an array read from label.all", options=[0, 1, 2])
+s(v) => str.tostring(v)
+yn(bool b) => b ? "yes" : "no"
+// linefill IDs cannot be compared with == (revision 1: CE10123), so listed IDs are classified with na() only
+deadListed() =>
+    int d = 0
+    for id in linefill.all
+        d += na(id) ? 1 : 0
+    d
+int L = last_bar_index
+
+// ---- A. *.all: a live view or a copy taken when read? No label exists before bar L-3.
+var array<label> earlyAll = label.all                  // read once on bar 0, when label.all is empty
+
+// ---- B. an array of line IDs: history of the container vs the objects it references
+var array<line> held = array.new<line>()
+if bar_index == L - 5
+    held.push(line.new(bar_index, 1.0, bar_index + 1, 1.0))
+if bar_index == L - 4
+    held.push(line.new(bar_index, 2.0, bar_index + 1, 2.0))
+
+// ---- C. linefill bookkeeping (q8 Case 0 observed linefill.all size 2 after two linefill.new on one pair)
+var string rC1 = "not reached"
+var string rC2 = "not reached"
+var string rC3 = "not reached"
+var linefill fa1 = na
+var linefill fa2 = na
+var linefill fb1 = na
+var linefill fc1 = na
+if bar_index == L - 8
+    // band B (above price, bars L-40..L-30): the same two lines in REVERSED argument order
+    line n1 = line.new(bar_index - 32, high * 1.006, bar_index - 22, high * 1.006)
+    line n2 = line.new(bar_index - 32, high * 1.004, bar_index - 22, high * 1.004)
+    int before = linefill.all.size()
+    fb1 := linefill.new(n1, n2, color.new(color.green, 50))
+    int afterOne = linefill.all.size()
+    linefill fb2 = linefill.new(n2, n1, color.new(color.yellow, 50))
+    rC2 := "reversed pair, same bar: linefill.all size before/after 1st/after 2nd = " + s(before) + "/" + s(afterOne) + "/" + s(linefill.all.size()) + "; na(1st) " + yn(na(fb1)) + "; na(2nd) " + yn(na(fb2)) + "; listed IDs that read na " + s(deadListed())
+if bar_index == L - 7
+    // band C (below price, bars L-27..L-7): two linefills on one pair, then the SECOND one is deleted
+    line c1 = line.new(bar_index - 20, low * 0.996, bar_index, low * 0.996)
+    line c2 = line.new(bar_index - 20, low * 0.994, bar_index, low * 0.994)
+    int before = linefill.all.size()
+    fc1 := linefill.new(c1, c2, color.new(color.orange, 50))
+    linefill fc2 = linefill.new(c1, c2, color.new(color.teal, 50))
+    int afterTwo = linefill.all.size()
+    linefill.delete(fc2)
+    rC3 := "band C (orange then teal; teal deleted): linefill.all size before/after two/after delete = " + s(before) + "/" + s(afterTwo) + "/" + s(linefill.all.size()) + "; na(orange) " + yn(na(fc1)) + "; na(teal) " + yn(na(fc2)) + "; listed IDs that read na " + s(deadListed())
+if bar_index == L - 6
+    // band A (at price, bars L-26..L-6): two linefills on one pair, same argument order
+    line m1 = line.new(bar_index - 20, high * 1.002, bar_index, high * 1.002)
+    line m2 = line.new(bar_index - 20, low * 0.998, bar_index, low * 0.998)
+    int before = linefill.all.size()
+    fa1 := linefill.new(m1, m2, color.new(color.red, 50))
+    int afterOne = linefill.all.size()
+    fa2 := linefill.new(m1, m2, color.new(color.blue, 50))
+    int n = linefill.all.size()
+    rC1 := "band A (red then blue), same bar: size before/after 1st/after 2nd = " + s(before) + "/" + s(afterOne) + "/" + s(n) + "; na(red) " + yn(na(fa1)) + "; na(blue) " + yn(na(fa2)) + "; listed IDs that read na " + s(deadListed()) + "; red's line1 is m1 " + yn(linefill.get_line1(fa1) == m1) + "; blue's line1 is m1 " + yn(linefill.get_line1(fa2) == m1)
+
+// ---- D. chart.point: persistence across bars, arrays of points, history
+var chart.point pa = chart.point.from_index(0, 0.0)
+var chart.point pb = pa                                // initialised from pa on bar 0
+var chart.point pc = chart.point.from_index(0, 0.0)
+var array<chart.point> pArr = array.from(pc)           // holds pc's ID from bar 0
+var chart.point ph = chart.point.from_index(0, 0.0)
+pa.price += 1
+pc.price += 1
+ph.price := bar_index
+
+// ---- probe on a historical bar
+var string rA = "probe not reached"
+var string rA2 = ""
+var string rB = ""
+var string rD1 = ""
+var string rD2 = ""
+var string rD3 = ""
+var string rCase = "none"
+if bar_index == L - 3
+    label a1 = label.new(bar_index, high, "A1")
+    label a2 = label.new(bar_index, high, "A2")
+    array<label> view = label.all
+    int sizeRead = view.size()
+    label a3 = label.new(bar_index, high, "A3")
+    int sizeAfterNew = view.size()
+    label.delete(a1)
+    int sizeAfterDelete = view.size()
+    string first = view.size() == 0 ? "empty" : na(view.get(0)) ? "a deleted ID" : label.get_text(view.get(0))
+    rA := "view = label.all after A1, A2: size at read " + s(sizeRead) + "; after label.new A3 " + s(sizeAfterNew) + "; after label.delete A1 " + s(sizeAfterDelete) + "; view[0] " + first + "; label.all.size() now " + s(label.all.size())
+    rA2 := "var earlyAll = label.all read on bar 0: size now " + s(earlyAll.size())
+    array<line> prev = held[1]                          // held as it was at the end of bar L-4 (2 IDs)
+    line.set_y1(prev.get(0), 21.0)                      // mutate the first line through the historical array
+    rB := "held[1] size " + s(prev.size()) + "; after line.set_y1(held[1].get(0), 21): y1 via held.get(0) " + s(line.get_y1(held.get(0))) + "; held.size() " + s(held.size())
+    rD1 := "var pb = pa (pa.price += 1 every bar): pa.price " + s(pa.price) + "; pb.price " + s(pb.price) + "; bars so far " + s(bar_index + 1)
+    rD2 := "var pArr = array.from(pc) (pc.price += 1 every bar): pc.price " + s(pc.price) + "; pArr.get(0).price " + s(pArr.get(0).price)
+    chart.point hp = ph[1]
+    rD3 := "ph.price := bar_index every bar; bar_index " + s(bar_index) + "; ph.price " + s(ph.price) + "; (ph[1]).price " + s(hp.price)
+    if caseSel == 1
+        hp.price := -5.0
+        chart.point hp2 = ph[1]
+        rCase := "hp = ph[1]; hp.price := -5 completed; hp.price " + s(hp.price) + "; ph.price " + s(ph.price) + "; ph[1] re-read price " + s(hp2.price)
+    if caseSel == 2
+        array<label> la = label.all
+        la.push(label.new(bar_index, low, "X"))
+        rCase := "la = label.all; la.push(label.new(...)) completed; la.size() " + s(la.size()) + "; label.all.size() " + s(label.all.size())
+
+// ---- last bar (realtime when the market is open): the same two linefill calls as band A
+var string rE = ""
+if barstate.islast
+    line k1 = line.new(bar_index - 3, high * 1.01, bar_index, high * 1.01)
+    line k2 = line.new(bar_index - 3, high * 1.008, bar_index, high * 1.008)
+    int before = linefill.all.size()
+    linefill h1 = linefill.new(k1, k2, color.new(color.red, 50))
+    linefill h2 = linefill.new(k1, k2, color.new(color.blue, 50))
+    rE := "last bar (isrealtime " + yn(barstate.isrealtime) + "): size before/after two = " + s(before) + "/" + s(linefill.all.size()) + "; na(1st) " + yn(na(h1)) + "; na(2nd) " + yn(na(h2)) + "; listed IDs that read na " + s(deadListed()) + "; at the last bar, alive: red " + yn(not na(fa1)) + ", blue " + yn(not na(fa2)) + ", green " + yn(not na(fb1)) + ", orange " + yn(not na(fc1))
+
+var table t = table.new(position.top_right, 2, 13, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int row, string k0, string v) =>
+    table.cell(t, 0, row, k0, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 1, row, v, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, "q9 collections and chart points - case " + s(caseSel), "probes on bar last_bar_index - 3 unless stated")
+    put(1, "A label.all read into a variable", rA)
+    put(2, "A var array read from label.all on bar 0", rA2)
+    put(3, "B array<line> history", rB)
+    put(4, "C band A (at price, red then blue, bars L-26..L-6)", rC1)
+    put(5, "C band B (above price, green then yellow, reversed)", rC2)
+    put(6, "C band C (below price, orange then teal, teal deleted)", rC3)
+    put(7, "C last bar", rE)
+    put(8, "D chart.point var initialised from another var", rD1)
+    put(9, "D chart.point held in a var array", rD2)
+    put(10, "D chart.point history", rD3)
+    put(11, "case action", rCase)
+    put(12, "VISUAL (case 0)", "Colour of band A: light blue / purple / red / none? Band C: orange / teal / none?")
+plot(close, "close", display=display.none)

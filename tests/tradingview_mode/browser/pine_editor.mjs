@@ -144,7 +144,7 @@ async function main() {
   await click("Compile gap example", ".pine-compile"); await settle();
   const problems = await evaluate("__tv.problems()");
   check("gap names request.dividends() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 3 `request.dividends()` is not implemented yet (data requests)."), JSON.stringify(problems));
-  check("gap names polyline.new() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 6 `polyline.new()` is not implemented yet (tables, polylines and chart points)."), JSON.stringify(problems));
+  check("gap names polyline.new() and its line", problems.some((t) => t === "NOT YET SUPPORTED Line 6 `polyline.new()` is not implemented yet (polylines and the rest of the table API)."), JSON.stringify(problems));
   check("no 'unsupported indicator' wording", problems.every((t) => !/indicator unsupported/i.test(t)));
   await click("Try adding gap example", ".pine-add"); await settle();
   check("gap script not added", (await pine()).length === 2);

@@ -186,7 +186,8 @@ class ArraySnapshot:
 
 # ---- drawing objects (P2.3a; see parity/P23_DRAWING_RESEARCH.md §15) -------------------------------------------------
 
-DRAWING_KINDS = ("line", "label", "box", "linefill")
+DRAWING_KINDS = ("line", "label", "box", "linefill", "table")      # table: P2.3b oracle-support tables-core
+ARRAY_DRAWING_KINDS = ("line", "label", "box", "linefill")          # element types of arrays of drawing IDs (P2.3b)
 
 
 @dataclass(frozen=True)
@@ -200,3 +201,23 @@ class DrawingRef:
 
     def __repr__(self) -> str:
         return f"{self.kind}#{self.oid}"
+
+
+# ---- chart points (P2.3b; see parity/P23B_COLLECTIONS_RESEARCH.md §16.4) ----------------------------------------------
+
+POINT_FIELDS = {"time": "int", "index": "int", "price": "float"}
+
+
+class ChartPoint:
+    """A ``chart.point`` object. Every constructor call creates a new one; variables, history slots, arrays and
+    aliases hold references to the same Python object, so a write through any of them (``p[1].price := v`` included)
+    is seen through all of them (TradingView q9 D1-D3, Case 1). Field writes go through the runtime so that realtime
+    rollback can undo them (``DrawingStore.point_set``)."""
+
+    __slots__ = ("time", "index", "price", "pid")
+
+    def __init__(self, time, index, price, pid: int):
+        self.time, self.index, self.price, self.pid = time, index, price, pid
+
+    def __repr__(self) -> str:
+        return f"chart.point#{self.pid}(time={self.time!r}, index={self.index!r}, price={self.price!r})"

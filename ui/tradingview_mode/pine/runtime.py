@@ -28,7 +28,7 @@ from . import values as V
 from .builtins.arrays import RE10052
 from .drawings import DrawingStore
 from .errors import PineRuntimeError
-from .values import NA, ArraySnapshot, Color, DrawingRef, PineArray, is_na, truthy
+from .values import NA, POINT_FIELDS, ArraySnapshot, ChartPoint, Color, DrawingRef, PineArray, is_na, truthy
 
 MISSING = object()
 MAX_LOOP_ITERATIONS = 100_000
@@ -268,13 +268,28 @@ class Runtime:
                 buffer.values[-1] = buffer.values[-1].snapshot()
 
     def rollback(self, bar: int) -> None:
-        """Undo everything recorded on ``bar`` or later (varip series excepted)."""
+        """Undo everything recorded on ``bar`` or later (varip series excepted). Chart-point field writes are undone
+        too, except on points reachable from a ``varip`` variable (manual: they persist across ticks)."""
+        keep = self._varip_points()
         for buffer in self.buffers.values():
             if not buffer.varip:
                 buffer.truncate(bar)
         for site in self.sites.values():
             site.truncate(bar)
-        self.drawings.rollback(bar)
+        self.drawings.rollback(bar, keep)
+
+    def _varip_points(self) -> frozenset:
+        """``id()`` of every chart point a ``varip`` slot holds directly or as an array element. Object-level rule:
+        a point reachable this way keeps all its writes, even when a ``var`` references it too (ENGINE POLICY for
+        mixed aliases, P23B_COLLECTIONS_RESEARCH.md §16.4)."""
+        found = set()
+        for buffer in self.buffers.values():
+            if not buffer.varip or not buffer.values:
+                continue
+            value = buffer.values[-1]
+            items = value.items if isinstance(value, (PineArray, ArraySnapshot)) else (value,)
+            found.update(id(item) for item in items if isinstance(item, ChartPoint))
+        return frozenset(found)
 
     def _drawing_roots(self) -> set[int]:
         """GC roots: the drawing IDs currently held by scalar `var` variables (global and function-local)."""
@@ -349,6 +364,8 @@ class Runtime:
         return value
 
     def exec_assign(self, node: A.Assign, scope: Scope):
+        if isinstance(node.target, A.Attribute):
+            return self.assign_field(node, scope)
         buffer = scope.lookup(node.target.name)
         value = self.eval(node.value, scope)
         if node.op != ":=":
@@ -356,6 +373,26 @@ class Runtime:
             value = {"+=": V.add, "-=": V.sub, "*=": V.mul, "/=": V.div, "%=": V.mod}[node.op](current, value)
         buffer.set(self.bar, value)
         return value
+
+    def assign_field(self, node: A.Assign, scope: Scope):
+        """`p.price := v` / `p.index += 1`: writes the shared point object (every reference sees it, q9 Case 1)."""
+        point = self._point(node.target, scope)
+        field = node.target.name
+        value = self.eval(node.value, scope)
+        if node.op != ":=":
+            value = {"+=": V.add, "-=": V.sub, "*=": V.mul, "/=": V.div, "%=": V.mod}[node.op](getattr(point, field), value)
+        if not is_na(value):
+            value = int(value) if POINT_FIELDS[field] == "int" else float(value)
+        self.drawings.point_set(point, field, value)
+        return value
+
+    def _point(self, node: A.Attribute, scope: Scope) -> ChartPoint:
+        point = self.eval(node.target, scope)
+        if isinstance(point, ChartPoint):
+            return point
+        if is_na(point):
+            self.fail(f"Cannot access the field `{node.name}` of an na chart point.", node)
+        self.fail(f"Cannot access the field `{node.name}`: the value is not a chart point.", node)
 
     def exec_if(self, node: A.If, scope: Scope):
         if truthy(self.eval(node.condition, scope)):
@@ -476,6 +513,8 @@ class Runtime:
             return scope.lookup(target).current()
         if kind == "var":
             return target.impl(self, self.bar)
+        if kind == "field":
+            return getattr(self._point(node, scope), target)
         return target                                # const
 
     def eval_history(self, node: A.History, scope: Scope):
@@ -487,7 +526,7 @@ class Runtime:
         n = int(offset)
         target = node.target
         resolved = self.program.names.get(target.id) if isinstance(target, (A.Name, A.Attribute)) else None
-        if resolved is not None:
+        if resolved is not None and resolved[0] != "field":
             kind, value = resolved
             if kind == "user":
                 return _historical(scope.lookup(value).back(n), n)
@@ -532,11 +571,13 @@ class Runtime:
         return tuple(self.eval(item, scope) for item in node.items)
 
     def eval_call(self, node: A.Call, scope: Scope):
-        kind, target, binding = self.program.calls[node.id]
+        kind, target, binding = self.program.calls[node.id][:3]
         if kind == "user":
             return self.call_user(node, target, binding, scope)
         if kind == "dispatch":
             return self.call_dispatch(node, target, binding, scope)
+        if kind == "overload":
+            return self.call_overload(node, target, binding, self.program.calls[node.id][3], scope)
         if target.kind == "declaration":
             return NA
         if target.kind == "input":
@@ -565,6 +606,8 @@ class Runtime:
             namespace = "array"
         elif isinstance(value, DrawingRef):
             namespace = value.kind                          # dead refs keep their kind; the builtin applies na rules
+        elif isinstance(value, ChartPoint):
+            namespace = "chart.point"
         elif is_na(value):
             self.fail(f"Cannot call method `{method}()` on an na value of unknown type: it exists for "
                       f"{', '.join(options)}. Declare the variable's type.", node)
@@ -580,6 +623,17 @@ class Runtime:
         if binding.extra:
             args["*"] = [self.eval(arg, scope) for arg in binding.extra]
         return self._invoke(node, target, args)
+
+    def call_overload(self, node: A.Call, builtin_, options: dict, first: A.Node, scope: Scope):
+        """`line.new` / `label.new` / `box.new` whose first argument had no static type: its value picks the
+        chart.point or the x/y signature (P2.3b). The first argument is evaluated once."""
+        value = self.eval(first, scope)
+        binding = options["point" if isinstance(value, ChartPoint) else "xy"]
+        args = {}
+        for param in binding.params:
+            arg = binding.nodes.get(param.name)
+            args[param.name] = value if arg is first else self.eval(arg, scope) if arg is not None else param.default
+        return self._invoke(node, builtin_, args)
 
     def _invoke(self, node: A.Call, target, args: dict):
         if target.kind == "output":

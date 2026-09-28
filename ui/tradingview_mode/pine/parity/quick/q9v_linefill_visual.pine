@@ -1,0 +1,21 @@
+//@version=6
+// Pine P2.3b parity - VISUAL ORACLE: which fill is drawn after two linefill.new() calls on the same two lines.
+// Real TradingView is the oracle. Setup: any chart with more than 120 bars. The script draws in its OWN pane (no other
+// drawings there), on one historical bar. Report only the colour of each band:
+//   UPPER band (A), y 60..80: red fill created first, then blue fill on the same two lines -> blue / purple / red / none?
+//   LOWER band (C), y 20..40: orange fill created first, then teal fill on the same lines, then the teal fill deleted
+//                             -> orange / teal / none?
+indicator("q9v linefill visual", overlay=false, max_lines_count=10)
+int L = last_bar_index
+if bar_index == L - 5
+    line a1 = line.new(bar_index - 100, 80.0, bar_index, 80.0, color=color.gray)
+    line a2 = line.new(bar_index - 100, 60.0, bar_index, 60.0, color=color.gray)
+    linefill.new(a1, a2, color.new(color.red, 50))
+    linefill.new(a1, a2, color.new(color.blue, 50))
+    line c1 = line.new(bar_index - 100, 40.0, bar_index, 40.0, color=color.gray)
+    line c2 = line.new(bar_index - 100, 20.0, bar_index, 20.0, color=color.gray)
+    linefill.new(c1, c2, color.new(color.orange, 50))
+    linefill cTeal = linefill.new(c1, c2, color.new(color.teal, 50))
+    linefill.delete(cTeal)
+plot(0, "scale 0", color.new(color.gray, 100))
+plot(100, "scale 100", color.new(color.gray, 100))

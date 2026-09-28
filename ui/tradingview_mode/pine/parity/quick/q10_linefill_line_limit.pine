@@ -1,0 +1,57 @@
+//@version=6
+// Pine P2.3b parity - QUICK HISTORICAL ORACLE: same-pair linefill replacement under line-limit pressure.
+// Real TradingView is the oracle: the table shows observed values only (no expected values, no PASS/FAIL).
+// Setup: any chart with more than 60 bars (BINANCE:BTCUSDT 1m is fine). One run; no settings.
+// Background: two linefill.new() calls on one line pair raised linefill.all by +1 in q9 (few lines, historical and
+// realtime last bar) but q8 Case 0 reported 2 with ~500 lines alive (max_lines_count = 500). Each probe below creates a
+// FRESH pair (l1, l2) as the two newest lines, then F1 and F2 on that pair, and reports:
+//   lines alive before the pair / linefill.all before, after F1, after F2 / na(l1), na(l2), na(F1), na(F2) /
+//   line.all after. Only lines and linefills are drawn (no labels or boxes); the table only prints the results.
+//   A (bar L-40): LOW PRESSURE - no other line exists.
+//   B (bar L-30): AT LIMIT - 496 unreferenced lines were created on bar L-31, so the pair makes exactly 500.
+//   C (bar L-20): OVERFLOW - 200 more lines on bar L-25 force garbage collection; the pair is the newest.
+//   D (last bar, realtime when the market is open): q8's context - 3 more lines, then the pair, at the limit.
+indicator("q10 linefill under line limit", overlay=true, max_lines_count=500)
+s(v) => str.tostring(v)
+yn(bool b) => b ? "yes" : "no"
+int L = last_bar_index
+
+probe(string name) =>
+    int linesBefore = line.all.size()
+    line l1 = line.new(bar_index - 5, high * 1.001, bar_index, high * 1.001)
+    line l2 = line.new(bar_index - 5, low * 0.999, bar_index, low * 0.999)
+    int before = linefill.all.size()
+    linefill f1 = linefill.new(l1, l2, color.new(color.red, 60))
+    int afterOne = linefill.all.size()
+    linefill f2 = linefill.new(l1, l2, color.new(color.blue, 60))
+    int afterTwo = linefill.all.size()
+    name + ": lines before pair " + s(linesBefore) + "; linefill.all before/F1/F2 = " + s(before) + "/" + s(afterOne) + "/" + s(afterTwo) + "; na(l1) " + yn(na(l1)) + ", na(l2) " + yn(na(l2)) + ", na(F1) " + yn(na(f1)) + ", na(F2) " + yn(na(f2)) + "; line.all after " + s(line.all.size())
+
+dummies(int n) =>
+    for i = 1 to n
+        line.new(bar_index - 1, close, bar_index, close)
+
+var string rA = "A not reached"
+var string rB = "B not reached"
+var string rC = "C not reached"
+var string rD = "D not reached"
+if bar_index == L - 40
+    rA := probe("A low pressure")
+if bar_index == L - 31
+    dummies(496)
+if bar_index == L - 30
+    rB := probe("B at limit")
+if bar_index == L - 25
+    dummies(200)
+if bar_index == L - 20
+    rC := probe("C overflow")
+if barstate.islast
+    dummies(3)
+    rD := probe("D last bar (isrealtime " + yn(barstate.isrealtime) + ")")
+
+var table t = table.new(position.top_right, 1, 4, bgcolor=color.white, border_color=color.gray, border_width=1)
+if barstate.islast
+    table.cell(t, 0, 0, rA, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 0, 1, rB, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 0, 2, rC, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 0, 3, rD, text_color=color.black, text_size=size.small, text_halign=text.align_left)

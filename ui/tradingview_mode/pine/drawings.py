@@ -11,7 +11,14 @@
   its old value, removal with the full object) together with the ID counter; rolling the bar back undoes the journal,
   so a re-executed tick recreates the same IDs. The journal is dropped when the next bar starts (commit), so removed
   objects never accumulate.
-* Linefills (manual): one active linefill per line pair (a new one replaces it); a linefill dies with either line.
+* Linefills (P2.3b, q9 C1-C3 + q9v): one CURRENT linefill per unordered line pair. A new ``linefill.new`` on the
+  pair makes the previous one SUPERSEDED: still a valid ID (getters work) but neither listed in ``linefill.all`` nor
+  rendered, and never reactivated. Deleting the current fill also removes the pair's superseded fills. Explicitly
+  deleting either of its lines kills a linefill (q8 Case 4); garbage collection of a line does NOT (q11 row G): the
+  fill stays alive and listed, its getters return the dead line's ID, and it is not rendered.
+* Tables (P2.3b oracle-support tables-core): stored like drawings (rollback included), never garbage-collected.
+* Chart points are not stored here (they are plain objects held by reference), but their field writes on the forming
+  bar are journaled here too, so that rollback undoes them except for points reachable from ``varip`` roots.
 """
 from __future__ import annotations
 
@@ -25,6 +32,7 @@ from .values import NA, DrawingRef
 DEFAULT_LIMIT = 50                  # TradingView: "~50" when max_*_count is not declared
 MAX_LIMIT = 500
 LINEFILL_ENGINE_LIMIT = 500         # ENGINE LIMIT (TradingView has no max_linefills_count)
+TABLE_ENGINE_LIMIT = 100            # ENGINE LIMIT (table limits were not researched; P2.4)
 LIMITED_KINDS = ("line", "label", "box")
 
 
@@ -34,6 +42,7 @@ class Drawing:
     oid: int
     props: dict
     created_bar: int
+    superseded: bool = False        # a linefill replaced by a newer one on the same pair (P2.3b)
 
 
 class DrawingStore:
@@ -42,13 +51,15 @@ class DrawingStore:
         self.limits.update(limits or {})
         self.roots = roots or (lambda: set())
         self.live: dict[int, Drawing] = {}
-        self.order: dict[str, list[int]] = {kind: [] for kind in ("line", "label", "box", "linefill")}
-        self.pairs: dict[tuple[int, int], int] = {}          # line pair -> its active linefill
+        self.order: dict[str, list[int]] = {kind: [] for kind in ("line", "label", "box", "linefill", "table")}
+        self.pairs: dict[tuple[int, int], int] = {}          # line pair -> its current linefill
         self.fills_of: dict[int, set[int]] = {}              # line -> linefills using it
         self.next_oid = 1
         self._journal: list | None = None
         self._journal_bar: int | None = None
         self._start_oid = 1
+        self.next_pid = 1                                    # chart.point identities (repr / diagnostics only)
+        self._start_pid = 1
 
     # -- lifecycle: journal, rollback, commit -------------------------------------------------------------------------
     def begin(self, bar: int, record: bool) -> None:
@@ -57,10 +68,12 @@ class DrawingStore:
         if self._journal_bar is not None and self._journal_bar != bar:
             self._journal, self._journal_bar = None, None
         if record and self._journal is None:
-            self._journal, self._journal_bar, self._start_oid = [], bar, self.next_oid
+            self._journal, self._journal_bar = [], bar
+            self._start_oid, self._start_pid = self.next_oid, self.next_pid
 
-    def rollback(self, bar: int) -> None:
-        """Undo every change journaled on ``bar`` or later: the store returns to its committed state."""
+    def rollback(self, bar: int, keep_points=frozenset()) -> None:
+        """Undo every change journaled on ``bar`` or later: the store returns to its committed state. Field writes to
+        the chart points whose ``id()`` is in ``keep_points`` (reachable from ``varip`` roots) persist (manual)."""
         if self._journal is None or self._journal_bar is None or self._journal_bar < bar:
             return
         for entry in reversed(self._journal):
@@ -69,9 +82,16 @@ class DrawingStore:
                 self._remove(self.live[entry[1]])
             elif op == "set":
                 self.live[entry[1]].props[entry[2]] = entry[3]
+            elif op == "supersede":
+                drawing = self.live[entry[1]]
+                drawing.superseded = False
+                self.pairs[_pair(drawing)] = drawing.oid
+            elif op == "point":
+                if id(entry[1]) not in keep_points:
+                    setattr(entry[1], entry[2], entry[3])
             else:                                           # "kill": restore the removed object
                 self._insert(entry[1])
-        self.next_oid = self._start_oid
+        self.next_oid, self.next_pid = self._start_oid, self._start_pid
         self._journal, self._journal_bar = None, None
 
     def _log(self, entry: tuple) -> None:
@@ -88,11 +108,19 @@ class DrawingStore:
     def alive(self, ref) -> bool:
         return self.get(ref) is not None
 
+    def listing(self, kind: str) -> list[DrawingRef]:
+        """``line.all`` / ``label.all`` / ``box.all`` / ``linefill.all``: the live (for linefills: current) objects of
+        ``kind``, oldest-created first (TradingView q8g r3, q9 A / C1)."""
+        return [DrawingRef(kind, oid) for oid in self.order[kind] if not self.live[oid].superseded]
+
     # -- changes ------------------------------------------------------------------------------------------------------
     def create(self, kind: str, props: dict, bar: int) -> DrawingRef:
         if kind == "linefill" and len(self.order["linefill"]) >= LINEFILL_ENGINE_LIMIT:
             raise PineRuntimeError(f"Current Pine engine limit: at most {LINEFILL_ENGINE_LIMIT} linefills can exist at "
                                    "the same time.", 0)
+        if kind == "table" and len(self.order["table"]) >= TABLE_ENGINE_LIMIT:
+            raise PineRuntimeError(f"Current Pine engine limit: at most {TABLE_ENGINE_LIMIT} tables can exist at the "
+                                   "same time.", 0)
         oid = self.next_oid
         self.next_oid += 1
         drawing = Drawing(kind, oid, props, bar)
@@ -112,7 +140,7 @@ class DrawingStore:
     def delete(self, ref) -> None:
         drawing = self.get(ref)
         if drawing is not None:                             # na / already dead: a no-op (q8 Cases 0, 2)
-            self._kill(drawing)
+            self._kill(drawing, cascade=True)
 
     def copy(self, ref, bar: int):
         drawing = self.get(ref)
@@ -123,19 +151,37 @@ class DrawingStore:
     def linefill(self, line1, line2, props: dict, bar: int):
         if not (self.alive(line1) and self.alive(line2)):
             return NA                                       # ENGINE POLICY: no fill without two live lines
-        key = (min(line1.oid, line2.oid), max(line1.oid, line2.oid))
-        previous = self.pairs.get(key)
+        previous = self.pairs.get((min(line1.oid, line2.oid), max(line1.oid, line2.oid)))
         if previous is not None and previous in self.live:
-            self._kill(self.live[previous])                 # manual: the new linefill replaces the pair's active one
+            drawing = self.live[previous]                   # q9 C1/C2 + q9v: the unordered pair's current fill is
+            drawing.superseded = True                       # superseded (valid ID, not listed, not rendered)
+            self._log(("supersede", previous))
         return self.create("linefill", {"line1": line1.oid, "line2": line2.oid, **props}, bar)
 
-    def _kill(self, drawing: Drawing) -> None:
+    def point_set(self, point, field: str, value) -> None:
+        """A chart.point field write, journaled on the forming bar (see ``rollback``)."""
+        self._log(("point", point, field, getattr(point, field)))
+        setattr(point, field, value)
+
+    def new_pid(self) -> int:
+        pid = self.next_pid
+        self.next_pid += 1
+        return pid
+
+    def _kill(self, drawing: Drawing, cascade: bool) -> None:
+        """Remove ``drawing``. ``cascade``: an explicit deletion, which also removes the linefills of a deleted line
+        (q8 Case 4); garbage collection passes False and leaves them alive (q11 row G)."""
         self._remove(drawing)
         self._log(("kill", drawing))
-        if drawing.kind == "line":                          # q8 Case 4: a linefill dies with either of its lines
+        if drawing.kind == "line" and cascade:
             for fill in sorted(self.fills_of.get(drawing.oid, ())):
                 if fill in self.live:
-                    self._kill(self.live[fill])
+                    self._kill(self.live[fill], cascade=True)
+        elif drawing.kind == "linefill" and not drawing.superseded:
+            l1, l2 = drawing.props["line1"], drawing.props["line2"]   # q9 C3: the pair's superseded fills go too
+            for fill in sorted(self.fills_of.get(l1, set()) & self.fills_of.get(l2, set())):
+                if fill in self.live and self.live[fill].superseded:
+                    self._kill(self.live[fill], cascade=True)
 
     def _collect(self, kind: str, exclude: int) -> None:
         ids = self.order[kind]
@@ -148,7 +194,7 @@ class DrawingStore:
                 break
             if oid == exclude or oid in roots:
                 continue
-            self._kill(self.live[oid])
+            self._kill(self.live[oid], cascade=False)       # q11 G: a collected line leaves its linefills alive
 
     # -- indexes ------------------------------------------------------------------------------------------------------
     def _insert(self, drawing: Drawing) -> None:
@@ -156,7 +202,8 @@ class DrawingStore:
         insort(self.order[drawing.kind], drawing.oid)
         if drawing.kind == "linefill":
             l1, l2 = drawing.props["line1"], drawing.props["line2"]
-            self.pairs[(min(l1, l2), max(l1, l2))] = drawing.oid
+            if not drawing.superseded:
+                self.pairs[_pair(drawing)] = drawing.oid
             self.fills_of.setdefault(l1, set()).add(drawing.oid)
             self.fills_of.setdefault(l2, set()).add(drawing.oid)
 
@@ -165,7 +212,7 @@ class DrawingStore:
         self.order[drawing.kind].remove(drawing.oid)
         if drawing.kind == "linefill":
             l1, l2 = drawing.props["line1"], drawing.props["line2"]
-            key = (min(l1, l2), max(l1, l2))
+            key = _pair(drawing)
             if self.pairs.get(key) == drawing.oid:
                 del self.pairs[key]
             for line in (l1, l2):
@@ -179,3 +226,9 @@ class DrawingStore:
     def objects(self) -> list[Drawing]:
         """Live objects in creation order."""
         return [self.live[oid] for oid in sorted(self.live)]
+
+
+def _pair(linefill: Drawing) -> tuple[int, int]:
+    """The unordered line pair of a linefill (q9 C2: `linefill.new(l2, l1)` is the same pair as `(l1, l2)`)."""
+    l1, l2 = linefill.props["line1"], linefill.props["line2"]
+    return min(l1, l2), max(l1, l2)

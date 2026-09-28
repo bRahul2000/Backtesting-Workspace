@@ -1,0 +1,60 @@
+//@version=6
+// Pine P2.3b parity - QUICK HISTORICAL ORACLE: linefills vs line garbage collection, and discarded linefill IDs.
+// Real TradingView is the oracle: the table shows observed values only (no expected values, no PASS/FAIL).
+// Setup: any chart with more than 60 bars (BINANCE:BTCUSDT 1m is fine). One run; no settings.
+// G  (q10 rows C/D kept an old pair's linefill listed after 200 extra lines overflowed max_lines_count = 500):
+//    bar L-40 creates pair P and fill PF (IDs held only in var ARRAYS, which never protect objects - q8g), bar L-30
+//    creates 600 unreferenced lines, bar L-20 reports whether P's lines and PF survived. Band P: green, above price.
+// D1-D3 (q8 Case 0 reported linefill.all 2 after two same-pair calls; q9/q10 gave +1 but ASSIGNED the results and used
+//    60%-transparent colors): D1 bar L-10 = q8's exact form (results DISCARDED, opaque color.red then color.blue);
+//    D2 bar L-5 = results assigned, same opaque colors; D3 last bar = q8's exact form again (realtime if open).
+indicator("q11 linefill gc and discarded ids", overlay=true, max_lines_count=500)
+s(v) => str.tostring(v)
+yn(bool b) => b ? "yes" : "no"
+int L = last_bar_index
+
+var array<line> pLines = array.new<line>()
+var array<linefill> pFill = array.new<linefill>()
+var string rG = "G not reached"
+if bar_index == L - 40
+    pLines.push(line.new(bar_index - 5, high * 1.004, bar_index, high * 1.004, color=color.green))
+    pLines.push(line.new(bar_index - 5, high * 1.002, bar_index, high * 1.002, color=color.green))
+    pFill.push(linefill.new(pLines.get(0), pLines.get(1), color.new(color.green, 40)))
+if bar_index == L - 30
+    for i = 1 to 600
+        line.new(bar_index - 1, close, bar_index, close)
+if bar_index == L - 20
+    linefill pf = pFill.get(0)
+    rG := "G after 600 more lines: na(P line1) " + yn(na(pLines.get(0))) + ", na(P line2) " + yn(na(pLines.get(1))) + ", na(PF) " + yn(na(pf)) + ", na(get_line1(PF)) " + yn(na(linefill.get_line1(pf))) + "; linefill.all " + s(linefill.all.size()) + "; line.all " + s(line.all.size())
+
+var string rD1 = "D1 not reached"
+var string rD2 = "D2 not reached"
+var string rD3 = "D3 not reached"
+if bar_index == L - 10
+    line a1 = line.new(bar_index, 2.0, bar_index + 1, 2.0)
+    line a2 = line.new(bar_index, 3.0, bar_index + 1, 3.0)
+    int before = linefill.all.size()
+    linefill.new(a1, a2, color.red)
+    linefill.new(a1, a2, color.blue)
+    rD1 := "D1 discarded, opaque: linefill.all before/after = " + s(before) + "/" + s(linefill.all.size())
+if bar_index == L - 5
+    line b1 = line.new(bar_index, 2.0, bar_index + 1, 2.0)
+    line b2 = line.new(bar_index, 3.0, bar_index + 1, 3.0)
+    int before = linefill.all.size()
+    linefill f1 = linefill.new(b1, b2, color.red)
+    linefill f2 = linefill.new(b1, b2, color.blue)
+    rD2 := "D2 assigned, opaque: linefill.all before/after = " + s(before) + "/" + s(linefill.all.size()) + "; na(F1) " + yn(na(f1)) + ", na(F2) " + yn(na(f2))
+if barstate.islast
+    line c1 = line.new(bar_index, 2.0, bar_index + 1, 2.0)
+    line c2 = line.new(bar_index, 3.0, bar_index + 1, 3.0)
+    int before = linefill.all.size()
+    linefill.new(c1, c2, color.red)
+    linefill.new(c1, c2, color.blue)
+    rD3 := "D3 last bar (isrealtime " + yn(barstate.isrealtime) + ") discarded, opaque: linefill.all before/after = " + s(before) + "/" + s(linefill.all.size())
+
+var table t = table.new(position.top_right, 1, 4, bgcolor=color.white, border_color=color.gray, border_width=1)
+if barstate.islast
+    table.cell(t, 0, 0, rG, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 0, 1, rD1, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 0, 2, rD2, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    table.cell(t, 0, 3, rD3, text_color=color.black, text_size=size.small, text_halign=text.align_left)

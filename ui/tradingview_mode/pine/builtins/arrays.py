@@ -5,6 +5,8 @@ handled by the runtime (end-of-execution snapshots). Arrays obtained with the hi
 every mutating function raises TradingView's RE10051 message for them.
 
 Only the A1 set (plus ``array.remove``, P2.2-A2) is implemented; every other ``array.*`` stays a capability gap.
+P2.3b: elements may also be drawing IDs (``DrawingRef``, one kind per array) or ``chart.point`` references. The
+container keeps the P2.2 semantics; the elements are references into the live drawing store / shared point objects.
 Wording of errors that were not observed on TradingView (bounds, empty arrays, na arrays in ``array.*`` calls,
 negative indices) is this engine's own.
 """
@@ -12,9 +14,9 @@ from __future__ import annotations
 
 from ..errors import PineRuntimeError
 from ..registry import Param as P, builtin
-from ..values import NA, Color, PineArray, is_na
+from ..values import ARRAY_DRAWING_KINDS, NA, ChartPoint, Color, DrawingRef, PineArray, is_na
 
-ELEMENT_TYPES = ("float", "int", "bool", "string", "color")
+ELEMENT_TYPES = ("float", "int", "bool", "string", "color", *ARRAY_DRAWING_KINDS, "chart.point")
 MAX_ELEMENTS = 100_000        # this engine's limit (TradingView documents the same number; not verified here)
 
 RE10051 = ("Cannot modify the elements of a historical array or any slices of that array. Instead of modifying "
@@ -65,6 +67,14 @@ def coerce_element(value, element: str, name: str):
         if not isinstance(value, Color):
             raise PineRuntimeError(f"`{name}()`: a color array cannot store {value!r}.", 0)
         return value
+    if element in ARRAY_DRAWING_KINDS:
+        if not (isinstance(value, DrawingRef) and value.kind == element):
+            raise PineRuntimeError(f"`{name}()`: an array<{element}> cannot store {value!r}.", 0)
+        return value                                # dead IDs are ordinary values (q8g r4)
+    if element == "chart.point":
+        if not isinstance(value, ChartPoint):
+            raise PineRuntimeError(f"`{name}()`: an array<chart.point> cannot store {value!r}.", 0)
+        return value
     raise PineRuntimeError(f"Arrays of `{element}` are not implemented yet.", 0)
 
 
@@ -106,9 +116,13 @@ def _new(element: str):
 
 
 for _element, _param in (("float", "series float"), ("int", "series int"), ("bool", "series bool"),
-                         ("string", "series string"), ("color", "series color")):
+                         ("string", "series string"), ("color", "series color"),
+                         *((kind, f"series {kind}") for kind in ARRAY_DRAWING_KINDS)):
     builtin(f"array.new_{_element}", P("size", I, 0), P("initial_value", _param, NA),
             returns=f"series array<{_element}>")(_new(_element))
+# `array.new<chart.point>()` (Pine has no `array.new_*` function for points): an internal name the analyzer maps to
+builtin("array.new<chart.point>", P("size", I, 0), P("initial_value", "series chart.point", NA),
+        returns="series array<chart.point>")(_new("chart.point"))
 
 
 @builtin("array.from", P("value0", ANY), variadic="values", returns="array_from")
@@ -123,6 +137,11 @@ def _from(rt, site, a):
         element = "string"
     elif all(isinstance(v, Color) for v in present):
         element = "color"
+    elif all(isinstance(v, DrawingRef) for v in present) and len({v.kind for v in present}) == 1 \
+            and present[0].kind in ARRAY_DRAWING_KINDS:
+        element = present[0].kind
+    elif all(isinstance(v, ChartPoint) for v in present):
+        element = "chart.point"
     else:
         raise PineRuntimeError("`array.from()`: all values must have the same type.", 0)
     if len(values) > MAX_ELEMENTS:

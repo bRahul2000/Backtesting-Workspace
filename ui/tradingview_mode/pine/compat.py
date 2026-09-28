@@ -90,10 +90,17 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     # Drawing objects
     Feature("drawings-core", "drawings", PARTIAL, "drawing objects (`line.*`, `label.*`, `box.*`, `linefill.*`)",
             "P2.3a object core per P23_DRAWING_RESEARCH.md: IDs, aliasing, history, copy, delete, garbage collection "
-            "(roots: scalar `var` variables), realtime rollback, x/y constructors, setters/getters, methods. Arrays of "
-            "drawing IDs, `*.all`, `chart.point` overloads, `force_overlay`, fonts and text formatting are not "
-            "implemented yet."),
-    Feature("drawing-objects", "drawings", GAP, "tables, polylines and chart points (`table.*`, `polyline.*`, `chart.point.*`)"),
+            "(roots: scalar `var` variables), realtime rollback, x/y and `chart.point` constructors, setters/getters, "
+            "methods. P2.3b (P23B_COLLECTIONS_RESEARCH.md): arrays of drawing IDs, `*.all` (a fresh array per read), "
+            "current/superseded linefills. `*.all[n]`, `force_overlay`, fonts and text formatting are not implemented "
+            "yet."),
+    Feature("chart-points", "drawings", PARTIAL, "chart points (`chart.point.*`, `p.time` / `p.index` / `p.price`)",
+            "Constructors, shared references (aliases, history, arrays), field writes with realtime rollback and "
+            "`varip` persistence. `==` on points and points in `request.*` (engine limit) are not implemented."),
+    Feature("tables-core", "drawings", PARTIAL, "P2.3b oracle-support tables-core (`table.new`, `table.cell`)",
+            "Only the subset the frozen parity oracles use: `position.top_right`, cell text, colors, size and "
+            "horizontal alignment, realtime rollback of cell writes. Not TradingView table parity (P2.4)."),
+    Feature("drawing-objects", "drawings", GAP, "polylines and the rest of the table API (`polyline.*`, `table.*`)"),
     # Data requests
     Feature("request", "request", PARTIAL,
             "data requests (`request.security()` for same and higher timeframes, `request.security_lower_tf()`)",
@@ -158,7 +165,7 @@ DOCUMENTED_ONLY = (
 NAMESPACE_FEATURE = {
     "request": "request", "ticker": "request", "array": "arrays", "matrix": "matrices", "map": "maps",
     "line": "drawings-core", "label": "drawings-core", "box": "drawings-core", "table": "drawing-objects",
-    "polyline": "drawing-objects", "linefill": "drawings-core", "chart.point": "drawing-objects",
+    "polyline": "drawing-objects", "linefill": "drawings-core", "chart.point": "chart-points",
     "strategy": "strategy", "log": "logging", "ta": "ta", "math": "math", "str": "strings", "input": "inputs",
     "timeframe": "chart-info", "syminfo": "chart-info", "barstate": "chart-info", "session": "time", "": "core",
 }
@@ -168,7 +175,12 @@ FUNCTION_FEATURE = {"plotarrow": "plotarrow", "plotcandle": "plotcandle", "plotb
                     "table": "drawing-objects", "linefill": "drawing-objects", "polyline": "drawing-objects"}
 
 
+TABLES_CORE = {"table.new", "table.cell", "position.top_right"}    # the P2.3b oracle-support subset
+
+
 def feature_for_builtin(name: str) -> str:
+    if name in TABLES_CORE:
+        return "tables-core"
     if name in FUNCTION_FEATURE:
         return FUNCTION_FEATURE[name]
     namespace = name.rsplit(".", 1)[0] if "." in name else ""

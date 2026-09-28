@@ -58,3 +58,29 @@ export function dashFor(style, width) {
   if (style === "dashed") return [w * 4, w * 3];
   return [];
 }
+
+// P2.3b oracle-support tables-core: the geometry of a Pine table anchored at the pane's top-right corner. Columns and
+// rows are sized by their largest cell (text width / font size plus padding); empty columns and rows take no space.
+// `measure(text, px)` returns a text width in pixels; `sizePx` maps Pine text sizes to font pixels.
+export function tableLayout(table, measure, paneWidth, sizePx, { pad = 4, margin = 8 } = {}) {
+  const widths = new Array(table.columns).fill(0);
+  const heights = new Array(table.rows).fill(0);
+  const cells = (table.cells || []).map((cell) => {
+    const px = sizePx[cell.text_size] ?? sizePx.normal;
+    const lines = String(cell.text).split("\n");
+    const w = Math.max(...lines.map((line) => measure(line, px))) + 2 * pad;
+    const h = lines.length * px * 1.25 + 2 * pad;
+    widths[cell.column] = Math.max(widths[cell.column], w);
+    heights[cell.row] = Math.max(heights[cell.row], h);
+    return { ...cell, px, lines };
+  });
+  const xs = widths.reduce((acc, w) => [...acc, acc[acc.length - 1] + w], [0]);
+  const ys = heights.reduce((acc, h) => [...acc, acc[acc.length - 1] + h], [0]);
+  const width = xs[xs.length - 1], height = ys[ys.length - 1];
+  const left = paneWidth - margin - width, top = margin;
+  return {
+    x: left, y: top, width, height,
+    cells: cells.map((cell) => ({ ...cell, x: left + xs[cell.column], y: top + ys[cell.row],
+                                  w: widths[cell.column], h: heights[cell.row] })),
+  };
+}

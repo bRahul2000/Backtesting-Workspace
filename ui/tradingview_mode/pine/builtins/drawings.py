@@ -4,14 +4,17 @@ Every function works on the runtime's DrawingStore through ``DrawingRef``s. Sema
 getters of a deleted / collected / na ID return na, setters and ``delete`` are no-ops (q8, q8g); ``xloc.bar_index``
 x-coordinates may not be more than 500 bars in the future (RE10020, q8 Case 6) nor, as documented, more than 10,000
 bars in the past. ``copy`` of a dead ID returns na and ``linefill.new`` with a dead line returns na: engine policies.
-Only the x/y overloads exist (``chart.point`` is P2.3b). Parameters whose rendering is not implemented
-(``force_overlay``, fonts, text formatting, text wrapping) are accepted only with their default value.
+P2.3b adds the ``chart.point`` overloads of ``line.new`` / ``label.new`` / ``box.new`` and the point setters: they copy
+the point's ``index`` (``xloc.bar_index``) or ``time`` (``xloc.bar_time``) and ``price`` at call time (manual), and the
+``*.all`` variables (a fresh array of the live - for linefills the current - IDs, oldest first, per read: q9 A, Case 2).
+Parameters whose rendering is not implemented (``force_overlay``, fonts, text formatting, text wrapping) are accepted
+only with their default value.
 """
 from __future__ import annotations
 
 from ..errors import PineRuntimeError
-from ..registry import Param as P, builtin, constant
-from ..values import NA, Color, DrawingRef, is_na
+from ..registry import Param as P, builtin, constant, variable
+from ..values import ARRAY_DRAWING_KINDS, NA, ChartPoint, Color, DrawingRef, PineArray, is_na
 
 RE10020 = "Objects positioned using xloc.bar_index cannot be drawn further than 500 bars into the future."
 PAST_LIMIT = "Objects positioned using xloc.bar_index cannot be drawn further than 10000 bars into the past."
@@ -37,6 +40,7 @@ for _name in ("left", "center", "right", "top", "bottom"):
     constant(f"text.align_{_name}", _name, "string")
 
 I, F, S, C = "series int", "series float", "series string", "series color"
+PT = "series chart.point"
 
 
 def _store(rt):
@@ -58,6 +62,13 @@ def _int(value):
 
 def _float(value):
     return NA if is_na(value) else float(value)
+
+
+def _point_xy(name: str, point, xloc) -> tuple:
+    """(x, y) of a chart point for a drawing with ``xloc``: ``index`` or ``time``, and ``price`` (copied now)."""
+    if not isinstance(point, ChartPoint):
+        raise PineRuntimeError(f"`{name}()`: the chart point is na.", 0)
+    return (point.index if xloc == "bar_index" else point.time), point.price
 
 
 def _defaults_only(name: str, a: dict, *params: str) -> None:
@@ -107,11 +118,17 @@ def _copy_delete(kind: str, copy: bool = True) -> None:
 
 # ---- line --------------------------------------------------------------------------------------------------------------
 
-@builtin("line.new", P("x1", I), P("y1", F), P("x2", I), P("y2", F), P("xloc", S, "bar_index"), P("extend", S, "none"),
-         P("color", C, BLUE), P("style", S, "solid"), P("width", I, 1), P("force_overlay", "const bool", False),
-         returns="series line")
+_LINE_STYLE = (P("xloc", S, "bar_index"), P("extend", S, "none"), P("color", C, BLUE), P("style", S, "solid"),
+               P("width", I, 1), P("force_overlay", "const bool", False))
+
+
+@builtin("line.new", P("x1", I), P("y1", F), P("x2", I), P("y2", F), *_LINE_STYLE, returns="series line",
+         overloads=((P("first_point", PT), P("second_point", PT), *_LINE_STYLE),))
 def _line_new(rt, site, a):
     _defaults_only("line.new", a, "force_overlay")
+    if "first_point" in a:
+        (a["x1"], a["y1"]), (a["x2"], a["y2"]) = (_point_xy("line.new", a["first_point"], a["xloc"]),
+                                                  _point_xy("line.new", a["second_point"], a["xloc"]))
     for key in ("x1", "x2"):
         _check_x(rt, a[key], a["xloc"])
     props = {"x1": _int(a["x1"]), "y1": _float(a["y1"]), "x2": _int(a["x2"]), "y2": _float(a["y2"]), "xloc": a["xloc"],
@@ -150,12 +167,18 @@ def _line_get_price(rt, site, a):
 
 # ---- label -------------------------------------------------------------------------------------------------------------
 
-@builtin("label.new", P("x", I), P("y", F), P("text", S, ""), P("xloc", S, "bar_index"), P("yloc", S, "price"),
-         P("color", C, BLUE), P("style", S, "label_down"), P("textcolor", C, _VERSION_DEFAULT), P("size", S, "normal"),
-         P("textalign", S, "center"), P("tooltip", S, NA), P("text_font_family", S, NA),
-         P("force_overlay", "const bool", False), P("text_formatting", S, NA), returns="series label")
+_LABEL_REST = (P("text", S, ""), P("xloc", S, "bar_index"), P("yloc", S, "price"), P("color", C, BLUE),
+               P("style", S, "label_down"), P("textcolor", C, _VERSION_DEFAULT), P("size", S, "normal"),
+               P("textalign", S, "center"), P("tooltip", S, NA), P("text_font_family", S, NA),
+               P("force_overlay", "const bool", False), P("text_formatting", S, NA))
+
+
+@builtin("label.new", P("x", I), P("y", F), *_LABEL_REST, returns="series label",
+         overloads=((P("point", PT), *_LABEL_REST),))
 def _label_new(rt, site, a):
     _defaults_only("label.new", a, "text_font_family", "force_overlay", "text_formatting")
+    if "point" in a:
+        a["x"], a["y"] = _point_xy("label.new", a["point"], a["xloc"])
     _check_x(rt, a["x"], a["xloc"])
     textcolor = a["textcolor"]
     if textcolor is _VERSION_DEFAULT:
@@ -182,14 +205,20 @@ _copy_delete("label")
 
 # ---- box ---------------------------------------------------------------------------------------------------------------
 
-@builtin("box.new", P("left", I), P("top", F), P("right", I), P("bottom", F), P("border_color", C, BLUE),
-         P("border_width", I, 1), P("border_style", S, "solid"), P("extend", S, "none"), P("xloc", S, "bar_index"),
-         P("bgcolor", C, BLUE), P("text", S, ""), P("text_size", S, "auto"), P("text_color", C, BLACK),
-         P("text_halign", S, "center"), P("text_valign", S, "center"), P("text_wrap", S, NA),
-         P("text_font_family", S, NA), P("force_overlay", "const bool", False), P("text_formatting", S, NA),
-         returns="series box")
+_BOX_REST = (P("border_color", C, BLUE), P("border_width", I, 1), P("border_style", S, "solid"), P("extend", S, "none"),
+             P("xloc", S, "bar_index"), P("bgcolor", C, BLUE), P("text", S, ""), P("text_size", S, "auto"),
+             P("text_color", C, BLACK), P("text_halign", S, "center"), P("text_valign", S, "center"),
+             P("text_wrap", S, NA), P("text_font_family", S, NA), P("force_overlay", "const bool", False),
+             P("text_formatting", S, NA))
+
+
+@builtin("box.new", P("left", I), P("top", F), P("right", I), P("bottom", F), *_BOX_REST, returns="series box",
+         overloads=((P("top_left", PT), P("bottom_right", PT), *_BOX_REST),))
 def _box_new(rt, site, a):
     _defaults_only("box.new", a, "text_wrap", "text_font_family", "force_overlay", "text_formatting")
+    if "top_left" in a:
+        (a["left"], a["top"]), (a["right"], a["bottom"]) = (_point_xy("box.new", a["top_left"], a["xloc"]),
+                                                            _point_xy("box.new", a["bottom_right"], a["xloc"]))
     for key in ("left", "right"):
         _check_x(rt, a[key], a["xloc"])
     props = {"left": _int(a["left"]), "top": _float(a["top"]), "right": _int(a["right"]),
@@ -234,3 +263,37 @@ def _get_line(which: str):
 
 _get_line("line1")
 _get_line("line2")
+
+
+# ---- chart.point setters (P2.3b): the object's current xloc picks `index` or `time` -----------------------------------
+
+def _point_setter(kind: str, name: str, x_key: str, y_key: str) -> None:
+    def impl(rt, site, a):
+        store = _store(rt)
+        drawing = store.get(a["id"])
+        if drawing is None:
+            return NA                                   # dead / na: no-op
+        x, y = _point_xy(f"{kind}.{name}", a["point"], drawing.props.get("xloc"))
+        _check_x(rt, x, drawing.props.get("xloc"))
+        store.set(a["id"], x_key, _int(x))
+        store.set(a["id"], y_key, _float(y))
+        return NA
+    builtin(f"{kind}.{name}", P("id", f"series {kind}"), P("point", PT), returns="void")(impl)
+
+
+_point_setter("line", "set_first_point", "x1", "y1")
+_point_setter("line", "set_second_point", "x2", "y2")
+_point_setter("label", "set_point", "x", "y")
+_point_setter("box", "set_top_left_point", "left", "top")
+_point_setter("box", "set_bottom_right_point", "right", "bottom")
+
+
+# ---- *.all (P2.3b): a fresh ordinary array per read, oldest first (q9 A, Case 2; q8g r3) ----------------------------
+
+def _all(kind: str) -> None:
+    variable(f"{kind}.all", returns=f"series array<{kind}>")(
+        lambda rt, bar: PineArray(rt.drawings.listing(kind), kind))
+
+
+for _kind in ARRAY_DRAWING_KINDS:
+    _all(_kind)

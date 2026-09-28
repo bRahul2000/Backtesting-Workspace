@@ -1,4 +1,5 @@
-// Browser acceptance: P2.3a drawing objects in the real terminal (production build), historical, Replay, Live.
+// Browser acceptance: P2.3a drawing objects and the P2.3b additions (chart.point constructors/setters, *.all, the
+// oracle-support table) in the real terminal (production build), historical, Replay, Live.
 //
 //   node chart_view.mjs <app-url> <chrome-binary>
 //
@@ -64,7 +65,8 @@ const HELPERS = `window.__tv = {
   drawings() { const s = this.win().__tvChart.pine.scripts[0]; const d = s && s.drawings && s.drawings.data;
     return d ? { lines: d.lines.length, labels: d.labels.length, boxes: d.boxes.length, linefills: d.linefills.length,
                  first: d.first_bar_index, maxBar: Math.max(-1, ...[...d.lines, ...d.labels, ...d.boxes, ...d.linefills].map((i) => i.bar)),
-                 lineX2: d.lines.length ? d.lines[0].x2 : null } : null; },
+                 lineX2: d.lines.length ? d.lines[0].x2 : null, tables: (d.tables || []).length,
+                 cells: (d.tables || []).flatMap((t) => t.cells.map((c) => c.text)) } : null; },
   barCount() { return this.win().__tvChart.bars.length; },
   lastBar() { const b = this.win().__tvChart.bars; return b.length ? b[b.length - 1].time : null; },
   setText(value) { const t = this.doc().querySelector('.pine-text'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, value);
@@ -87,12 +89,16 @@ const SCRIPT = `//@version=6
 indicator("Drawings smoke", overlay = true, max_lines_count = 50, max_labels_count = 50, max_boxes_count = 50)
 var line trend = line.new(bar_index, close, bar_index, close, extend = extend.right, color = color.orange, width = 2)
 line.set_xy2(trend, bar_index, close)
-var line base = line.new(bar_index, low, bar_index, low, color = color.teal)
-line.set_xy2(base, bar_index, low)
+var line base = line.new(chart.point.now(low), chart.point.now(low), color = color.teal)
+line.set_second_point(base, chart.point.now(low))
 var linefill band = linefill.new(trend, base, color.new(color.teal, 85))
 if bar_index % 20 == 0
     label.new(bar_index, high, "L" + str.tostring(bar_index), style = label.style_label_down)
     box.new(bar_index, high, bar_index + 5, low, bgcolor = color.new(color.blue, 85))
+var table info = table.new(position.top_right, 2, 1, bgcolor = color.white, border_color = color.gray, border_width = 1)
+if barstate.islast
+    table.cell(info, 0, 0, "lines " + str.tostring(line.all.size()), text_color = color.black, text_size = size.small)
+    table.cell(info, 1, 0, "bar " + str.tostring(bar_index), text_color = color.black, text_halign = text.align_left)
 plot(close, "close", display = display.none)
 `;
 
@@ -138,6 +144,8 @@ async function main() {
     writeFileSync(`${process.env.PINE_SHOTS}/drawings_historical.png`, Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));
   }
   check("historical: trend line ends on the last bar", hist && hist.first + hist.lineX2 === (await evaluate("__tv.barCount()")) - 1, JSON.stringify(hist));
+  check("historical: the table shows line.all and the last bar", hist && hist.tables === 1 && hist.cells[0] === "lines 2"
+        && hist.cells[1] === `bar ${hist.lineX2}`, JSON.stringify(hist));
 
   // Replay: only revealed bars; the trend follows the cursor.
   await click("Replay", ".mode-btn", "Replay"); await sleep(400);
@@ -149,6 +157,7 @@ async function main() {
   await click("Next bar", ".replay-bar .rp-btn", "▶︎|"); await settle();
   const r2 = await evaluate("__tv.drawings()"), bars2 = await evaluate("__tv.barCount()");
   check("replay step: the trend line advances with the cursor", r2 && bars2 === bars + 1 && r2.first + r2.lineX2 === bars2 - 1, JSON.stringify({ r2, bars2 }));
+  check("replay step: the table follows the cursor", r2 && r2.tables === 1 && r2.cells[1] === `bar ${r2.lineX2}`, JSON.stringify(r2));
   await click("Exit Replay", ".replay-bar .rp-btn", "✕ Exit"); await settle();
 
   // Live (real Binance): drawings update with the forming bar; the chart is not reloaded.
@@ -162,6 +171,7 @@ async function main() {
   const live = await evaluate("__tv.drawings()");
   check("live: polls arrive without a chart reload", end.updates > start.updates && end.setData === start.setData, JSON.stringify({ start, end }));
   check("live: trend line on the forming bar", live && live.first + live.lineX2 === (await evaluate("__tv.barCount()")) - 1, JSON.stringify(live));
+  check("live: the table is on the forming bar", live && live.tables === 1 && live.cells[1] === `bar ${live.lineX2}`, JSON.stringify(live));
   await click("Exit Live", ".live-bar .rp-btn", "✕ Exit"); await settle();
   check("no page errors", errors.length === 0, JSON.stringify(errors));
   ws.close();

@@ -18,7 +18,7 @@ def only(source):
     ("d = request.dividends(syminfo.tickerid)", 3,
      "`request.dividends()` is not implemented yet (data requests)."),
     ("a = array.avg(array.from(1.0, 2.0))", 3, "`array.avg()` is not implemented yet (arrays)."),
-    ("p = polyline.new(na)", 3, "`polyline.new()` is not implemented yet (tables, polylines and chart points)."),
+    ("p = polyline.new(na)", 3, "`polyline.new()` is not implemented yet (polylines and the rest of the table API)."),
     ("type Pivot\n    float price\n    int bar", 3, "User-defined types (`type Pivot`) are not implemented yet."),
     ("method twice(float x) => x * 2", 3, "Methods (`method twice`) are not implemented yet."),
     ("import TradingView/ta/7 as tv", 3, "Libraries (`import TradingView/ta/7`) are not implemented yet."),

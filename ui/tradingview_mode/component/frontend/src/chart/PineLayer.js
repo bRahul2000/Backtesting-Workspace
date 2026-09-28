@@ -2,9 +2,10 @@
 // Knows output KINDS (plot, shape, char, hline, fill, bgcolor, barcolor), never
 // any particular indicator, and the P2.3a drawing objects (line, label, box,
 // linefill) that Python keeps: presentation only, from their raw Pine coordinates.
+// P2.3b: tables (oracle-support subset) drawn at the pane's top-right corner.
 import { AreaSeries, HistogramSeries, LineSeries, LineStyle, LineType } from "lightweight-charts";
 import { diffSeries, indexOfTime } from "./chartView.js";
-import { dashFor, extendBox, extendSegment, labelPrice, logicalOf } from "./drawingGeometry.js";
+import { dashFor, extendBox, extendSegment, labelPrice, logicalOf, tableLayout } from "./drawingGeometry.js";
 import { firstColor, seriesData } from "./pineData.js";
 
 const SIZE_PX = { tiny: 7, small: 10, normal: 14, large: 20, huge: 28, auto: 10 };
@@ -271,9 +272,33 @@ class DrawingsPrimitive extends Primitive {
             if (x === null || y === null) continue;
             drawLabel(context, label, x, y);
           }
+          for (const table of d.tables || []) drawTable(context, table, mediaSize.width);
         });
       },
     };
+  }
+}
+
+// A Pine table (oracle-support subset): top-right of the pane, cells sized to their text.
+function drawTable(ctx, table, paneWidth) {
+  const measure = (text, px) => { ctx.font = `${px}px sans-serif`; return ctx.measureText(text).width; };
+  const layout = tableLayout(table, measure, paneWidth, SIZE_PX);
+  if (table.bgcolor) { ctx.fillStyle = table.bgcolor; ctx.fillRect(layout.x, layout.y, layout.width, layout.height); }
+  for (const cell of layout.cells) {
+    if (cell.bgcolor) { ctx.fillStyle = cell.bgcolor; ctx.fillRect(cell.x, cell.y, cell.w, cell.h); }
+    if (table.border_color && table.border_width > 0) {
+      ctx.strokeStyle = table.border_color;
+      ctx.lineWidth = table.border_width;
+      ctx.strokeRect(cell.x, cell.y, cell.w, cell.h);
+    }
+    ctx.font = `${cell.px}px sans-serif`;
+    ctx.fillStyle = cell.text_color || "#000000";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = cell.text_halign === "left" ? "left" : cell.text_halign === "right" ? "right" : "center";
+    const tx = ctx.textAlign === "left" ? cell.x + 4 : ctx.textAlign === "right" ? cell.x + cell.w - 4 : cell.x + cell.w / 2;
+    const lineHeight = cell.px * 1.25;
+    const first = cell.y + cell.h / 2 - ((cell.lines.length - 1) * lineHeight) / 2;
+    cell.lines.forEach((line, i) => ctx.fillText(line, tx, first + i * lineHeight));
   }
 }
 

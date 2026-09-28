@@ -185,6 +185,8 @@ def test_declared_limits_are_read_from_indicator():
 # ---- linefill (manual; q8 Case 4) -------------------------------------------------------------------------------------------
 
 def test_linefill_replacement_and_cascade():
+    # P2.3a assumed the replaced fill died (na); the P2.3b evidence (q9 C1-C3, q9v) corrects this: the replaced fill is
+    # superseded - a valid ID, not listed, not rendered - and dies with the current fill (test_collections.py).
     p = last("""
 l1 = line.new(bar_index, 2.0, bar_index + 1, 2.0)
 l2 = line.new(bar_index, 3.0, bar_index + 1, 3.0)
@@ -194,9 +196,10 @@ plot(na(f1) ? 1 : 0, "firstReplaced")
 plot(line.get_y1(linefill.get_line1(f2)), "line1")
 line.delete(l2)
 plot(na(f2) ? 1 : 0, "cascade")
+plot(na(f1) ? 1 : 0, "cascadeSuperseded")
 plot(na(linefill.get_line1(f2)) ? 1 : 0, "getLine1Na")
 """)
-    assert (p["firstReplaced"], p["line1"], p["cascade"], p["getLine1Na"]) == (1, 3.0, 1, 1)
+    assert (p["firstReplaced"], p["line1"], p["cascade"], p["cascadeSuperseded"], p["getLine1Na"]) == (0, 3.0, 1, 1, 1)
 
 
 # ---- realtime rollback and commit (m07) ---------------------------------------------------------------------------------------
@@ -257,11 +260,11 @@ def test_m07_every_open_bar_change_rolls_back_and_the_final_execution_commits():
     first = live._run()                                          # tick 1 of the forming bar
     counts = lambda: {k: len(v) for k, v in live.store.order.items()}                      # noqa: E731
     assert (first["A"], first["R"], first["D"]) == (0, 0, 1)
-    assert counts() == {"line": 3, "label": 2, "box": 0, "linefill": 0}                    # state after tick 1
+    assert counts() == {"line": 3, "label": 2, "box": 0, "linefill": 0, "table": 0}          # state after tick 1
     oids = sorted(live.store.live)
     second = live.tick()                                         # tick 2: everything from tick 1 was rolled back
     assert (second["A"], second["R"], second["D"]) == (0, 0, 1)
-    assert counts() == {"line": 3, "label": 2, "box": 0, "linefill": 0}
+    assert counts() == {"line": 3, "label": 2, "box": 0, "linefill": 0, "table": 0}
     assert sorted(live.store.live) == oids                       # the ID counter rolled back: same IDs each tick
     third = live.new_bar()                                       # the previous bar's final execution (exec 2) commits
     assert (third["A"], third["R"], third["D"]) == (2, 2, 0)

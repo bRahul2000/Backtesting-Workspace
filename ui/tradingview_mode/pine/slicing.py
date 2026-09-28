@@ -12,6 +12,8 @@ isolated scalar ``var`` / ``:=`` state. Rejected with a capability diagnostic (n
 * a dependency statement with side effects (plots, alerts, runtime.error, logs).
 
 Arrays, maps, matrices, drawings and object mutation are already capability gaps of the whole script.
+P2.3b: tables and ``*.all`` are drawing side effects; chart points (types, constructors, field reads and writes) never
+run in a requested context either - an ENGINE LIMIT (TradingView requests chart points).
 """
 from __future__ import annotations
 
@@ -20,7 +22,11 @@ from dataclasses import dataclass, field
 from . import ast as A
 
 SIDE_EFFECTS = {"alert", "alertcondition", "runtime.error"}
-DRAWING_NAMESPACES = ("line.", "label.", "box.", "linefill.")   # P2.3a: drawings never run in a requested context
+DRAWING_NAMESPACES = ("line.", "label.", "box.", "linefill.", "table.")   # drawings never run in a requested context
+ALL_VARIABLES = {"line.all", "label.all", "box.all", "linefill.all"}         # P2.3b: drawing-store reads
+
+
+POINT_LIMIT = "Current Pine engine limit: chart points cannot be used in a requested expression"
 
 
 @dataclass
@@ -61,6 +67,7 @@ class _StatementInfo:
     functions: set = field(default_factory=set)
     effects: list = field(default_factory=list)       # (construct, line)
     arrays: list = field(default_factory=list)        # (construct, line): arrays stay out of security slices
+    points: list = field(default_factory=list)        # (construct, line): chart points too (ENGINE LIMIT, P2.3b)
 
 
 def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementInfo:
@@ -70,6 +77,8 @@ def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementI
     for item in A.walk(node):
         if isinstance(item, A.TypeRef) and (item.array_suffix or item.name == "array"):
             info.arrays.append(("array type", item.line))
+        elif isinstance(item, A.TypeRef) and item.name == "chart.point":
+            info.points.append(("chart.point type", item.line))
         elif isinstance(item, A.ForIn):
             info.arrays.append(("for ... in", item.line))
     if top_level and isinstance(node, A.TupleDecl):
@@ -79,12 +88,19 @@ def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementI
             info.writes.add(item.target.name)
         elif isinstance(item, A.Name) and names.get(item.id, (None,))[0] == "user":
             info.reads.add(item.name)
+        elif isinstance(item, A.Attribute) and names.get(item.id, (None,))[0] == "field":
+            info.points.append((f"chart point field `{item.name}`", item.line))
+        elif isinstance(item, A.Attribute) and names.get(item.id, (None,))[0] == "var" \
+                and names[item.id][1].name in ALL_VARIABLES:
+            info.effects.append((names[item.id][1].name, item.line))
         elif isinstance(item, A.Call) and item.id in calls:
             kind, target = calls[item.id][0], calls[item.id][1]
             if kind == "dispatch":                          # a method resolved at run time: every candidate counts
                 for ns, (builtin_, _binding) in target.items():
                     if ns == "array":
                         info.arrays.append((f"{builtin_.name}()", item.line))
+                    elif ns == "chart.point":
+                        info.points.append((f"{builtin_.name}()", item.line))
                     else:
                         info.effects.append((f"{builtin_.name}()", item.line))
                 continue
@@ -95,6 +111,8 @@ def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementI
                 info.effects.append((f"{target.name}()", item.line))
             if kind == "builtin" and (target.name.startswith("array.") or target.name == "request.security_lower_tf"):
                 info.arrays.append((f"{target.name}()", item.line))          # lower-timeframe results are arrays
+            if kind == "builtin" and target.name.startswith("chart.point."):
+                info.points.append((f"{target.name}()", item.line))
     return info
 
 
@@ -180,6 +198,7 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
     fn_globals = _function_globals(functions, names, calls)
     fn_arrays = _function_arrays(functions, names, calls)
     fn_effects = _function_arrays(functions, names, calls, "effects")
+    fn_points = _function_arrays(functions, names, calls, "points")
     specs: dict[int, SecuritySpec] = {}
     for call in calls_recorded:
         node, expr = call.node, call.expr
@@ -209,6 +228,11 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
             construct, line = expr_arrays[0]
             gap(f"{label} on line {node.line}: arrays in a requested expression are not implemented yet "
                 f"(`{construct}` on line {line}).", node)
+            continue
+        expr_points = expr_info.points + [fn_points[fn] for fn in sorted(expr_info.functions) if fn in fn_points]
+        if expr_points:
+            construct, line = expr_points[0]
+            gap(f"{label} on line {node.line}: {POINT_LIMIT} (`{construct}` on line {line}).", node)
             continue
         need = set(expr_info.reads)
         for fn in expr_info.functions:
@@ -242,6 +266,13 @@ def build(script: A.Script, calls_recorded: list[SecurityCall], names: dict, cal
             construct, line = array_uses[0]
             gap(f"{label} on line {node.line}: arrays in a requested expression are not implemented yet "
                 f"(`{construct}` on line {line}).", node)
+            continue
+        point_uses = [use for index in sorted(included) for use in infos[index].points]
+        point_uses += [fn_points[fn] for index in sorted(included) for fn in sorted(infos[index].functions)
+                       if fn in fn_points]
+        if point_uses:
+            construct, line = point_uses[0]
+            gap(f"{label} on line {node.line}: {POINT_LIMIT} (`{construct}` on line {line}).", node)
             continue
         for index in range(position, len(body)):
             late = infos[index].writes & need

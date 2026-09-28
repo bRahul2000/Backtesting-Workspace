@@ -9,7 +9,7 @@ naming the feature and the line; anything that is not valid Pine becomes an
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from . import ast as A
@@ -17,16 +17,18 @@ from . import catalog, slicing
 from .compat import FEATURES, feature_for_builtin
 from .errors import ERROR, GAP, WARNING, Diagnostic
 from .registry import CONSTANTS, FUNCTIONS, QUALIFIER_RANK, VARIABLES, Builtin, TypeSpec, bind, load_all
-from .values import DRAWING_KINDS, NA, Color
+from .values import ARRAY_DRAWING_KINDS, DRAWING_KINDS, NA, POINT_FIELDS, Color
 
 BASIC_TYPES = {"int", "float", "bool", "string", "color"}
 NUMERIC = {"int", "float"}
 DECLARATIONS = {"indicator", "strategy", "library"}
 SOURCE_NAMES = ("open", "high", "low", "close", "volume", "hl2", "hlc3", "ohlc4", "hlcc4")
-TYPE_GAPS = {"table": "drawing-objects", "polyline": "drawing-objects", "array": "arrays", "matrix": "matrices",
-             "map": "maps", "chart.point": "drawing-objects"}
-DRAWING_TYPES = set(DRAWING_KINDS)          # P2.3a: line, label, box, linefill
-METHOD_NAMESPACES = ("array", "line", "label", "box", "linefill")
+TYPE_GAPS = {"polyline": "drawing-objects", "array": "arrays", "matrix": "matrices", "map": "maps"}
+DRAWING_TYPES = set(DRAWING_KINDS)          # P2.3a: line, label, box, linefill; P2.3b: table (oracle-support subset)
+POINT = "chart.point"                       # P2.3b
+ELEMENT_TYPES = BASIC_TYPES | set(ARRAY_DRAWING_KINDS) | {POINT}     # array<T> element types
+METHOD_NAMESPACES = ("array", "line", "label", "box", "linefill", "table", POINT)
+ALL_VARIABLES = {f"{kind}.all" for kind in ARRAY_DRAWING_KINDS}
 
 
 @dataclass
@@ -248,8 +250,10 @@ class Analyzer:
         spec = declared or value_type
         if spec is not None and node.mode:
             spec = TypeSpec("series", spec.base)
-        if node.mode == "varip" and spec is not None and spec.base in DRAWING_TYPES:
-            # TradingView CE10128, observed for `varip line` (m07 revision 1)
+        if node.mode == "varip" and spec is not None and (spec.base in DRAWING_TYPES
+                                                          or spec.base[6:-1] in DRAWING_TYPES):
+            # TradingView CE10128, observed for `varip line` (m07 revision 1); arrays of drawing IDs and tables follow
+            # the manual's varip rule with the same wording (not observed). Points and arrays of points are allowed.
             self.error(f'Variables with varip modifier cannot have type "series {spec.base}".', node)
         self.declare(node.name, VarInfo(spec, self.function_depth > 0), node)
         return spec
@@ -258,6 +262,12 @@ class Analyzer:
         self.feature("reassignment", node)
         value_type = self.expr(node.value)
         if isinstance(node.target, A.Attribute):
+            if self.is_field(node.target):               # P2.3b: `p.price := v`, `p.index += 1` on a chart point
+                spec = self.field(node.target, assigning=True)
+                if spec is not None and value_type is not None and not self.assignable(value_type, spec):
+                    self.error(f"Cannot assign a value of type `{value_type.base}` to the `{spec.base}` field "
+                               f"`{node.target.name}`.", node)
+                return spec
             self.gap("user-defined-types", "Assigning to an object field (`obj.field := ...`) requires user-defined types, "
                                            "which are not implemented yet.", node)
             return None
@@ -324,7 +334,10 @@ class Analyzer:
                      f"is not implemented yet ({FEATURES[TYPE_GAPS.get(name, 'generics')].description}).", ref)
             return None
         if name in DRAWING_TYPES:
-            self.feature("drawings-core", ref)
+            self.feature("tables-core" if name == "table" else "drawings-core", ref)
+            return TypeSpec(ref.qualifier or "series", name)
+        if name == POINT:
+            self.feature("chart-points", ref)
             return TypeSpec(ref.qualifier or "series", name)
         if name in TYPE_GAPS:
             feature = TYPE_GAPS[name]
@@ -350,16 +363,20 @@ class Analyzer:
             return None
         else:
             return False
-        if element in DRAWING_TYPES:
-            self.gap("drawings-core", f"Arrays of drawing IDs (`array<{element}>`) are not implemented yet.", ref)
+        if element == "table":
+            self.gap("drawing-objects", "Arrays of tables (`array<table>`) are not implemented yet.", ref)
             return None
-        if element not in BASIC_TYPES:
+        if element not in ELEMENT_TYPES:
             feature = TYPE_GAPS.get(element, "user-defined-types")
             self.gap(feature if feature != "arrays" else "arrays",
                      f"Arrays of `{element}` are not implemented yet ({FEATURES[feature].description}).", ref)
             return None
         self.uses_arrays = True
         self.feature("arrays", ref)
+        if element in ARRAY_DRAWING_KINDS:
+            self.feature("drawings-core", ref)
+        elif element == POINT:
+            self.feature("chart-points", ref)
         return TypeSpec(ref.qualifier or "series", f"array<{element}>")
 
     # -- expressions -----------------------------------------------------------------------------------------
@@ -375,6 +392,13 @@ class Analyzer:
         if isinstance(node, A.History):
             self.feature("history", node)
             target = self.expr(node.target)
+            resolved = self.names.get(node.target.id, (None, None))
+            if resolved[0] == "var" and resolved[1].name in ALL_VARIABLES:
+                self.gap("drawings-core", f"History of `{resolved[1].name}` (`{resolved[1].name}[n]`) is not "
+                                          "implemented yet.", node)
+            elif resolved[0] == "field":
+                self.gap("chart-points", f"History of a chart point field (`p.{node.target.name}[n]`) is not "
+                                         f"implemented yet; use `(p[n]).{node.target.name}`.", node)
             offset = self.expr(node.offset)
             if offset is not None and offset.base not in NUMERIC:
                 self.error("A history reference offset must be an integer.", node.offset)
@@ -484,6 +508,17 @@ class Analyzer:
             self.error(f"Cannot compare arrays with `{node.op}`: array operands are not supported by this operator.",
                        node)
             return TypeSpec(qualifier, "bool")
+        if node.op in ("==", "!=") and any(t is not None and t.base == "linefill" for t in (left, right)):
+            # TradingView CE10123, observed for `linefill == linefill` (q9 revision 1); `!=` inferred (wording unverified)
+            operand = node.left.name if isinstance(node.left, A.Name) else "expr"
+            self.error(f'Cannot call "operator {node.op}" with argument "expr0"="{operand}". An argument of '
+                       f'"series linefill" type was used but a "simple string" is expected.', node)
+            return TypeSpec(qualifier, "bool")
+        if node.op in ("==", "!=") and any(t is not None and t.base in (POINT, "table") for t in (left, right)):
+            base = next(t.base for t in (left, right) if t is not None and t.base in (POINT, "table"))
+            self.gap("chart-points" if base == POINT else "drawing-objects",
+                     f"Comparing `{base}` values with `{node.op}` is not implemented yet.", node)
+            return TypeSpec(qualifier, "bool")
         if node.op in ("==", "!=", "<", ">", "<=", ">="):
             if node.op not in ("==", "!=") and left is not None and right is not None and (
                     left.base not in NUMERIC or right.base not in NUMERIC):
@@ -514,17 +549,36 @@ class Analyzer:
                 self.names[node.id] = ("user", node.name)
                 return info.type
             return self.builtin_name(node, node.name)
-        if isinstance(node.target, A.Name) and self.lookup(node.target.name)[0] is not None:
-            self.gap("user-defined-types", f"Field access `{node.target.name}.{node.name}` requires user-defined types, "
-                                           "which are not implemented yet.", node)
+        if self.is_field(node):
+            return self.field(node)
+        return self.builtin_name(node, node.dotted())
+
+    def is_field(self, node: A.Attribute) -> bool:
+        """`x.f` where `x` is a user variable or any non-name expression (`a.get(0).price`, `(p[1]).price`): a field
+        access, not a built-in name such as `syminfo.tickerid`."""
+        return (isinstance(node.target, A.Name) and self.lookup(node.target.name)[0] is not None) \
+            or node.dotted() is None
+
+    def field(self, node: A.Attribute, assigning: bool = False) -> TypeSpec | None:
+        """A chart.point field (`time`, `index`, `price`) read or written through any reference (P2.3b). A receiver of
+        unknown type is checked at run time; other types need user-defined types (a gap)."""
+        target = self.expr(node.target)
+        base = target.base if target is not None else None
+        if node.name in POINT_FIELDS and base in (POINT, None):
+            self.feature("chart-points", node)
+            self.names[node.id] = ("field", node.name)
+            return TypeSpec("series", POINT_FIELDS[node.name])
+        if base == POINT:
+            self.error(f"`chart.point` has no field `{node.name}` (its fields are time, index and price).", node)
             return None
-        dotted = node.dotted()
-        if dotted is None:
-            self.expr(node.target)
-            self.gap("user-defined-types", f"Field access `.{node.name}` requires user-defined types, which are not "
+        shown = f"{node.target.name}.{node.name}" if isinstance(node.target, A.Name) else f".{node.name}"
+        if assigning:
+            self.gap("user-defined-types", "Assigning to an object field (`obj.field := ...`) requires user-defined "
+                                           "types, which are not implemented yet.", node)
+        else:
+            self.gap("user-defined-types", f"Field access `{shown}` requires user-defined types, which are not "
                                            "implemented yet.", node)
-            return None
-        return self.builtin_name(node, dotted)
+        return None
 
     def builtin_name(self, node, name: str) -> TypeSpec | None:
         if name in VARIABLES:
@@ -532,6 +586,8 @@ class Analyzer:
             self.names[node.id] = ("var", variable)
             self.builtins_used.setdefault(name, []).append(node.line)
             self.feature(feature_for_builtin(name) if "." in name else "declarations", node)
+            if name in ALL_VARIABLES:
+                self.uses_arrays = True                   # `*.all` values are arrays (end-of-execution snapshots)
             return TypeSpec.parse(variable.returns)
         if name in CONSTANTS:
             value, type_ = CONSTANTS[name]
@@ -560,8 +616,9 @@ class Analyzer:
         func = node.func
         if isinstance(func, A.Attribute) and (
                 not isinstance(func.target, (A.Name, A.Attribute))
-                or isinstance(func.target, A.Name) and self.lookup(func.target.name)[0] is not None):
-            return self.method_call(node, func)
+                or isinstance(func.target, A.Name) and self.lookup(func.target.name)[0] is not None
+                or isinstance(func.target, A.Attribute) and func.target.dotted() in ALL_VARIABLES):
+            return self.method_call(node, func)              # `label.all.size()`: a method on a built-in variable
         name = func.name if isinstance(func, A.Name) else func.dotted() if isinstance(func, A.Attribute) else None
         if name is None:
             self.error("Only functions can be called.", node)
@@ -582,10 +639,12 @@ class Analyzer:
         if node.generic:
             element = node.generic[0].name if len(node.generic) == 1 and not node.generic[0].args \
                 and not node.generic[0].array_suffix else None
-            if name == "array.new" and element in BASIC_TYPES:
+            if name == "array.new" and (element in BASIC_TYPES or element in ARRAY_DRAWING_KINDS):
                 name = f"array.new_{element}"              # array.new<float>() is array.new_float()
-            elif name == "array.new" and element in DRAWING_TYPES:
-                self.gap("drawings-core", f"Arrays of drawing IDs (`array<{element}>`) are not implemented yet.", node)
+            elif name == "array.new" and element == POINT:
+                name = "array.new<chart.point>"            # internal name: Pine has no array.new_* for points
+            elif name == "array.new" and element == "table":
+                self.gap("drawing-objects", "Arrays of tables (`array<table>`) are not implemented yet.", node)
                 for argument in node.args:
                     self.expr(argument.value)
                 return None
@@ -632,7 +691,8 @@ class Analyzer:
             self.error(f"Could not find method `{func.name}()` for a `{base}` value.", node)
             return None
         if base is not None:
-            namespace = "array" if base.startswith("array") else base if base in DRAWING_TYPES else None
+            namespace = "array" if base.startswith("array") else base if base in DRAWING_TYPES or base == POINT \
+                else None
             if namespace is None:
                 for argument in node.args:
                     self.expr(argument.value)
@@ -717,6 +777,8 @@ class Analyzer:
             if arg is not None:
                 self.check_argument(builtin_, param, arg, arg_types.get(id(arg)))
         self.calls[node.id] = ("builtin", builtin_, binding)
+        if builtin_.overloads and receiver is None and positional and arg_types.get(id(positional[0])) is None:
+            self.overload_call(node, builtin_, positional, named)
         if builtin_.kind == "security":
             return self.security_call(node, binding, arg_types)
         if builtin_.kind == "output":
@@ -729,6 +791,18 @@ class Analyzer:
             self.uses_arrays = True
             return self.array_result(builtin_, binding, arg_types)
         return TypeSpec.parse(builtin_.returns) if builtin_.returns not in ("void", "tuple") else None
+
+    def overload_call(self, node: A.Call, builtin_: Builtin, positional: list, named: dict) -> None:
+        """`line.new(p1, p2)` / `label.new(p, ...)` / `box.new(tl, br, ...)` whose first argument has no static type
+        (an untyped parameter, `na`): if both the x/y and the chart.point signatures bind, the first argument's value
+        picks one at run time (P2.3b)."""
+        options = {}
+        for params in builtin_.signatures():
+            binding, _ = bind(replace(builtin_, params=params, overloads=()), positional, named)
+            if binding is not None:
+                options["point" if params[0].spec.base == POINT else "xy"] = binding
+        if len(options) == 2:
+            self.calls[node.id] = ("overload", builtin_, options, positional[0])
 
     def security_call(self, node: A.Call, binding, arg_types: dict) -> TypeSpec | None:
         """request.security() / request.security_lower_tf(): record the call for slicing; validate literal
@@ -761,6 +835,11 @@ class Analyzer:
         result = arg_types.get(id(expr))
         if result is not None and result.base in DRAWING_TYPES and not lower:
             self.gap("request", f"{label}: requested expressions returning drawing IDs are not implemented yet.", node)
+        elif result is not None and (result.base == POINT or result.base == f"array<{POINT}>"
+                                     or result.base[6:-1] in DRAWING_TYPES):
+            # TradingView requests chart points (manual); this engine does not: ENGINE LIMIT (P2.3b §16.7)
+            self.gap("request", f"{label}: Current Pine engine limit: requested expressions returning "
+                                f"`{result.base}` values are not supported.", node)
         elements = None
         if lower:
             elements = self.lower_tf_elements(expr, result, label)
@@ -814,7 +893,7 @@ class Analyzer:
                 return None
             if bases <= NUMERIC:
                 return TypeSpec("series", "array<int>" if bases == {"int"} else "array<float>")
-            if len(bases) == 1 and next(iter(bases)) in BASIC_TYPES:
+            if len(bases) == 1 and next(iter(bases)) in ELEMENT_TYPES:
                 return TypeSpec("series", f"array<{next(iter(bases))}>")
             self.error("`array.from()` needs values of one type.", binding.nodes.get("value0"))
             return None
@@ -832,6 +911,10 @@ class Analyzer:
                              "minute", "second", "time_close"):
             return "time"
         feature = feature_for_builtin(builtin_.name)
+        if builtin_.name.startswith("array.new_") and builtin_.name[10:] in ARRAY_DRAWING_KINDS:
+            feature = "drawings-core"
+        elif builtin_.name == "array.new<chart.point>":
+            feature = "chart-points"
         return feature if feature in FEATURES else "declarations"
 
     @staticmethod

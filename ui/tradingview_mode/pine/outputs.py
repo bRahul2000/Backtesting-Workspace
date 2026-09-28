@@ -120,25 +120,40 @@ def render(outputs: list[Output], times: list[int], prefix: str) -> list[dict]:
     return result
 
 
-# ---- drawing objects (P2.3a) ------------------------------------------------------------------------------------------
+# ---- drawing objects (P2.3a; P2.3b: superseded linefills, oracle-support tables) -------------------------------------
 
-DRAWING_LISTS = {"line": "lines", "label": "labels", "box": "boxes", "linefill": "linefills"}
+DRAWING_LISTS = {"line": "lines", "label": "labels", "box": "boxes", "linefill": "linefills", "table": "tables"}
+
+
+def _plain(value):
+    if isinstance(value, Color):
+        return css(value)
+    if isinstance(value, float):
+        return _number(value)
+    return None if is_na(value) else value
 
 
 def render_drawings(store, prefix: str) -> dict:
     """The live drawing objects of a run, with their raw Pine coordinates (``xloc`` + x as a bar index or a UNIX time
-    in ms, y as a price): the browser maps them onto the chart. Keys are stable across realtime ticks."""
+    in ms, y as a price): the browser maps them onto the chart. Keys are stable across realtime ticks. Superseded
+    linefills are not rendered (q9v), nor are linefills whose source line was garbage-collected (they stay alive and
+    listed, q11 row G, but have no geometry); tables carry their cells (P2.3b oracle-support tables-core)."""
     result = {name: [] for name in DRAWING_LISTS.values()}
     for drawing in store.objects():
+        if drawing.superseded or (drawing.kind == "linefill" and not all(
+                drawing.props[end] in store.live for end in ("line1", "line2"))):
+            continue
         item = {"key": f"{prefix}:{drawing.kind}:{drawing.oid}", "kind": drawing.kind, "bar": drawing.created_bar}
+        cells = []
         for name, value in drawing.props.items():
-            if drawing.kind == "linefill" and name in ("line1", "line2"):
+            if isinstance(name, tuple):                 # a table cell ("cell", column, row)
+                if value is not None:
+                    cells.append({"column": name[1], "row": name[2], **{k: _plain(v) for k, v in value.items()}})
+            elif drawing.kind == "linefill" and name in ("line1", "line2"):
                 item[name] = f"{prefix}:line:{value}"
-            elif isinstance(value, Color):
-                item[name] = css(value)
-            elif isinstance(value, float):
-                item[name] = _number(value)
             else:
-                item[name] = None if is_na(value) else value
+                item[name] = _plain(value)
+        if drawing.kind == "table":
+            item["cells"] = sorted(cells, key=lambda c: (c["row"], c["column"]))
         result[DRAWING_LISTS[drawing.kind]].append(item)
     return result
