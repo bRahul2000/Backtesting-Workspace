@@ -49,6 +49,7 @@ MAX_CONTEXTS_PER_SCRIPT = 16
 MAX_CONTEXTS_PER_CHART = 32
 MAX_BARS_PER_CONTEXT = 10_000
 MAX_DEPTH = 2
+STORE_SLACK = 256                  # provider bars dropped beyond the minimum when a store must shrink (rarely again)
 LIMIT = "Current Pine engine limit"
 
 _UTC = timezone.utc
@@ -284,6 +285,8 @@ class Context:
     stale: bool = False                            # re-ask the provider on the next advance (new run)
     lower: bool = False                            # a request.security_lower_tf() context
     limit: int = MAX_BARS_PER_CONTEXT              # provider bars kept (lower: minus room for received bars)
+    min_time: int | None = None                    # provider bars opening earlier are dropped (see _fit)
+    received: Any = None                           # this run's ReceivedBars (lower, Live), fetched once per run
 
     @property
     def size(self) -> int:
@@ -311,7 +314,7 @@ class SecurityManager:
         """A new run: the provider may know more (live) - contexts re-ask it on their next advance."""
         self.provider = provider
         for context in self.contexts.values():
-            context.stale = True
+            context.stale, context.received = True, None
             if context.runtime.security is not None:
                 context.runtime.security.set_provider(provider)
 
@@ -368,7 +371,7 @@ class SecurityManager:
 
     # -- context lifecycle ---------------------------------------------------------------------------------------------
     def _ask(self, rt, symbol: str, timeframe: Timeframe, lower: bool = False,
-             limit: int = MAX_BARS_PER_CONTEXT) -> Requested:
+             limit: int = MAX_BARS_PER_CONTEXT, min_time: int | None = None) -> Requested:
         data = rt.data
         extra = {"lower": True} if lower else {}
         chart_end = int(data.time[-1]) if data.size else None
@@ -386,6 +389,8 @@ class SecurityManager:
                                     f"({type(exc).__name__}: {exc}).", "unavailable") from None
         if requested.bars.size > limit:
             requested.bars = requested.bars.tail(limit)
+        if min_time is not None:
+            requested.bars = _from(requested.bars, int(np.searchsorted(requested.bars.time, min_time, side="left")))
         if data.knowable and data.knowable_until is not None and requested.bars.size \
                 and int(requested.bars.close_time[-1]) > data.knowable_until:
             raise SecurityDataError("the data source returned bars after the knowable time (refused).", "future")
@@ -424,7 +429,7 @@ class SecurityManager:
     def _refresh(self, rt, context: Context) -> None:
         if context.stale:
             context.stale = False
-            fresh = self._ask(rt, context.symbol, context.timeframe, context.lower, context.limit)
+            fresh = self._ask(rt, context.symbol, context.timeframe, context.lower, context.limit, context.min_time)
             if not _same_prefix(context.requested.bars, fresh.bars, context.n_provider):
                 self._reset(context, rt)
             context.requested = fresh
@@ -439,6 +444,7 @@ class SecurityManager:
             max_source = int(bars.close_time[-1]) if bars.size else None
         else:
             n_provider, tail, forming, max_source = self._knowable(rt, context, data, bar)
+        n_provider, tail = self._fit(context, n_provider, tail)
         self._apply(context, n_provider, tail, forming)
         context.max_source_time = max_source
 
@@ -453,20 +459,46 @@ class SecurityManager:
             confirmed = data.confirmed_until is None or bar < data.confirmed_until
             cutoff = _bar_close(data, bar) if confirmed else int(data.time[bar])
             n_provider = int(np.searchsorted(bars.close_time, cutoff, side="right"))
-            if not confirmed:
-                tail, forming = self._received(context, int(bars.close_time[n_provider - 1]) if n_provider else None)
+            # after the provider's coverage (a dataset ending before the live chart, the forming bar): received bars
+            tail, forming = self._received(context, int(bars.close_time[n_provider - 1]) if n_provider else None)
+            if confirmed:
+                tail, forming = [row for row in tail if int(row[1]) <= cutoff], False
         max_source = int(bars.close_time[n_provider - 1]) if n_provider else None
         if tail:
             last = tail[-1]
             max_source = max(max_source or 0, last[0] if forming else last[1])
+        n_provider, tail = self._fit(context, n_provider, tail)
         self._apply(context, n_provider, tail, forming)
         context.max_source_time = max_source
 
+    def _fit(self, context: Context, n_provider: int, tail: list) -> tuple[int, list]:
+        """Keep a store (provider bars + aggregated / received tail) within MAX_BARS_PER_CONTEXT, which the payload
+        validator enforces. In Live the tail can be long (a dataset ending days ago, then received bars): the oldest
+        provider bars are dropped first, never received ones; the cut-off time is remembered so the provider's later
+        answers are trimmed the same way (one rebuild, not one per rerun)."""
+        excess = n_provider + len(tail) - MAX_BARS_PER_CONTEXT
+        if excess <= 0:
+            return n_provider, tail
+        if excess > n_provider:                          # the tail alone is too long: keep its newest rows
+            tail, excess = tail[excess - n_provider:], n_provider
+        if excess == 0:
+            return n_provider, tail
+        bars = context.requested.bars
+        drop = min(n_provider, excess + STORE_SLACK)
+        context.min_time = int(bars.time[drop]) if drop < bars.size else int(bars.time[-1]) + 1
+        context.requested.bars = _from(bars, drop)
+        self._reset(context)
+        return n_provider - drop, tail
+
     def _received(self, context: Context, covered: int | None) -> tuple[list, bool]:
-        """Received live intrabars after the provider's coverage (none without a received source)."""
+        """Received live intrabars after the provider's coverage (none without a received source, e.g. Replay)."""
         source = getattr(self.provider, "received", None)
-        received = source(context.symbol, context.timeframe) if source is not None else None
-        if received is None or not received.rows:
+        if source is None:
+            return [], False
+        if context.received is None:
+            context.received = source(context.symbol, context.timeframe) or ReceivedBars([], False)
+        received = context.received
+        if not received.rows:
             return [], False
         rows = [tuple(row) for row in received.rows if covered is None or int(row[1]) > covered]
         return rows, bool(rows) and received.forming
@@ -595,6 +627,12 @@ class SecurityManager:
             return _na_like(spec)
         results = context.runtime.results.values
         return results[index] if index < len(results) else _na_like(spec)
+
+
+def _from(bars: Bars, k: int) -> Bars:
+    """Bars from index k on (``Bars.tail`` cannot express an empty result)."""
+    return Bars(bars.time[k:], bars.close_time[k:], bars.open[k:], bars.high[k:], bars.low[k:], bars.close[k:],
+                bars.volume[k:])
 
 
 def _same_prefix(old: Bars, new: Bars, n: int) -> bool:

@@ -665,8 +665,8 @@ def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketData
     digits = 2 if digits is None else int(digits)
     # Live: lower-timeframe requests see the intrabars this terminal has received on the forming bar (P2.2-A4)
     received = providers.lower_tf_received(family, now=time.time(), session_id=live_session_id(st.session_state),
-                                           books=st.session_state.setdefault(LIVE_BOOKS_KEY, {})) \
-        if streaming else None
+                                           books=st.session_state.setdefault(LIVE_BOOKS_KEY, {}),
+                                           chart=(symbol, seconds, frame)) if streaming else None
     section = pine_bridge.pine_payload(
         state, frame, st.session_state, identity=identity, timeframe_seconds=seconds, ticker=symbol,
         tickerid=f"{provider.split(' ')[0].upper()}:{symbol}", mintick=10.0 ** -digits, forming_last=streaming,

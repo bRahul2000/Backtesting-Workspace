@@ -189,17 +189,28 @@ class BinanceFuturesProvider:
 # ---------------------------------------------------------------------------
 
 def lower_tf_received(source: str, *, now: float, session_id: str | None = None,
-                      hub: binance.BinanceHub | None = None, books: dict | None = None, folder: Path | None = None):
+                      hub: binance.BinanceHub | None = None, books: dict | None = None, folder: Path | None = None,
+                      chart: tuple | None = None):
     """``received(symbol, timeframe) -> ReceivedBars | None``: the lower-timeframe bars this terminal has actually
     received from the chart's own source family — never fetched, synthesised or taken from the other family.
 
+    * The chart's own symbol and timeframe (``chart = (symbol, seconds, frame)``): exactly the chart frame this
+      payload shows, so a same-timeframe request can never be a tick ahead of or behind the chart.
     * Binance: a public kline stream at the requested interval (a lower native interval, or the largest one that
       divides a custom interval, aggregated on UTC boundaries), leased separately from the chart's stream.
-    * Exness: the MT5 bridge snapshot, which carries received M15 / M30 / H1 bars (the forming one included)."""
+    * Exness: the MT5 bridge snapshot, which carries received M15 / M30 / H1 bars (the forming one included); every
+      period is taken from the snapshot the chart applied in this rerun (one consistent moment)."""
     from ..pine.security import BarGrid
     from .security_data import received_from_frame
 
+    def own(symbol, timeframe):
+        if chart is not None and symbol == chart[0] and timeframe.seconds == chart[1]:
+            return received_from_frame(chart[2], chart[1])
+        return None
+
     def from_binance(symbol, timeframe):
+        if (mine := own(symbol, timeframe)) is not None:
+            return mine
         streams = {seconds: name for name, seconds in binance.STREAM_INTERVALS.items()}
         interval, grid = streams.get(timeframe.seconds), None
         if interval is None:                                  # e.g. 10m: aggregated from a received 5m/1m stream
@@ -214,14 +225,20 @@ def lower_tf_received(source: str, *, now: float, session_id: str | None = None,
         return received_from_frame(snap["frame"], binance.STREAM_INTERVALS[interval], grid)
 
     def from_exness(symbol, timeframe):
+        if (mine := own(symbol, timeframe)) is not None:
+            return mine
         periods = {seconds: key for key, (_, seconds) in mt5.LIVE_TIMEFRAMES.items()}
         key = periods.get(timeframe.seconds)
         if key is None or books is None:
             return None
         book = books.get((symbol, key)) or mt5.empty_book(symbol, key)
         feed = mt5.read_feed(folder or mt5.common_files_dir(), symbol, key)
-        if feed.snapshot is not None and feed.error is None:
-            book, _ = mt5.apply_snapshot(book, feed.snapshot, feed.seed)
+        snapshot = feed.snapshot if feed.error is None else None
+        applied = [b.snapshot for (sym, _), b in books.items() if sym == symbol and b.snapshot is not None]
+        if applied:                                # the snapshot the chart applied in this rerun (the newest one)
+            snapshot = max(applied, key=lambda s: s.seq)
+        if snapshot is not None:
+            book, _ = mt5.apply_snapshot(book, snapshot, feed.seed)
         books[(symbol, key)] = book
         if book.bars.empty:
             return None

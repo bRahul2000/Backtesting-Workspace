@@ -1,0 +1,6 @@
+//@version=6
+// P2.2 REAL-LIVE VALIDATION L3 - Exness MT5: a lower timeframe below the finest authoritative dataset (M15).
+// Expected: an explicit missing-source error naming the dataset; never Binance data.
+indicator("L3 below M15 (Exness)", overlay=false)
+a = request.security_lower_tf(syminfo.tickerid, "5", close)
+plot(a.size(), "n5")

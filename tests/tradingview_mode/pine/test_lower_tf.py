@@ -304,6 +304,59 @@ def test_live_without_a_received_source_shows_no_unreceived_intrabar():
     assert p["n"][-1] == 0 and p["n"][-2] == 15               # nothing is fetched or synthesised for the forming bar
 
 
+class EarlyEnd(FakeLTF):
+    """A dataset that ends long before the live chart (Exness files end days ago; the rest is received live)."""
+
+    def __init__(self, end_ms: int, **kw):
+        super().__init__(**kw)
+        self.end_ms = end_ms
+
+    def request(self, *args, **kwargs):
+        answer = super().request(*args, **kwargs)
+        answer.bars = answer.bars.upto_close(self.end_ms)
+        return answer
+
+
+def test_a_long_received_tail_keeps_every_store_within_the_payload_limit(monkeypatch):
+    monkeypatch.setattr(SEC, "MAX_BARS_PER_CONTEXT", 200)
+    frame = live_frame(29, 7)                                         # 30 x 15m bars, the last one forming
+    forming_open = int(frame["timestamp"].iloc[-1].timestamp() * 1000)
+    provider = EarlyEnd(end_ms=forming_open - 300 * MIN)              # the dataset ends 300 minutes earlier
+    b = minute_bars("BTCUSDT", forming_open - 300 * MIN, forming_open + 6 * MIN)
+    provider.received_bars = ReceivedBars([(int(b.time[i]), int(b.close_time[i]), float(b.open[i]), float(b.high[i]),
+                                            float(b.low[i]), float(b.close[i]), float(b.volume[i]))
+                                           for i in range(b.size)], forming=True)
+    out, execution = run(LIVE, frame, provider, 15, knowable=True, forming=True)
+    assert out.error is None and all(c["bar_count"] <= 200 for c in out.contexts)
+    p = plots(out)
+    assert p["n"][-1] == 7 and p["olast"][-1] == 6 and p["lastEqClose"][-1] == 0
+    assert set(p["n"][-10:-1]) == {15}                                # the received gap bars are complete
+    child = execution.runtime.security.contexts
+    before = {k: c.runtime for k, c in child.items()}
+    out, execution = run(LIVE, frame, provider, 15, knowable=True, forming=True, execution=execution)
+    assert out.error is None and {k: c.runtime for k, c in child.items()} == before     # no rebuild per rerun
+
+
+def test_request_security_stores_stay_within_the_payload_limit_too(monkeypatch):
+    from .test_security import FakeBinance
+
+    class Early(FakeBinance):
+        def request(self, *args, **kwargs):
+            answer = super().request(*args, **kwargs)
+            answer.bars = answer.bars.upto_close(T0 + 100 * MIN)      # the dataset ends early; the rest is the chart's
+            return answer
+
+    monkeypatch.setattr(SEC, "MAX_BARS_PER_CONTEXT", 60)
+    frame = chart(1, 400)
+    result = compile_script('//@version=6\nindicator("t")\nplot(request.security(syminfo.tickerid, "5", close), "h")\n')
+    until = int(frame["timestamp"].iloc[-1].timestamp() * 1000)
+    data = data_context(frame, timeframe_seconds=60, ticker="BTCUSDT", tickerid="BINANCE:BTCUSDT", mintick=0.1,
+                        forming_last=True, knowable=True, knowable_until=until)
+    provider = Early(history_minutes=2000)
+    out = run_script(PineExecution(result.program, {}, provider), data, ("t",), "t", provider)
+    assert out.error is None and all(c["bar_count"] <= 61 for c in out.contexts), out.contexts
+
+
 # ---- limits and diagnostics ------------------------------------------------------------------------------------------
 
 def test_calc_bars_count_and_the_engine_limit(monkeypatch):
@@ -438,6 +491,33 @@ def test_exness_received_source_reads_the_mt5_snapshot(tmp_path):
     got = source("XAUUSDm", parse_timeframe("15"))
     assert got is not None and got.forming and got.rows[-1][0] == int(now // 900 * 900) * 1000
     assert source("XAUUSDm", parse_timeframe("5")) is None                      # no M5 feed: nothing received
+
+
+def test_the_charts_own_interval_is_the_chart_frame_itself():
+    class Hub:
+        def lower_kline(self, *args):
+            raise AssertionError("the chart's own interval must not lease another stream")
+
+    stamps = pd.to_datetime([T0, T0 + 15 * MIN], unit="ms", utc=True)
+    frame = pd.DataFrame({"timestamp": stamps, "open": [1.0, 2.0], "high": [2.0, 3.0], "low": [0.5, 1.0],
+                          "close": [1.5, 2.25], "volume": [1.0, 1.0]})
+    source = PR.lower_tf_received("binance", now=T0 / 1000, session_id="s", hub=Hub(), chart=("BTCUSDT", 900, frame))
+    got = source("BTCUSDT", parse_timeframe("15"))
+    assert got.forming and [r[5] for r in got.rows] == [1.5, 2.25]           # exactly what the chart shows
+
+
+def test_exness_takes_every_period_from_the_snapshot_the_chart_applied(tmp_path):
+    from ui.tradingview_mode.component import live as L
+
+    folder = tmp_path / "Common" / "Files"
+    feed, now = SyntheticFeed(folder, "XAUUSDm"), 1_790_277_720.0
+    feed.write(now, price=4400.0)
+    first = L.read_feed(folder, "XAUUSDm", "1h")
+    chart_book, _ = L.apply_snapshot(L.empty_book("XAUUSDm", "1h"), first.snapshot, first.seed)
+    books = {("XAUUSDm", "1h"): chart_book}
+    feed.write(now + 2, price=4410.0)                                         # a newer tick after the chart was read
+    got = PR.lower_tf_received("exness", now=now, books=books, folder=folder)("XAUUSDm", parse_timeframe("15"))
+    assert got.rows[-1][5] == 4400.0                                          # the chart's snapshot, not the newer file
 
 
 def test_the_receiving_provider_delegates_to_the_family_provider():

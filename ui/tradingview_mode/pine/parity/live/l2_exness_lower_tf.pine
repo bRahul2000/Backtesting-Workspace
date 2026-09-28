@@ -1,0 +1,28 @@
+//@version=6
+// P2.2 REAL-LIVE VALIDATION L2 - Exness MT5: request.security_lower_tf() on a Live chart (BTCUSDm), 1h then 30m.
+// Only authoritative Exness data may appear (M15 / M30 / H1). Every value is a plot for the harness.
+indicator("L2 lower-tf live (Exness)", overlay=false)
+
+[t15, c15] = request.security_lower_tf(syminfo.tickerid, "15", [time, close])
+int n15 = t15.size()
+bool ordered = true
+if n15 > 1
+    for i = 1 to n15 - 1
+        if t15.get(i) - t15.get(i - 1) != 900000
+            ordered := false
+plot(n15, "n15")
+plot(n15 > 0 ? (t15.first() - time) / 60000 : na, "first15")
+plot(n15 > 0 ? (t15.last() - time) / 60000 : na, "last15")
+plot(n15 > 0 ? c15.last() - close : na, "last15MinusClose")
+plot(n15 > 0 ? c15.last() : na, "last15Close")
+plot(ordered ? 1 : 0, "ordered15")
+plot(n15 > 0 ? (t15.last() - timenow) / 1000 : na, "last15OpenMinusNowSec")
+
+[t30, c30] = request.security_lower_tf(syminfo.tickerid, "30", [time, close])
+plot(t30.size(), "n30")
+plot(t30.size() > 0 ? (t30.last() - time) / 60000 : na, "last30")
+plot(t30.size() > 0 ? c30.last() - close : na, "last30MinusClose")
+
+same = request.security_lower_tf(syminfo.tickerid, timeframe.period, close)
+plot(same.size(), "sameN")
+plot(same.size() > 0 ? same.last() - close : na, "sameMinusClose")
