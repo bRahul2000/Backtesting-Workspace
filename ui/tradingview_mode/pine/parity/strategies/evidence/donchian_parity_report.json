@@ -1,0 +1,128 @@
+{
+ "aggregates": {
+  "losing trades": {
+   "engine": 5,
+   "tradingview": 5
+  },
+  "net profit (closed)": {
+   "engine": 337469.2,
+   "tradingview": 337469.4
+  },
+  "open trades at end": {
+   "engine": 0,
+   "tradingview": 0
+  },
+  "winning trades": {
+   "engine": 241,
+   "tradingview": 241
+  }
+ },
+ "compared": 246,
+ "engine_trades": 246,
+ "first_divergence": 103,
+ "fully_matched": 244,
+ "mismatches": [
+  {
+   "engine": "19547.5",
+   "field": "entry price",
+   "trade": 103,
+   "tradingview": "19547.6"
+  },
+  {
+   "engine": "-6.9",
+   "field": "profit",
+   "trade": 103,
+   "tradingview": "-6.8"
+  },
+  {
+   "engine": "23.1",
+   "field": "run-up",
+   "trade": 103,
+   "tradingview": "23.2"
+  },
+  {
+   "engine": "1026.5",
+   "field": "drawdown",
+   "trade": 103,
+   "tradingview": "1026.4"
+  },
+  {
+   "engine": "49943.6",
+   "field": "entry price",
+   "trade": 150,
+   "tradingview": "49943.5"
+  },
+  {
+   "engine": "455.2",
+   "field": "profit",
+   "trade": 150,
+   "tradingview": "455.3"
+  },
+  {
+   "engine": "485.2",
+   "field": "run-up",
+   "trade": 150,
+   "tradingview": "485.3"
+  }
+ ],
+ "sequence_matched": 246,
+ "summary": {
+  "closed": {
+   "engine": 246.0,
+   "match": true,
+   "tradingview": 246.0
+  },
+  "equity": {
+   "engine": 347469.2,
+   "match": false,
+   "tradingview": 347469.4
+  },
+  "even": {
+   "engine": 0.0,
+   "match": true,
+   "tradingview": 0.0
+  },
+  "gross_loss": {
+   "engine": 26.8,
+   "match": false,
+   "tradingview": 26.7
+  },
+  "gross_profit": {
+   "engine": 337496.0,
+   "match": false,
+   "tradingview": 337496.1
+  },
+  "initial": {
+   "engine": 10000.0,
+   "match": true,
+   "tradingview": 10000.0
+  },
+  "losses": {
+   "engine": 5.0,
+   "match": true,
+   "tradingview": 5.0
+  },
+  "max_drawdown": {
+   "engine": 2809.9,
+   "match": true,
+   "tradingview": 2809.9
+  },
+  "net": {
+   "engine": 337469.2,
+   "match": false,
+   "tradingview": 337469.4
+  },
+  "position": {
+   "engine": 0.0,
+   "match": true,
+   "tradingview": 0.0
+  },
+  "wins": {
+   "engine": 241.0,
+   "match": true,
+   "tradingview": 241.0
+  }
+ },
+ "timezone_offset_minutes": 0,
+ "tradingview_trades": 246
+}

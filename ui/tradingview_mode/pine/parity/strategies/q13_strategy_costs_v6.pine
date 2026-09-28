@@ -1,0 +1,39 @@
+//@version=6
+// Zoneflow P3.1 parity - STRATEGY ORACLE q13: cash sizing, commission per order and slippage by order type.
+// Real TradingView is the oracle. Chart: BINANCE:BTCUSDT.P, 1D. Result: "List of trades" -> Download (CSV).
+strategy("q13 strategy costs", overlay=true, initial_capital=1000000, default_qty_type=strategy.cash,
+     default_qty_value=10000, commission_type=strategy.commission.cash_per_order, commission_value=3,
+     slippage=20, margin_long=0, margin_short=0)
+on(int y, int m, int d) => time == timestamp("UTC", y, m, d, 0, 0)
+
+// C1 market entry and market close (cash sizing, market slippage, commission per order)
+if on(2025, 7, 1)
+    strategy.entry("C1", strategy.long)
+if on(2025, 7, 3)
+    strategy.close_all()
+// C2 limit entry below the market, take-profit limit exit (limit orders)
+if on(2025, 7, 10)
+    strategy.entry("C2", strategy.long, limit = close - 500)
+    strategy.exit("C2x", "C2", profit = 10000)
+if on(2025, 7, 20)
+    strategy.close_all()
+// C3 stop entry above the market, stop-loss exit (stop orders)
+if on(2025, 7, 25)
+    strategy.entry("C3", strategy.long, stop = close + 500)
+    strategy.exit("C3x", "C3", loss = 10000)
+if on(2025, 8, 5)
+    strategy.close_all()
+// C4 reversal: one transaction closes the long and opens the short
+if on(2025, 8, 10)
+    strategy.entry("C4L", strategy.long)
+if on(2025, 8, 13)
+    strategy.entry("C4S", strategy.short)
+if on(2025, 8, 16)
+    strategy.close_all()
+// C5 trailing stop exit with slippage
+if on(2025, 8, 20)
+    strategy.entry("C5", strategy.long)
+    strategy.exit("C5t", "C5", trail_points = 10, trail_offset = 3000)
+if on(2025, 9, 5)
+    strategy.close_all()
+plot(strategy.position_size, "position size", display = display.data_window)

@@ -3,10 +3,11 @@
 // any particular indicator, and the P2.3a drawing objects (line, label, box,
 // linefill) that Python keeps: presentation only, from their raw Pine coordinates.
 // P2.3b: tables (oracle-support subset) drawn at the pane's top-right corner.
-import { AreaSeries, HistogramSeries, LineSeries, LineStyle, LineType } from "lightweight-charts";
+import { AreaSeries, HistogramSeries, LineSeries, LineStyle, LineType, createSeriesMarkers } from "lightweight-charts";
 import { diffSeries, indexOfTime } from "./chartView.js";
 import { dashFor, extendBox, extendSegment, labelPrice, logicalOf, tableLayout } from "./drawingGeometry.js";
 import { firstColor, seriesData } from "./pineData.js";
+import { strategyMarkers } from "./strategyMarkers.js";
 
 const SIZE_PX = { tiny: 7, small: 10, normal: 14, large: 20, huge: 28, auto: 10 };
 const LINE_STYLES = { solid: LineStyle.Solid, dotted: LineStyle.Dotted, dashed: LineStyle.Dashed };
@@ -357,6 +358,17 @@ export class PineLayer {
     this.sig = null;
     this.scripts = [];          // [{ id, overlay, pane, plots: Map, hosts, primitives: [], priceLines: [] }]
     this.barColors = new Map(); // time -> css color (barcolor)
+    this.strategyMarkers = null; // P3.1: Pine strategy fills on the price candles (Python-computed)
+    this.strategySig = null;
+  }
+
+  syncStrategyMarkers(scripts) {
+    const fills = scripts.filter((s) => s.enabled && !s.error && s.strategy).flatMap((s) => s.strategy.fills || []);
+    const sig = `${fills.length}|${fills.at(-1)?.key ?? ""}|${fills.at(-1)?.time ?? ""}|${fills[0]?.time ?? ""}`;
+    if (sig === this.strategySig) return;
+    this.strategySig = sig;
+    if (!this.strategyMarkers) this.strategyMarkers = createSeriesMarkers(this.engine.candles, []);
+    this.strategyMarkers.setMarkers(strategyMarkers(fills));
   }
 
   // Structure first (rebuild on change), then data (incremental).
@@ -372,6 +384,7 @@ export class PineLayer {
       this.scripts = layout.map(({ script, pane: p }) => this.build(script, p));
     }
     layout.forEach(({ script }, index) => this.update(this.scripts[index], script));
+    this.syncStrategyMarkers(visible);
     this.barColors = new Map();
     visible.forEach((s) => s.outputs.filter((o) => o.kind === "barcolor").forEach((o) => o.data.forEach((p) => this.barColors.set(p.time, p.color))));
   }

@@ -44,8 +44,10 @@ def test_for_in_over_a_scalar_and_gaps_for_strategy_and_old_versions():
     assert only(script("for x in close\n    y = x\nplot(close)"))[:2] == ("error", 3)
     assert only(script("for x in close\n    y = x\nplot(close)"))[2] == ("`for ... in` needs an array; `float` cannot be "
                                                                     "iterated.")
-    kind, line, message = only("//@version=5\nstrategy('S')\nplot(close)\n")
-    assert (kind, line) == ("gap", 2) and "`strategy()` scripts are not implemented yet" in message
+    # P3.1: strategy() scripts compile; settings whose behaviour is not implemented stay explicit gaps
+    assert diagnostics("//@version=5\nstrategy('S')\nplot(close)\n") == []
+    kind, line, message = only("//@version=5\nstrategy('S', calc_on_every_tick=true)\nplot(close)\n")
+    assert (kind, line) == ("gap", 2) and "`strategy(calc_on_every_tick = True)` is not implemented yet" in message
     kind, line, message = only("//@version=4\nindicator('Old')\nplot(close)\n")
     assert kind == "gap" and "Pine v4 scripts are not translated yet" in message
 
@@ -92,7 +94,9 @@ def test_compatibility_matrix_is_by_feature_and_makes_no_blanket_claim():
     assert set(m["features"]) >= {"parser", "runtime", "builtins", "outputs", "drawings", "request", "strategy", "types"}
     statuses = {f["id"]: f["status"] for group in m["features"].values() for f in group}
     # request.security() is implemented (P2.1); the rest of request.* stays a gap inside the partial feature
-    assert statuses["request"] == "partial" and statuses["drawing-objects"] == "gap" and statuses["strategy"] == "gap"
+    # P3.1: strategies are a partial feature (the broker emulator), never a blanket claim; unimplemented percentages stay gaps
+    assert statuses["request"] == "partial" and statuses["drawing-objects"] == "gap" and statuses["strategy"] == "partial"
+    assert "strategy.max_drawdown_percent" in m["builtins"]["by_namespace"]["strategy"]["missing"]
     assert "request.dividends" in m["builtins"]["by_namespace"]["request"]["missing"]
     assert statuses["functions"] == "supported" and statuses["ta"] == "partial"
     ta = m["builtins"]["by_namespace"]["ta"]

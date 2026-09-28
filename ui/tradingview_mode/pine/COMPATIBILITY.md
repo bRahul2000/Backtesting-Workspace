@@ -5,7 +5,7 @@ built-in registries; a test fails if this file is out of date. Compatibility is 
 feature. **No claim of full Pine compatibility is made**: a script runs only if every feature it
 uses is supported, and otherwise fails with the exact feature and line.
 
-Features: 23 supported, 17 partial, 12 not yet implemented. Built-ins: 243 functions, 64 variables, 129 constants.
+Features: 23 supported, 25 partial, 10 not yet implemented. Built-ins: 282 functions, 91 variables, 162 constants.
 
 ## parser
 
@@ -61,7 +61,7 @@ Features: 23 supported, 17 partial, 12 not yet implemented. Built-ins: 243 funct
 | inputs (`input.*`) | partial | Defaults, editable values; session/symbol/time inputs are gaps. |
 | time variables and functions (UTC) | partial | time() with a session argument is a gap. |
 | barstate.*, syminfo.*, timeframe.* | partial | Fundamental syminfo fields are gaps. |
-| Pine logs (`log.*`) | gap |  |
+| Pine logs (`log.info()`, `log.warning()`, `log.error()`) | partial | Messages are collected on the run (parity tooling); the terminal does not display them yet. |
 | alert() / alertcondition() | partial | Accepted; no alerts are delivered. |
 
 ## outputs
@@ -97,13 +97,19 @@ Features: 23 supported, 17 partial, 12 not yet implemented. Built-ins: 243 funct
 
 | feature | status | notes |
 |---|---|---|
-| strategy scripts (`strategy()`, `strategy.*` order simulation) | gap |  |
+| strategy scripts (`strategy()`, `strategy.*` order simulation) | partial | P3.1 TradingView-style broker emulator (P31_STRATEGY_RESEARCH.md), simulation only - no broker orders; authoritative for TradingView Mode strategy semantics only. Not implemented: calc_on_every_tick, calc_on_order_fills, calc_on_every_history_tick, bar magnifier, close_entries_rule="ANY", account-currency conversion, strategy.risk.*, margin calls (liquidation), percentage metrics beyond net/gross profit. Engine policies (not TradingView-proven): the 6-decimal quantity step outside BINANCE:BTCUSDT.P, limit-fill tick rounding, max run-up, Live paper fills over the received bar. |
+| strategy() declaration settings | partial | initial_capital, default_qty_type/value, pyramiding, commission_type/value, slippage, process_orders_on_close, backtest_fill_limits_assumption, margin_long/short (v5 0, v6 100). |
+| market entries, reversals, pyramiding, strategy.order, strategy.close / close_all (incl. immediately) | partial | Fill at the next tick (next bar open) per the manual. |
+| limit, stop and stop-limit entries; OCA cancel/reduce | partial | Historical intrabar path open-high-low-close / open-low-high-close; gaps fill at the open. |
+| strategy.exit take-profit / stop-loss / trailing stops | partial | profit/limit, loss/stop, trail_points/trail_price + trail_offset, qty/qty_percent reservation, from_entry binding, FIFO closing. See the research file for oracle-verified vs engine-policy items. |
+| strategy.* state variables and opentrades/closedtrades functions | partial | position, trade counts, net/gross/open profit, equity, max run-up/drawdown, per-trade data. |
+| Pine strategy report (trades, metrics, equity) and chart markers | partial | Built from the emulator's single trade ledger; historical, Replay (knowable at cursor) and Live paper. |
 
 ## Built-in coverage by namespace
 
 | namespace | implemented / known | not implemented yet |
 |---|---|---|
-| `(global)` | 44 / 56 | `box`, `label`, `library`, `line`, `linefill`, `plotarrow`, `plotbar`, `plotcandle`, `polyline`, `strategy`, `table`, `time_tradingday` |
+| `(global)` | 45 / 56 | `box`, `label`, `library`, `line`, `linefill`, `plotarrow`, `plotbar`, `plotcandle`, `polyline`, `table`, `time_tradingday` |
 | `array` | 22 / 55 | `array.abs`, `array.avg`, `array.binary_search`, `array.binary_search_leftmost`, `array.binary_search_rightmost`, `array.concat`, `array.covariance`, `array.every`, `array.fill`, `array.includes`, `array.indexof`, `array.insert` … (+21) |
 | `barstate` | 7 / 7 |  |
 | `box` | 26 / 30 | `box.set_text_font_family`, `box.set_text_formatting`, `box.set_text_wrap`, `box.set_xloc` |
@@ -114,7 +120,7 @@ Features: 23 supported, 17 partial, 12 not yet implemented. Built-ins: 243 funct
 | `label` | 20 / 22 | `label.set_text_font_family`, `label.set_text_formatting` |
 | `line` | 22 / 22 |  |
 | `linefill` | 6 / 6 |  |
-| `log` | 0 / 3 | `log.error`, `log.info`, `log.warning` |
+| `log` | 3 / 3 |  |
 | `map` | 0 / 11 | `map.clear`, `map.contains`, `map.copy`, `map.get`, `map.keys`, `map.new`, `map.put`, `map.put_all`, `map.remove`, `map.size`, `map.values` |
 | `math` | 24 / 24 |  |
 | `matrix` | 0 / 49 | `matrix.add_col`, `matrix.add_row`, `matrix.avg`, `matrix.col`, `matrix.columns`, `matrix.concat`, `matrix.copy`, `matrix.det`, `matrix.diff`, `matrix.eigenvalues`, `matrix.eigenvectors`, `matrix.elements_count` … (+37) |
@@ -123,9 +129,9 @@ Features: 23 supported, 17 partial, 12 not yet implemented. Built-ins: 243 funct
 | `runtime` | 1 / 1 |  |
 | `session` | 0 / 7 | `session.isfirstbar`, `session.isfirstbar_regular`, `session.islastbar`, `session.islastbar_regular`, `session.ismarket`, `session.ispostmarket`, `session.ispremarket` |
 | `str` | 15 / 18 | `str.format_time`, `str.match`, `str.split` |
-| `strategy` | 0 / 43 | `strategy.account_currency`, `strategy.avg_losing_trade`, `strategy.avg_losing_trade_percent`, `strategy.avg_trade`, `strategy.avg_trade_percent`, `strategy.avg_winning_trade`, `strategy.avg_winning_trade_percent`, `strategy.cancel`, `strategy.cancel_all`, `strategy.close`, `strategy.close_all`, `strategy.closedtrades` … (+31) |
-| `strategy.closedtrades` | 0 / 15 | `strategy.closedtrades.commission`, `strategy.closedtrades.entry_bar_index`, `strategy.closedtrades.entry_comment`, `strategy.closedtrades.entry_id`, `strategy.closedtrades.entry_price`, `strategy.closedtrades.entry_time`, `strategy.closedtrades.exit_bar_index`, `strategy.closedtrades.exit_comment`, `strategy.closedtrades.exit_id`, `strategy.closedtrades.exit_price`, `strategy.closedtrades.exit_time`, `strategy.closedtrades.max_drawdown` … (+3) |
-| `strategy.opentrades` | 0 / 10 | `strategy.opentrades.commission`, `strategy.opentrades.entry_bar_index`, `strategy.opentrades.entry_comment`, `strategy.opentrades.entry_id`, `strategy.opentrades.entry_price`, `strategy.opentrades.entry_time`, `strategy.opentrades.max_drawdown`, `strategy.opentrades.max_runup`, `strategy.opentrades.profit`, `strategy.opentrades.size` |
+| `strategy` | 36 / 43 | `strategy.avg_losing_trade_percent`, `strategy.avg_trade_percent`, `strategy.avg_winning_trade_percent`, `strategy.margin_liquidation_price`, `strategy.max_drawdown_percent`, `strategy.max_runup_percent`, `strategy.openprofit_percent` |
+| `strategy.closedtrades` | 15 / 15 |  |
+| `strategy.opentrades` | 10 / 10 |  |
 | `strategy.risk` | 0 / 6 | `strategy.risk.allow_entry_in`, `strategy.risk.max_cons_loss_days`, `strategy.risk.max_drawdown`, `strategy.risk.max_intraday_filled_orders`, `strategy.risk.max_intraday_loss`, `strategy.risk.max_position_size` |
 | `syminfo` | 15 / 38 | `syminfo.country`, `syminfo.employees`, `syminfo.expiration_date`, `syminfo.industry`, `syminfo.main_tickerid`, `syminfo.mincontract`, `syminfo.recommendations_buy`, `syminfo.recommendations_buy_strong`, `syminfo.recommendations_date`, `syminfo.recommendations_hold`, `syminfo.recommendations_sell`, `syminfo.recommendations_sell_strong` … (+11) |
 | `ta` | 53 / 67 | `ta.cog`, `ta.iii`, `ta.max`, `ta.min`, `ta.mode`, `ta.nvi`, `ta.percentile_linear_interpolation`, `ta.percentile_nearest_rank`, `ta.pivot_point_levels`, `ta.pvi`, `ta.pvt`, `ta.rci` … (+2) |

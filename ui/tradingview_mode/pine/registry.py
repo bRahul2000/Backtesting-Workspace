@@ -151,4 +151,4 @@ def bind(builtin_: Builtin, positional: list, named: dict,
 def load_all() -> None:
     """Import every built-in module (each registers itself)."""
     from .builtins import (arrays, core, color, drawings, inputs, math_, outputs, points, request, strings,  # noqa: F401
-                           ta, tables, time_)
+                           strategy, ta, tables, time_)

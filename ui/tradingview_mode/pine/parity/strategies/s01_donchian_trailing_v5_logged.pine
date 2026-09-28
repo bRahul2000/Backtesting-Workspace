@@ -1,0 +1,37 @@
+//@version=5
+strategy("Donchian Breakout", overlay=true, initial_capital=10000,
+     default_qty_type=strategy.fixed, default_qty_value=1)
+
+length     = input.int(20, "Channel length", minval=2, maxval=200, group="Channel")
+trailTicks = input.int(300, "Trail offset (ticks)", minval=1, group="Exit")
+trailStart = input.int(150, "Trail trigger (ticks)", minval=1, group="Exit")
+
+upper = ta.highest(high, length)
+lower = ta.lowest(low, length)
+
+if close >= upper[1]
+    strategy.entry("Long", strategy.long)
+
+if close <= lower[1]
+    strategy.entry("Short", strategy.short)
+
+strategy.exit("Trail", trail_points=trailStart, trail_offset=trailTicks)
+
+plot(upper, title="Upper", color=color.green)
+plot(lower, title="Lower", color=color.red)
+
+// ==== ZF observation block (added for Pine Logs; read-only: no order, setting or input changes) ====
+// Emits one machine-readable Pine Logs line per trade on the last confirmed historical bar, prefix ZF|DONCHIAN|.
+zfNum(float v) => na(v) ? "na" : str.tostring(v, "#.########")
+zfDate(int t) => na(t) ? "na" : str.tostring(year(t, "UTC")) + "-" + (month(t, "UTC") < 10 ? "0" : "") + str.tostring(month(t, "UTC")) + "-" + (dayofmonth(t, "UTC") < 10 ? "0" : "") + str.tostring(dayofmonth(t, "UTC"))
+if barstate.islastconfirmedhistory
+    int zfClosed = strategy.closedtrades
+    int zfOpen = strategy.opentrades
+    log.info("ZF|DONCHIAN|BEGIN|closed=" + str.tostring(zfClosed) + "|open=" + str.tostring(zfOpen) + "|last_bar_time=" + str.tostring(time) + "|mintick=" + zfNum(syminfo.mintick))
+    if zfClosed > 0
+        for i = 0 to zfClosed - 1
+            log.info("ZF|DONCHIAN|TRADE|" + str.tostring(i) + "|entry_id=" + strategy.closedtrades.entry_id(i) + "|size=" + zfNum(strategy.closedtrades.size(i)) + "|entry_time=" + str.tostring(strategy.closedtrades.entry_time(i)) + "|entry_bar=" + str.tostring(strategy.closedtrades.entry_bar_index(i)) + "|entry_price=" + zfNum(strategy.closedtrades.entry_price(i)) + "|exit_id=" + strategy.closedtrades.exit_id(i) + "|exit_time=" + str.tostring(strategy.closedtrades.exit_time(i)) + "|exit_bar=" + str.tostring(strategy.closedtrades.exit_bar_index(i)) + "|exit_price=" + zfNum(strategy.closedtrades.exit_price(i)) + "|profit=" + zfNum(strategy.closedtrades.profit(i)) + "|commission=" + zfNum(strategy.closedtrades.commission(i)) + "|runup=" + zfNum(strategy.closedtrades.max_runup(i)) + "|drawdown=" + zfNum(strategy.closedtrades.max_drawdown(i)))
+    if zfOpen > 0
+        for i = 0 to zfOpen - 1
+            log.info("ZF|DONCHIAN|OPEN|" + str.tostring(i) + "|entry_id=" + strategy.opentrades.entry_id(i) + "|size=" + zfNum(strategy.opentrades.size(i)) + "|entry_time=" + str.tostring(strategy.opentrades.entry_time(i)) + "|entry_bar=" + str.tostring(strategy.opentrades.entry_bar_index(i)) + "|entry_price=" + zfNum(strategy.opentrades.entry_price(i)))
+    log.info("ZF|DONCHIAN|SUMMARY|initial=" + zfNum(strategy.initial_capital) + "|equity=" + zfNum(strategy.equity) + "|net=" + zfNum(strategy.netprofit) + "|gross_profit=" + zfNum(strategy.grossprofit) + "|gross_loss=" + zfNum(strategy.grossloss) + "|closed=" + str.tostring(zfClosed) + "|wins=" + str.tostring(strategy.wintrades) + "|losses=" + str.tostring(strategy.losstrades) + "|even=" + str.tostring(strategy.eventrades) + "|max_drawdown=" + zfNum(strategy.max_drawdown) + "|position=" + zfNum(strategy.position_size))

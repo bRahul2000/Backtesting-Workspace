@@ -488,3 +488,12 @@ input { font: inherit; color: var(--text); }
 .pine-compat-head { color: var(--text-2); margin-bottom: 8px; }
 .pine-compat-group h4 { margin: 8px 0 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .pine-compat-row { display: flex; gap: 6px; align-items: baseline; padding: 1px 0; }
+
+/* P3.1 Pine strategy report (presentation only) */
+.pine-strategy { display: flex; flex-direction: column; gap: 8px; padding: 6px 10px; overflow: auto; height: 100%; }
+.pine-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 16px; }
+.pine-metric { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; border-bottom: 1px solid var(--border, #2a2e39); padding: 2px 0; }
+.pine-equity { width: 100%; height: 70px; }
+.pine-trades td.pos { color: #26a69a; }
+.pine-trades td.neg { color: #ef5350; }
+.pine-trades tr.is-open td { font-style: italic; }

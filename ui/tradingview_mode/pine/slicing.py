@@ -22,7 +22,8 @@ from dataclasses import dataclass, field
 from . import ast as A
 
 SIDE_EFFECTS = {"alert", "alertcondition", "runtime.error"}
-DRAWING_NAMESPACES = ("line.", "label.", "box.", "linefill.", "table.")   # drawings never run in a requested context
+DRAWING_NAMESPACES = ("line.", "label.", "box.", "linefill.", "table.",   # drawings never run in a requested context
+                      "strategy.")                                          # P3.1: nor do strategy commands
 ALL_VARIABLES = {"line.all", "label.all", "box.all", "linefill.all"}         # P2.3b: drawing-store reads
 
 
@@ -91,8 +92,8 @@ def _info(node, names: dict, calls: dict, top_level: bool = True) -> _StatementI
         elif isinstance(item, A.Attribute) and names.get(item.id, (None,))[0] == "field":
             info.points.append((f"chart point field `{item.name}`", item.line))
         elif isinstance(item, A.Attribute) and names.get(item.id, (None,))[0] == "var" \
-                and names[item.id][1].name in ALL_VARIABLES:
-            info.effects.append((names[item.id][1].name, item.line))
+                and (names[item.id][1].name in ALL_VARIABLES or names[item.id][1].name.startswith("strategy.")):
+            info.effects.append((names[item.id][1].name, item.line))     # drawing store / strategy state reads
         elif isinstance(item, A.Call) and item.id in calls:
             kind, target = calls[item.id][0], calls[item.id][1]
             if kind == "dispatch":                          # a method resolved at run time: every candidate counts

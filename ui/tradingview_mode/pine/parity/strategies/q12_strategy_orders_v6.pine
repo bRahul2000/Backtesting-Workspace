@@ -1,0 +1,75 @@
+//@version=6
+// Zoneflow P3.1 parity - STRATEGY ORACLE q12: order timing, brackets, trailing stops, reversal, pyramiding.
+// Real TradingView is the oracle. Chart: BINANCE:BTCUSDT.P, 1D (the whole history loads), any chart timezone.
+// Result: Strategy Tester -> "List of trades" -> Download (CSV). Scenarios run on fixed UTC dates, one after another,
+// each flattened before the next; every trade's entry ID names its scenario.
+strategy("q12 strategy orders", overlay=true, initial_capital=1000000, default_qty_type=strategy.fixed,
+     default_qty_value=1, margin_long=0, margin_short=0)
+on(int y, int m, int d) => time == timestamp("UTC", y, m, d, 0, 0)
+
+// S1 market entry and market close: both fill at the next bar's open
+if on(2025, 1, 4)
+    strategy.entry("S1", strategy.long)
+if on(2025, 1, 5)
+    strategy.close_all()
+// S2 / S3 bracket (+/-5000 ticks) on the entry bar: open nearer the high (S2) and nearer the low (S3)
+if on(2025, 1, 12)
+    strategy.entry("S2", strategy.long)
+    strategy.exit("S2x", "S2", profit = 5000, loss = 5000)
+if on(2025, 1, 19)
+    strategy.entry("S3", strategy.long)
+    strategy.exit("S3x", "S3", profit = 5000, loss = 5000)
+// S4 trailing stop, activation 10 ticks, offset 1000 ticks, on an entry bar whose open is nearer the high
+if on(2025, 2, 3)
+    strategy.entry("S4", strategy.long)
+    strategy.exit("S4t", "S4", trail_points = 10, trail_offset = 1000)
+if on(2025, 2, 6)
+    strategy.close_all()
+// S5 trailing stop, offset 5000 ticks, on an entry bar whose open is nearer the low and whose close is near the high
+if on(2025, 2, 11)
+    strategy.entry("S5", strategy.long)
+    strategy.exit("S5t", "S5", trail_points = 10, trail_offset = 5000)
+if on(2025, 2, 16)
+    strategy.close_all()
+// S7 reversal: a long in loss is reversed by a short entry; an exit without from_entry is placed on the same bar
+if on(2025, 2, 20)
+    strategy.entry("S7L", strategy.long)
+if on(2025, 2, 23)
+    strategy.entry("S7S", strategy.short)
+    strategy.exit("S7x", trail_points = 10, trail_offset = 100)
+if on(2025, 3, 1)
+    strategy.close_all()
+// S8 two market entries with different IDs on one bar, default pyramiding (1)
+if on(2025, 3, 20)
+    strategy.entry("S8a", strategy.long)
+    strategy.entry("S8b", strategy.long)
+if on(2025, 3, 22)
+    strategy.close_all()
+// S9 buy limit above the market; S10 buy stop below the market
+if on(2025, 3, 26)
+    strategy.entry("S9", strategy.long, limit = close + 2000)
+if on(2025, 3, 28)
+    strategy.close_all()
+if on(2025, 4, 1)
+    strategy.entry("S10", strategy.long, stop = close - 2000)
+if on(2025, 4, 3)
+    strategy.close_all()
+// S11 the same entry ID placed again with a new limit price
+if on(2025, 4, 6)
+    strategy.entry("S11", strategy.long, limit = close - 20000)
+if on(2025, 4, 7)
+    strategy.entry("S11", strategy.long, limit = close - 1000)
+if on(2025, 4, 10)
+    strategy.close_all()
+// S6 trailing stop across many bars: activation 20000 ticks, offset 30000 ticks
+if on(2025, 4, 21)
+    strategy.entry("S6", strategy.long)
+    strategy.exit("S6t", "S6", trail_points = 20000, trail_offset = 30000)
+if on(2025, 5, 25)
+    strategy.close_all()
+// S13 strategy.close(immediately = true) on the entry bar
+if on(2025, 6, 2)
+    strategy.entry("S13", strategy.long)
+if on(2025, 6, 3)
+    strategy.close("S13", immediately = true)
+plot(strategy.position_size, "position size", display = display.data_window)

@@ -131,3 +131,20 @@ def _format(rt, site, a):
         return tostring(args[index], pattern.strip() if pattern else NA, rt.data.mintick if rt else 0.01)
 
     return _PLACEHOLDER.sub(replace, a["formatString"])
+
+
+# ---- Pine logs (P3.1: used by the log-instrumented parity oracles) ---------------------------------------------------
+
+def _log(level: str):
+    def impl(rt, site, a):
+        message = a["message"]
+        if a.get("*"):
+            message = _format(rt, site, {"formatString": message, "*": a["*"]})
+        # Collected on the run (bar, level, text); like TradingView, logs are not rolled back on realtime re-runs.
+        rt.logs.append((rt.bar, level, "" if is_na(message) else str(message)))
+        return NA
+    builtin(f"log.{level}", P("message", S), variadic="args", returns="void")(impl)
+
+
+for _level in ("info", "warning", "error"):
+    _log(_level)

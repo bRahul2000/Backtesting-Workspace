@@ -4,8 +4,9 @@ import { Icon } from "./icons.jsx";
 import { StrategyTester } from "./tester/StrategyTester.jsx";
 import { TradesWorkspace } from "./tester/TradesTable.jsx";
 import { PineEditor } from "./PineEditor.jsx";
+import { PineStrategyReport } from "./PineStrategyReport.jsx";
 
-const DEFAULT_HEIGHT = { strategy_tester: 330, trades: 260, pine: 340 };
+const DEFAULT_HEIGHT = { strategy_tester: 330, trades: 260, pine: 340, pine_strategy: 330 };
 const HEIGHT_STORAGE = "tvterm:bottom-height:";
 
 function storedHeight(tab) {
@@ -17,6 +18,7 @@ const TABS = [
   ["strategy_tester", "Strategy Tester"],
   ["trades", "Trades"],
   ["pine", "Pine Editor"],
+  ["pine_strategy", "Pine Strategy"],
   ["logs", "Logs"],
 ];
 
@@ -144,6 +146,8 @@ export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelec
             {key === "strategy_tester" && pending?.type === "run_backtest" && <span className="spinner" />}
             {key === "trades" && payload.tester.run && <span className="count">{payload.tester.run.trades.length}</span>}
             {key === "pine" && payload.pine?.scripts.length > 0 && <span className="count">{payload.pine.scripts.length}</span>}
+            {key === "pine_strategy" && (payload.pine?.scripts || []).some((s) => s.strategy) && (
+              <span className="count">{(payload.pine.scripts.find((s) => s.strategy)?.strategy.metrics.total_closed_trades) ?? 0}</span>)}
           </button>
         ))}
         <div className="spacer" />
@@ -166,6 +170,7 @@ export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelec
             </div>
           )}
           {tab === "pine" && <PineEditor pine={payload.pine} pending={pending} />}
+          {tab === "pine_strategy" && <PineStrategyReport pine={payload.pine} precision={payload.price_precision ?? 2} />}
           {tab === "logs" && <LogsTab logs={payload.logs} clientLogs={clientLogs} />}
         </div>
       )}

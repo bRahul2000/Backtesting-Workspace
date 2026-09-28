@@ -59,3 +59,17 @@ test("P2.3b tables: top-right layout sized by the largest cell of each column an
   assert.equal(c.h, 2 * 14 * 1.25 + 8);
   assert.deepEqual(c.lines, ["two", "lines"]);
 });
+
+test("P3.1 strategy fills become chart markers (presentation only)", async () => {
+  const { strategyMarkers } = await import("../../../ui/tradingview_mode/component/frontend/src/chart/strategyMarkers.js");
+  const markers = strategyMarkers([
+    { key: "s:fill:1", time: 200, side: -1, qty: 2, kind: "reversal", exit_kind: "reversal", id: "Short" },
+    { key: "s:fill:0", time: 100, side: 1, qty: 1, kind: "entry", exit_kind: null, id: "Long" },
+    { key: "s:fill:2", time: 300, side: 1, qty: 1, kind: "exit", exit_kind: "trail", id: "Trail" },
+  ]);
+  assert.deepEqual(markers.map((m) => [m.time, m.position, m.shape, m.text]), [
+    [100, "belowBar", "arrowUp", "Long +1"],
+    [200, "aboveBar", "arrowDown", "Short -2"],
+    [300, "belowBar", "arrowUp", "Trail +1"],
+  ]);
+});

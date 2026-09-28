@@ -75,7 +75,8 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     Feature("inputs", "builtins", PARTIAL, "inputs (`input.*`)", "Defaults, editable values; session/symbol/time inputs are gaps."),
     Feature("time", "builtins", PARTIAL, "time variables and functions (UTC)", "time() with a session argument is a gap."),
     Feature("chart-info", "builtins", PARTIAL, "barstate.*, syminfo.*, timeframe.*", "Fundamental syminfo fields are gaps."),
-    Feature("logging", "builtins", GAP, "Pine logs (`log.*`)"),
+    Feature("logging", "builtins", PARTIAL, "Pine logs (`log.info()`, `log.warning()`, `log.error()`)",
+            "Messages are collected on the run (parity tooling); the terminal does not display them yet."),
     Feature("alerts", "builtins", PARTIAL, "alert() / alertcondition()", "Accepted; no alerts are delivered."),
     # Outputs
     Feature("plot", "outputs", SUPPORTED, "plot() (line, stepline, linebr, histogram, columns, area, circles, cross)"),
@@ -108,7 +109,27 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
             "<= 2; at most 10,000 intrabars per lower-timeframe request (TradingView: 100K-200K). `currency`, "
             "seconds/tick/range timeframes, other request.* and ticker.* are not implemented yet."),
     # Strategies
-    Feature("strategy", "strategy", GAP, "strategy scripts (`strategy()`, `strategy.*` order simulation)"),
+    Feature("strategy", "strategy", PARTIAL, "strategy scripts (`strategy()`, `strategy.*` order simulation)",
+            "P3.1 TradingView-style broker emulator (P31_STRATEGY_RESEARCH.md), simulation only - no broker orders; "
+            "authoritative for TradingView Mode strategy semantics only. Not implemented: calc_on_every_tick, "
+            "calc_on_order_fills, calc_on_every_history_tick, bar magnifier, close_entries_rule=\"ANY\", "
+            "account-currency conversion, strategy.risk.*, margin calls (liquidation), percentage metrics beyond "
+            "net/gross profit. Engine policies (not TradingView-proven): the 6-decimal quantity step outside "
+            "BINANCE:BTCUSDT.P, limit-fill tick rounding, max run-up, Live paper fills over the received bar."),
+    Feature("strategy-declaration", "strategy", PARTIAL, "strategy() declaration settings",
+            "initial_capital, default_qty_type/value, pyramiding, commission_type/value, slippage, "
+            "process_orders_on_close, backtest_fill_limits_assumption, margin_long/short (v5 0, v6 100)."),
+    Feature("strategy-market-orders", "strategy", PARTIAL, "market entries, reversals, pyramiding, strategy.order, "
+            "strategy.close / close_all (incl. immediately)", "Fill at the next tick (next bar open) per the manual."),
+    Feature("strategy-price-orders", "strategy", PARTIAL, "limit, stop and stop-limit entries; OCA cancel/reduce",
+            "Historical intrabar path open-high-low-close / open-low-high-close; gaps fill at the open."),
+    Feature("strategy-exits", "strategy", PARTIAL, "strategy.exit take-profit / stop-loss / trailing stops",
+            "profit/limit, loss/stop, trail_points/trail_price + trail_offset, qty/qty_percent reservation, "
+            "from_entry binding, FIFO closing. See the research file for oracle-verified vs engine-policy items."),
+    Feature("strategy-state", "strategy", PARTIAL, "strategy.* state variables and opentrades/closedtrades functions",
+            "position, trade counts, net/gross/open profit, equity, max run-up/drawdown, per-trade data."),
+    Feature("strategy-tester", "strategy", PARTIAL, "Pine strategy report (trades, metrics, equity) and chart markers",
+            "Built from the emulator's single trade ledger; historical, Replay (knowable at cursor) and Live paper."),
 )}
 
 #: Behaviour compared bar by bar with ACTUAL TradingView output (see parity/PARITY_REPORT.md). Only entries
@@ -181,6 +202,8 @@ TABLES_CORE = {"table.new", "table.cell", "position.top_right"}    # the P2.3b o
 def feature_for_builtin(name: str) -> str:
     if name in TABLES_CORE:
         return "tables-core"
+    if name.startswith("strategy."):                  # strategy.risk.*, strategy.opentrades.* ... (P3.1)
+        return "strategy"
     if name in FUNCTION_FEATURE:
         return FUNCTION_FEATURE[name]
     namespace = name.rsplit(".", 1)[0] if "." in name else ""

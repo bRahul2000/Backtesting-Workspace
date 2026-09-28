@@ -1,0 +1,7 @@
+Date,Message
+2026-09-27T05:30:00.000+05:30,ZF|Q14|BEGIN|closed=4|open=0|last_bar_time=1790467200000|mintick=0.1
+2026-09-27T05:30:00.000+05:30,ZF|Q14|TRADE|0|entry_id=M2|size=0.05|entry_time=1759708800000|entry_bar=2220|entry_price=124628.5|exit_id=Close position order|exit_time=1759881600000|exit_bar=2222|exit_price=123237.5|profit=-69.55|commission=0|runup=23.475|drawdown=205.625
+2026-09-27T05:30:00.000+05:30,ZF|Q14|TRADE|1|entry_id=M3|size=0.05|entry_time=1760227200000|entry_bar=2226|entry_price=114894.4|exit_id=Close position order|exit_time=1760400000000|exit_bar=2228|exit_price=112983.8|profit=-95.53|commission=0|runup=50.88|drawdown=254.62
+2026-09-27T05:30:00.000+05:30,ZF|Q14|TRADE|2|entry_id=M4|size=0.05|entry_time=1760745600000|entry_bar=2232|entry_price=107117.5|exit_id=Close position order|exit_time=1760918400000|exit_bar=2234|exit_price=110469.9|profit=167.62|commission=0|runup=226.625|drawdown=53.085
+2026-09-27T05:30:00.000+05:30,ZF|Q14|TRADE|3|entry_id=M5a|size=0.08|entry_time=1761264000000|entry_bar=2238|entry_price=110965.4|exit_id=Close position order|exit_time=1761609600000|exit_bar=2242|exit_price=112833.5|profit=149.448|commission=0|runup=433.184|drawdown=29.192
+2026-09-27T05:30:00.000+05:30,ZF|Q14|SUMMARY|initial=10000|equity=10151.988|net=151.988|gross_profit=317.068|gross_loss=165.08|closed=4|wins=2|losses=2|even=0|max_drawdown=324.17|position=0

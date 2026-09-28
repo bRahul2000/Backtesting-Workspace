@@ -22,7 +22,7 @@ from .replay import SPEEDS as REPLAY_SPEEDS, is_utc_text
 
 CONTRACT_VERSION = 1
 MODES = ("historical", "replay", "live")
-BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs", "pine")
+BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs", "pine", "pine_strategy")
 _BAR_FIELDS = ("time", "open", "high", "low", "close", "volume")
 _REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
 
@@ -229,12 +229,52 @@ def _validate_pine(payload: dict[str, Any], bar_times: set[int]) -> None:
                 previous = point["time"]
         _validate_contexts(payload, script, bar_times)
         _validate_drawings(script, len(bar_times))
+        _validate_strategy(script, bar_times)
         for output in outputs:
             if output["kind"] == "fill":
                 between = output.get("between") or []
                 _require(len(between) == 2 and all(ref in kinds for ref in between)
                          and kinds[between[0]] == kinds[between[1]] and kinds[between[0]] in ("plot", "hline"),
                          "a pine fill must reference two plots or two hlines of the same script.")
+
+
+def _finite(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _validate_strategy(script: dict, bar_times: set[int]) -> None:
+    """P3.1 strategy report: simulated trades and fills only, every event on a bar the chart has (Replay cannot show a
+    trade from after the cursor), finite numbers, unique keys."""
+    report = script.get("strategy")
+    if report is None:
+        return
+    _require(isinstance(report, dict), "pine strategy report must be an object.")
+    keys: set = set()
+    for trade in report.get("trades") or []:
+        key = trade.get("key")
+        _require(isinstance(key, str) and key not in keys, f"pine strategy trade keys must be unique ({key!r}).")
+        keys.add(key)
+        _require(trade.get("direction") in (1, -1), f"pine strategy trade {key}: direction must be 1 or -1.")
+        _require(trade.get("entry_time") in bar_times, f"pine strategy trade {key}: entry is not on a chart bar.")
+        _require(_finite(trade.get("entry_price")) and _finite(trade.get("qty")) and trade["qty"] > 0,
+                 f"pine strategy trade {key}: entry price and quantity must be finite.")
+        if not trade.get("open"):
+            _require(trade.get("exit_time") in bar_times, f"pine strategy trade {key}: exit is not on a chart bar.")
+            _require(_finite(trade.get("exit_price")) and _finite(trade.get("profit")),
+                     f"pine strategy trade {key}: exit price and profit must be finite.")
+    for fill in report.get("fills") or []:
+        key = fill.get("key")
+        _require(isinstance(key, str) and key not in keys, f"pine strategy fill keys must be unique ({key!r}).")
+        keys.add(key)
+        _require(fill.get("time") in bar_times, f"pine strategy fill {key}: not on a chart bar.")
+        _require(fill.get("side") in (1, -1) and _finite(fill.get("price")) and _finite(fill.get("qty")),
+                 f"pine strategy fill {key}: side, price and quantity must be valid.")
+    previous = None
+    for point in report.get("equity") or []:
+        _require(isinstance(point, list) and len(point) == 2 and point[0] in bar_times and _finite(point[1])
+                 and (previous is None or point[0] > previous), "pine strategy equity must be finite points on "
+                 "chart bars in time order.")
+        previous = point[0]
 
 
 DRAWING_LISTS = {"lines": "line", "labels": "label", "boxes": "box", "linefills": "linefill", "tables": "table"}

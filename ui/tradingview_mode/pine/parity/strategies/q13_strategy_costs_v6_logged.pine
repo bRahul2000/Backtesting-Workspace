@@ -1,0 +1,65 @@
+//@version=6
+// Zoneflow P3.1 parity - STRATEGY ORACLE q13: cash sizing, commission per order and slippage by order type.
+// Real TradingView is the oracle. Chart: BINANCE:BTCUSDT.P, 1D. Result: "List of trades" -> Download (CSV).
+strategy("q13 strategy costs", overlay=true, initial_capital=1000000, default_qty_type=strategy.cash,
+     default_qty_value=10000, commission_type=strategy.commission.cash_per_order, commission_value=3,
+     slippage=20, margin_long=0, margin_short=0)
+on(int y, int m, int d) => time == timestamp("UTC", y, m, d, 0, 0)
+
+// C1 market entry and market close (cash sizing, market slippage, commission per order)
+if on(2025, 7, 1)
+    strategy.entry("C1", strategy.long)
+if on(2025, 7, 3)
+    strategy.close_all()
+// C2 limit entry below the market, take-profit limit exit (limit orders)
+if on(2025, 7, 10)
+    strategy.entry("C2", strategy.long, limit = close - 500)
+    strategy.exit("C2x", "C2", profit = 10000)
+if on(2025, 7, 20)
+    strategy.close_all()
+// C3 stop entry above the market, stop-loss exit (stop orders)
+if on(2025, 7, 25)
+    strategy.entry("C3", strategy.long, stop = close + 500)
+    strategy.exit("C3x", "C3", loss = 10000)
+if on(2025, 8, 5)
+    strategy.close_all()
+// C4 reversal: one transaction closes the long and opens the short
+if on(2025, 8, 10)
+    strategy.entry("C4L", strategy.long)
+if on(2025, 8, 13)
+    strategy.entry("C4S", strategy.short)
+if on(2025, 8, 16)
+    strategy.close_all()
+// C5 trailing stop exit with slippage
+if on(2025, 8, 20)
+    strategy.entry("C5", strategy.long)
+    strategy.exit("C5t", "C5", trail_points = 10, trail_offset = 3000)
+if on(2025, 9, 5)
+    strategy.close_all()
+plot(strategy.position_size, "position size", display = display.data_window)
+
+// ==== ZF observation block (added for Pine Logs; read-only: no order, setting or input changes) ====
+// Emits one machine-readable Pine Logs line per trade on the last confirmed historical bar, prefix ZF|Q13|.
+zfNum(float v) => na(v) ? "na" : str.tostring(v, "#.########")
+zfDate(int t) => na(t) ? "na" : str.tostring(year(t, "UTC")) + "-" + (month(t, "UTC") < 10 ? "0" : "") + str.tostring(month(t, "UTC")) + "-" + (dayofmonth(t, "UTC") < 10 ? "0" : "") + str.tostring(dayofmonth(t, "UTC"))
+if barstate.islastconfirmedhistory
+    int zfClosed = strategy.closedtrades
+    int zfOpen = strategy.opentrades
+    log.info("ZF|Q13|BEGIN|closed=" + str.tostring(zfClosed) + "|open=" + str.tostring(zfOpen) + "|last_bar_time=" + str.tostring(time) + "|mintick=" + zfNum(syminfo.mintick))
+    if zfClosed > 0
+        for i = 0 to zfClosed - 1
+            log.info("ZF|Q13|TRADE|" + str.tostring(i) + "|entry_id=" + strategy.closedtrades.entry_id(i) + "|size=" + zfNum(strategy.closedtrades.size(i)) + "|entry_time=" + str.tostring(strategy.closedtrades.entry_time(i)) + "|entry_bar=" + str.tostring(strategy.closedtrades.entry_bar_index(i)) + "|entry_price=" + zfNum(strategy.closedtrades.entry_price(i)) + "|exit_id=" + strategy.closedtrades.exit_id(i) + "|exit_time=" + str.tostring(strategy.closedtrades.exit_time(i)) + "|exit_bar=" + str.tostring(strategy.closedtrades.exit_bar_index(i)) + "|exit_price=" + zfNum(strategy.closedtrades.exit_price(i)) + "|profit=" + zfNum(strategy.closedtrades.profit(i)) + "|commission=" + zfNum(strategy.closedtrades.commission(i)) + "|runup=" + zfNum(strategy.closedtrades.max_runup(i)) + "|drawdown=" + zfNum(strategy.closedtrades.max_drawdown(i)))
+    if zfOpen > 0
+        for i = 0 to zfOpen - 1
+            log.info("ZF|Q13|OPEN|" + str.tostring(i) + "|entry_id=" + strategy.opentrades.entry_id(i) + "|size=" + zfNum(strategy.opentrades.size(i)) + "|entry_time=" + str.tostring(strategy.opentrades.entry_time(i)) + "|entry_bar=" + str.tostring(strategy.opentrades.entry_bar_index(i)) + "|entry_price=" + zfNum(strategy.opentrades.entry_price(i)))
+    log.info("ZF|Q13|SUMMARY|initial=" + zfNum(strategy.initial_capital) + "|equity=" + zfNum(strategy.equity) + "|net=" + zfNum(strategy.netprofit) + "|gross_profit=" + zfNum(strategy.grossprofit) + "|gross_loss=" + zfNum(strategy.grossloss) + "|closed=" + str.tostring(zfClosed) + "|wins=" + str.tostring(strategy.wintrades) + "|losses=" + str.tostring(strategy.losstrades) + "|even=" + str.tostring(strategy.eventrades) + "|max_drawdown=" + zfNum(strategy.max_drawdown) + "|position=" + zfNum(strategy.position_size))
+// Visual fallback: the same trades in one table (screenshot).
+var table zfTable = table.new(position.top_right, 1, 22, bgcolor=color.white, border_color=color.gray, border_width=1)
+if barstate.islastconfirmedhistory
+    table.cell(zfTable, 0, 0, "ZF|Q13 closed=" + str.tostring(strategy.closedtrades) + " open=" + str.tostring(strategy.opentrades) + " net=" + zfNum(strategy.netprofit), text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    int zfRows = strategy.closedtrades > 20 ? 20 : strategy.closedtrades
+    if zfRows > 0
+        for i = 0 to zfRows - 1
+            table.cell(zfTable, 0, i + 1, str.tostring(i) + " " + strategy.closedtrades.entry_id(i) + " size=" + zfNum(strategy.closedtrades.size(i)) + " in " + zfDate(strategy.closedtrades.entry_time(i)) + " @" + zfNum(strategy.closedtrades.entry_price(i)) + " out " + strategy.closedtrades.exit_id(i) + " " + zfDate(strategy.closedtrades.exit_time(i)) + " @" + zfNum(strategy.closedtrades.exit_price(i)) + " pnl=" + zfNum(strategy.closedtrades.profit(i)) + " comm=" + zfNum(strategy.closedtrades.commission(i)), text_color=color.black, text_size=size.small, text_halign=text.align_left)
+    if strategy.opentrades > 0
+        table.cell(zfTable, 0, 21, "OPEN " + strategy.opentrades.entry_id(0) + " size=" + zfNum(strategy.opentrades.size(0)) + " in " + zfDate(strategy.opentrades.entry_time(0)) + " @" + zfNum(strategy.opentrades.entry_price(0)), text_color=color.black, text_size=size.small, text_halign=text.align_left)

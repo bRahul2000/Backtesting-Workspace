@@ -17,6 +17,7 @@ from . import catalog, slicing
 from .compat import FEATURES, feature_for_builtin
 from .errors import ERROR, GAP, WARNING, Diagnostic
 from .registry import CONSTANTS, FUNCTIONS, QUALIFIER_RANK, VARIABLES, Builtin, TypeSpec, bind, load_all
+from .builtins.strategy import STRATEGY_PARAMS
 from .values import ARRAY_DRAWING_KINDS, DRAWING_KINDS, NA, POINT_FIELDS, Color
 
 BASIC_TYPES = {"int", "float", "bool", "string", "color"}
@@ -151,14 +152,12 @@ class Analyzer:
             self.error("Only one declaration statement (`indicator()`/`strategy()`/`library()`) is allowed.", declarations[1])
         call = declarations[0].expr
         kind = call.func.name
-        if kind == "strategy":
-            self.gap("strategy", "`strategy()` scripts are not implemented yet (strategy.* order simulation); "
-                                 "use `indicator()`.", call)
-        elif kind == "library":
+        if kind == "library":
             self.gap("libraries", "`library()` scripts are not implemented yet.", call)
         positional = [a.value for a in call.args if a.name is None]
         named = {a.name: a.value for a in call.args if a.name is not None}
-        order = ("title", "shorttitle", "overlay", "format", "precision", "scale", "max_bars_back")
+        order = STRATEGY_PARAMS if kind == "strategy" else (
+            "title", "shorttitle", "overlay", "format", "precision", "scale", "max_bars_back")
 
         def arg(name, default=None):
             node = named.get(name)
@@ -174,6 +173,69 @@ class Analyzer:
                      "overlay": bool(arg("overlay", False)), "precision": arg("precision"),
                      "format": arg("format"), "max_bars_back": arg("max_bars_back"), "version": self.script.version or 5,
                      "drawing_limits": self.drawing_limits(arg)}
+        if kind == "strategy":
+            self.feature("strategy", call)
+            self.meta["strategy"] = self.strategy_settings(arg, named, call)
+
+    def strategy_settings(self, arg, named: dict, call: A.Call) -> dict:
+        """strategy() arguments -> StrategySettings fields. Arguments whose behaviour is not implemented are
+        capability gaps, never silently ignored (P3.1)."""
+        version = self.script.version or 5
+
+        def number(name, default, minimum=None, integer=False):
+            value = arg(name, default)
+            if value is NA or value is None:
+                return default
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                self.error(f"`strategy()` argument `{name}` must be a number.", call)
+                return default
+            if integer and not float(value).is_integer():
+                self.error(f"`strategy()` argument `{name}` must be an integer.", call)
+            if minimum is not None and value < minimum:
+                self.error(f"`strategy()` argument `{name}` must be at least {minimum}.", call)
+                return default
+            return int(value) if integer else float(value)
+
+        def choice(name, default, options):
+            value = arg(name, default)
+            if value is NA or value is None:
+                return default
+            if value not in options:
+                self.error(f"`strategy()` argument `{name}` must be one of {', '.join(options)}.", call)
+                return default
+            return value
+
+        def unsupported(name, default, why):
+            value = arg(name, default)
+            if value is not NA and value is not None and value != default:
+                self.gap("strategy", f"`strategy({name} = {value!r})` is not implemented yet ({why}).", call)
+
+        unsupported("calc_on_every_tick", False, "strategies execute once per closed bar")
+        unsupported("calc_on_order_fills", False, "no extra executions after order fills")
+        unsupported("use_bar_magnifier", False, "no lower-timeframe bar detail for historical fills")
+        unsupported("close_entries_rule", "FIFO", "exits always close trades first in, first out")
+        unsupported("calc_bars_count", 0, "the strategy runs over every chart bar")
+        currency = arg("currency", "NONE")
+        if currency not in (NA, None, "NONE"):
+            self.gap("strategy", f"`strategy(currency = {currency})` is not implemented yet (the account currency is "
+                                 "the chart's currency).", call)
+        if "calc_on_every_history_tick" in named:
+            self.gap("strategy", "`calc_on_every_history_tick` is not implemented yet.", call)
+        margin_default = 100.0 if version >= 6 else 0.0
+        return {
+            "initial_capital": number("initial_capital", 1_000_000.0, minimum=1e-9),
+            "default_qty_type": choice("default_qty_type", "fixed", ("fixed", "cash", "percent_of_equity")),
+            "default_qty_value": number("default_qty_value", 1.0, minimum=0),
+            "pyramiding": max(1, number("pyramiding", 1, minimum=0, integer=True)),
+            "commission_type": choice("commission_type", "percent", ("percent", "cash_per_contract", "cash_per_order")),
+            "commission_value": number("commission_value", 0.0, minimum=0),
+            "slippage": number("slippage", 0, minimum=0, integer=True),
+            "process_orders_on_close": bool(arg("process_orders_on_close", False) or False),
+            "backtest_fill_limits_assumption": number("backtest_fill_limits_assumption", 0, minimum=0, integer=True),
+            "margin_long": number("margin_long", margin_default, minimum=0),
+            "margin_short": number("margin_short", margin_default, minimum=0),
+            "version": version,
+        }
 
     def drawing_limits(self, arg) -> dict:
         """max_lines_count / max_labels_count / max_boxes_count (default ~50, at most 500; no linefill count)."""
@@ -580,7 +642,14 @@ class Analyzer:
                                            "implemented yet.", node)
         return None
 
+    def strategy_only(self, what: str, node) -> None:
+        if self.meta.get("kind") != "strategy":
+            self.error(f"`{what}` can only be used in scripts declared with `strategy()`.", node)
+        self.feature("strategy", node)
+
     def builtin_name(self, node, name: str) -> TypeSpec | None:
+        if name.startswith("strategy.") and name in VARIABLES:
+            self.strategy_only(name, node)
         if name in VARIABLES:
             variable = VARIABLES[name]
             self.names[node.id] = ("var", variable)
@@ -761,6 +830,10 @@ class Analyzer:
     def builtin_call(self, node: A.Call, builtin_: Builtin, positional: list, named: dict,
                      receiver: tuple | None = None) -> TypeSpec | None:
         self.builtins_used.setdefault(builtin_.name, []).append(node.line)
+        if builtin_.name.startswith("strategy."):
+            self.strategy_only(builtin_.name + "()", node)
+            if "when" in named and (self.script.version or 5) >= 6:
+                self.error("The `when` parameter was removed in Pine v6: call the command inside an `if` block.", node)
         self.feature(self.builtin_feature(builtin_), node)
         arg_types = {id(a.value): self.expr(a.value) for a in node.args}
         if receiver is not None:                  # method syntax: the receiver is the first argument, already typed

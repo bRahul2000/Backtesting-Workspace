@@ -27,6 +27,7 @@ from . import ast as A
 from . import values as V
 from .builtins.arrays import RE10052
 from .drawings import DrawingStore
+from .strategy import Broker, StrategySettings
 from .errors import PineRuntimeError
 from .values import NA, POINT_FIELDS, ArraySnapshot, ChartPoint, Color, DrawingRef, PineArray, is_na, truthy
 
@@ -203,9 +204,13 @@ class Runtime:
         self.executed_bars = 0          # bar executions (incl. re-runs), for reporting
         self._colors: dict[int, Color] = {}
         self.results = self.buffer(("__security_result__",)) if capture else None
+        self.logs: list[tuple[int, str, str]] = []      # log.info / warning / error records (bar, level, text)
         # P2.3a drawing objects: one store per runtime; the current values of scalar `var` slots are its GC roots
         self._var_slots: list[SeriesBuffer] = []
         self.drawings = DrawingStore((program.meta or {}).get("drawing_limits"), roots=self._drawing_roots)
+        # P3.1 strategies: the broker emulator (simulation only). Requested contexts (``body`` given) never trade.
+        settings = (program.meta or {}).get("strategy")
+        self.strategy = Broker(StrategySettings(**settings), data) if settings is not None and body is None else None
         # version-dependent semantics (TradingView's v5 -> v6 migration guide)
         version = program.script.version or 5
         self.lazy_bool = version >= 6            # v6 `and`/`or` short-circuit; v5 evaluates both sides
@@ -244,8 +249,12 @@ class Runtime:
         self.drawings.begin(bar, record=bar == self.data.size - 1)
         scope = Scope()
         self.global_scope = scope
+        if self.strategy is not None and self._strategy_bar(bar):
+            return
         try:
             value = self.exec_body(self.body, scope)
+            if self.strategy is not None:
+                self.strategy.after_execution(bar)
             if self.results is not None:
                 self.results.set(bar, value)
             if self.program.uses_arrays:
@@ -259,6 +268,25 @@ class Runtime:
             raise PineRuntimeError("Expression nesting is too deep.", 0, bar) from None
         self.last_bar = bar
         self.executed_bars += 1
+
+    def _strategy_bar(self, bar: int) -> bool:
+        """P3.1: the broker fills this bar's working orders along its intrabar path before the script executes on it.
+        A strategy executes once per closed bar (manual; calc_on_every_tick is not supported): on an open realtime
+        bar only the broker runs, over the bar received so far. Returns True when the script does not execute."""
+        broker = self.strategy
+        broker.data = self.data
+        broker.begin(bar, record=bar == self.data.size - 1)
+        forming = self.data.confirmed_until is not None and bar >= self.data.confirmed_until
+        try:
+            broker.process_bar(bar, final=not forming)
+        except PineRuntimeError as exc:
+            exc.bar_index = bar
+            raise
+        if forming:
+            self.last_bar = bar
+            self.executed_bars += 1
+            return True
+        return False
 
     def snapshot_arrays(self, bar: int) -> None:
         """End of an execution: every array held by a slot on this bar becomes that slot's own immutable snapshot
@@ -277,6 +305,8 @@ class Runtime:
         for site in self.sites.values():
             site.truncate(bar)
         self.drawings.rollback(bar, keep)
+        if self.strategy is not None:
+            self.strategy.rollback(bar)
 
     def _varip_points(self) -> frozenset:
         """``id()`` of every chart point a ``varip`` slot holds directly or as an array element. Object-level rule:

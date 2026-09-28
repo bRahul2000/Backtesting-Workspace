@@ -1,0 +1,34 @@
+//@version=6
+// Zoneflow P3.1 parity - STRATEGY ORACLE q14: v6 default margin (100%) and process_orders_on_close.
+// Real TradingView is the oracle. Chart: BINANCE:BTCUSDT.P, 1D. Result: "List of trades" -> Download (CSV).
+strategy("q14 strategy margin close", overlay=true, initial_capital=10000, default_qty_type=strategy.fixed,
+     default_qty_value=1, process_orders_on_close=true)
+on(int y, int m, int d) => time == timestamp("UTC", y, m, d, 0, 0)
+
+// M1 one contract (~100k USDT) with 10k of equity and 100% margin
+if on(2025, 10, 1)
+    strategy.entry("M1", strategy.long)
+if on(2025, 10, 3)
+    strategy.close_all()
+// M2 0.05 contracts: fits; with process_orders_on_close the market order fills on the signal bar's close
+if on(2025, 10, 6)
+    strategy.entry("M2", strategy.long, qty = 0.05)
+if on(2025, 10, 8)
+    strategy.close_all()
+// M3 buy stop below the close and M4 buy limit above the close, placed on the close
+if on(2025, 10, 12)
+    strategy.entry("M3", strategy.long, qty = 0.05, stop = close - 1000)
+if on(2025, 10, 14)
+    strategy.close_all()
+if on(2025, 10, 18)
+    strategy.entry("M4", strategy.long, qty = 0.05, limit = close + 1000)
+if on(2025, 10, 20)
+    strategy.close_all()
+// M5 0.08 contracts (fits), then a second 0.08 entry (together more than the equity)
+if on(2025, 10, 24)
+    strategy.entry("M5a", strategy.long, qty = 0.08)
+if on(2025, 10, 25)
+    strategy.order("M5b", strategy.long, qty = 0.08)
+if on(2025, 10, 28)
+    strategy.close_all()
+plot(strategy.position_size, "position size", display = display.data_window)

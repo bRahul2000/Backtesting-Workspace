@@ -47,7 +47,7 @@ def css(color) -> str | None:
 
 
 def _number(value):
-    if is_na(value) or isinstance(value, bool):
+    if value is None or is_na(value) or isinstance(value, bool):     # None: a bar without an execution (P3.1)
         return None
     value = float(value)
     return None if math.isnan(value) or math.isinf(value) else value
@@ -157,3 +157,77 @@ def render_drawings(store, prefix: str) -> dict:
             item["cells"] = sorted(cells, key=lambda c: (c["row"], c["column"]))
         result[DRAWING_LISTS[drawing.kind]].append(item)
     return result
+
+
+# ---- strategy report (P3.1) ----------------------------------------------------------------------------------------
+
+MAX_REPORT_TRADES = 9000              # TradingView keeps the latest 9000 trades in its report (manual)
+
+
+def _num(value):
+    return None if value is None or is_na(value) or (isinstance(value, float) and not math.isfinite(value)) else value
+
+
+def strategy_metrics(broker, last_close) -> dict:
+    """Strategy Tester metrics, all derived from the broker's single trade ledger."""
+    s, settings = broker.state, broker.settings
+    closed = s.closed
+    wins = [t.profit for t in closed if t.profit > 1e-9]
+    losses = [t.profit for t in closed if t.profit < -1e-9]
+    open_profit = broker.open_profit(last_close) if last_close is not None else 0.0
+    longs = [t for t in closed if t.direction > 0]
+    shorts = [t for t in closed if t.direction < 0]
+    return {
+        "initial_capital": settings.initial_capital,
+        "net_profit": s.netprofit, "net_profit_percent": s.netprofit / settings.initial_capital * 100,
+        "gross_profit": s.grossprofit, "gross_loss": s.grossloss,
+        "profit_factor": _num(s.grossprofit / s.grossloss) if s.grossloss > 0 else None,
+        "commission_paid": s.commission_paid,
+        "total_closed_trades": len(closed), "winning_trades": len(wins), "losing_trades": len(losses),
+        "even_trades": s.evens, "percent_profitable": len(wins) / len(closed) * 100 if closed else None,
+        "avg_trade": s.netprofit / len(closed) if closed else None,
+        "avg_winning_trade": sum(wins) / len(wins) if wins else None,
+        "avg_losing_trade": sum(losses) / len(losses) if losses else None,
+        "largest_winning_trade": max(wins) if wins else None, "largest_losing_trade": min(losses) if losses else None,
+        "max_drawdown": s.max_drawdown, "max_runup": s.max_runup,
+        "open_profit": open_profit, "open_trades": len(s.trades), "position_size": broker.position(),
+        "ending_equity": settings.initial_capital + s.netprofit + open_profit,
+        "long_trades": len(longs), "long_net_profit": sum(t.profit for t in longs),
+        "short_trades": len(shorts), "short_net_profit": sum(t.profit for t in shorts),
+        "margin_calls": s.margin_calls,
+    }
+
+
+def render_strategy(broker, times: list, prefix: str) -> dict:
+    """The strategy report sent to the chart: closed and open trades, fills (chart markers), equity per closed bar
+    and metrics. Times are epoch seconds; bars are indices into the run's bars."""
+    s = broker.state
+    last = broker.bar if broker.bar >= 0 else None
+    last_close = float(broker.data.close[last]) if last is not None and not math.isnan(broker.data.close[last]) else None
+
+    def when(bar):
+        return times[bar] if 0 <= bar < len(times) else None
+
+    trades = [{
+        "key": f"{prefix}:trade:{t.number}", "number": t.number, "open": False, "direction": t.direction,
+        "entry_id": t.entry_id, "entry_bar": t.entry_bar, "entry_time": when(t.entry_bar), "entry_price": t.entry_price,
+        "entry_comment": t.entry_comment, "exit_id": t.exit_id, "exit_bar": t.exit_bar, "exit_time": when(t.exit_bar),
+        "exit_price": t.exit_price, "exit_kind": t.exit_kind, "exit_comment": t.exit_comment, "qty": t.qty,
+        "profit": t.profit, "commission": t.commission, "max_runup": t.max_runup, "max_drawdown": t.max_drawdown,
+    } for t in s.closed[-MAX_REPORT_TRADES:]]
+    for index, t in enumerate(s.trades):
+        trades.append({
+            "key": f"{prefix}:open:{t.uid}", "number": len(s.closed) + index + 1, "open": True, "direction": t.direction,
+            "entry_id": t.entry_id, "entry_bar": t.entry_bar, "entry_time": when(t.entry_bar),
+            "entry_price": t.entry_price, "entry_comment": t.entry_comment, "exit_id": None, "exit_bar": None,
+            "exit_time": None, "exit_price": None, "exit_kind": None, "exit_comment": None, "qty": t.qty,
+            "profit": None if last_close is None else (last_close - t.entry_price) * t.direction * t.qty,
+            "commission": t.commission, "max_runup": t.max_runup * t.qty, "max_drawdown": t.max_drawdown * t.qty,
+        })
+    fills = [{"key": f"{prefix}:fill:{i}", "bar": f.bar, "time": when(f.bar), "id": f.order_id, "kind": f.kind,
+              "exit_kind": f.exit_kind, "side": f.direction, "qty": f.qty, "price": f.price,
+              "position_after": f.position_after, "comment": f.comment}
+             for i, f in enumerate(s.fills)][-2 * MAX_REPORT_TRADES:]
+    equity = [[when(bar), value] for bar, value in s.equity_curve if when(bar) is not None]
+    return {"trades": trades, "fills": fills, "equity": equity, "metrics": strategy_metrics(broker, last_close),
+            "pending_orders": len(s.orders), "settings": dict(vars(broker.settings))}
