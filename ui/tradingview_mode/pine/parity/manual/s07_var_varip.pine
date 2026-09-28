@@ -1,0 +1,83 @@
+//@version=6
+// Pine parity MANUAL script for fixture `s07_var_varip` (table). Generated from fixtures.py - do not edit.
+// Same calculations as fixtures/s07_var_varip.pine; the values are shown in a table (TradingView Basic plan).
+indicator("parity s07_var_varip (manual)", overlay=true, precision=8)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+var int count = 0
+count += 1
+float v_var_count = count
+varip int ipCount = 0
+ipCount += 1
+float v_varip_count = ipCount
+var float lastCross = na
+if ta.crossover(ta.ema(c, 5), ta.sma(c, 20))
+    lastCross := c
+float v_var_last_cross = lastCross
+var int sinceReset = 0
+sinceReset := k % 50 == 0 ? 0 : sinceReset + 1
+float v_var_resets = sinceReset
+counter() =>
+    var int n = 0
+    n += 1
+    n
+float v_udf_var_a = counter()
+float v_udf_var_b = k % 2 == 0 ? counter() : -1
+float plain = 0.0
+plain += 1
+float v_no_var = plain
+// ---- manual parity table (TradingView only) ----
+int page = input.int(0, "Page", minval=0, maxval=2, tooltip="0: bars 0-9 first bars | 1: bars 45-54 var_resets goes back to 0 at bar 50 | 2: bars 84-93 var_last_cross is set at bar 88")
+int part = input.int(1, "Columns", minval=1, maxval=1, tooltip="1: var_count, varip_count, var_last_cross, var_resets, udf_var_a, udf_var_b, no_var")
+int firstBarInput = input.int(-1, "First bar (-1 = use Page)", minval=-1)
+int pageStart = switch page
+    0 => 0
+    1 => 45
+    2 => 84
+    => 0
+int firstBar = firstBarInput >= 0 ? firstBarInput : pageStart
+var table grid = table.new(position.top_right, 8, 12, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt) =>
+    table.cell(grid, col, row, txt, text_color=color.black, text_size=size.normal, text_halign=text.align_right)
+fmt(float value) => na(value) ? "na" : str.tostring(value, "0.########")
+if barstate.isfirst
+    put(0, 0, "s07_var_varip · columns " + str.tostring(part) + " · bars " + str.tostring(firstBar) + "-" + str.tostring(firstBar + 9))
+    table.merge_cells(grid, 0, 0, 7, 0)
+    put(0, 1, "bar")
+    if part == 1
+        put(1, 1, "var_count")
+        put(2, 1, "varip_count")
+        put(3, 1, "var_last_cross")
+        put(4, 1, "var_resets")
+        put(5, 1, "udf_var_a")
+        put(6, 1, "udf_var_b")
+        put(7, 1, "no_var")
+int row = bar_index - firstBar + 2
+if row >= 2 and row <= 11
+    put(0, row, str.tostring(bar_index))
+    if part == 1
+        put(1, row, fmt(v_var_count))
+        put(2, row, fmt(v_varip_count))
+        put(3, row, fmt(v_var_last_cross))
+        put(4, row, fmt(v_var_resets))
+        put(5, row, fmt(v_udf_var_a))
+        put(6, row, fmt(v_udf_var_b))
+        put(7, row, fmt(v_no_var))
+plot(bar_index, "bi", display=display.data_window)

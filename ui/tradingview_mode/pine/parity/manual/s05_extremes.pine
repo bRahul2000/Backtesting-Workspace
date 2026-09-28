@@ -1,0 +1,120 @@
+//@version=6
+// Pine parity MANUAL script for fixture `s05_extremes` (table). Generated from fixtures.py - do not edit.
+// Same calculations as fixtures/s05_extremes.pine; the values are shown in a table (TradingView Basic plan).
+indicator("parity s05_extremes (manual)", overlay=true, precision=8)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+float tp = switch bar_index % 24
+    0 => 3.0
+    1 => 5.0
+    2 => 5.0
+    3 => 2.0
+    4 => 6.0
+    5 => 6.0
+    6 => 6.0
+    7 => 1.0
+    8 => 4.0
+    9 => 7.0
+    10 => 2.0
+    11 => 7.0
+    12 => 3.0
+    13 => 9.0
+    14 => 1.0
+    15 => 1.0
+    16 => 9.0
+    17 => 2.0
+    18 => 4.0
+    19 => 8.0
+    20 => 3.0
+    21 => 4.0
+    22 => 8.0
+    23 => 1.0
+    => na
+
+float v_tp = tp
+float v_hi3 = ta.highest(tp, 3)
+float v_lo3 = ta.lowest(tp, 3)
+float v_hi5 = ta.highest(tp, 5)
+float v_lo5 = ta.lowest(tp, 5)
+float v_hib3 = ta.highestbars(tp, 3)
+float v_lob3 = ta.lowestbars(tp, 3)
+float v_hib5 = ta.highestbars(tp, 5)
+float v_lob5 = ta.lowestbars(tp, 5)
+float v_hi10_h = ta.highest(h, 10)
+float v_lo10_l = ta.lowest(l, 10)
+float v_hib10_h = ta.highestbars(h, 10)
+float v_lob10_l = ta.lowestbars(l, 10)
+// ---- manual parity table (TradingView only) ----
+int page = input.int(0, "Page", minval=0, maxval=3, tooltip="0: bars 0-9 warm-up and the repeating tie pattern | 1: bars 10-19 tie pattern: equal values at distance 1, 2 and 3 | 2: bars 182-191 equal highs at 184, 186, 190, 191 | 3: bars 196-205 equal highs at 196, 199; equal lows at 203, 205")
+int part = input.int(1, "Columns", minval=1, maxval=3, tooltip="1: tp, hi3, lo3, hib3, lob3 | 2: tp, hi5, lo5, hib5, lob5 | 3: hi10_h, lo10_l, hib10_h, lob10_l")
+int firstBarInput = input.int(-1, "First bar (-1 = use Page)", minval=-1)
+int pageStart = switch page
+    0 => 0
+    1 => 10
+    2 => 182
+    3 => 196
+    => 0
+int firstBar = firstBarInput >= 0 ? firstBarInput : pageStart
+var table grid = table.new(position.top_right, 6, 12, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt) =>
+    table.cell(grid, col, row, txt, text_color=color.black, text_size=size.normal, text_halign=text.align_right)
+fmt(float value) => na(value) ? "na" : str.tostring(value, "0.########")
+if barstate.isfirst
+    put(0, 0, "s05_extremes · columns " + str.tostring(part) + " · bars " + str.tostring(firstBar) + "-" + str.tostring(firstBar + 9))
+    table.merge_cells(grid, 0, 0, 5, 0)
+    put(0, 1, "bar")
+    if part == 1
+        put(1, 1, "tp")
+        put(2, 1, "hi3")
+        put(3, 1, "lo3")
+        put(4, 1, "hib3")
+        put(5, 1, "lob3")
+    if part == 2
+        put(1, 1, "tp")
+        put(2, 1, "hi5")
+        put(3, 1, "lo5")
+        put(4, 1, "hib5")
+        put(5, 1, "lob5")
+    if part == 3
+        put(1, 1, "hi10_h")
+        put(2, 1, "lo10_l")
+        put(3, 1, "hib10_h")
+        put(4, 1, "lob10_l")
+int row = bar_index - firstBar + 2
+if row >= 2 and row <= 11
+    put(0, row, str.tostring(bar_index))
+    if part == 1
+        put(1, row, fmt(v_tp))
+        put(2, row, fmt(v_hi3))
+        put(3, row, fmt(v_lo3))
+        put(4, row, fmt(v_hib3))
+        put(5, row, fmt(v_lob3))
+    if part == 2
+        put(1, row, fmt(v_tp))
+        put(2, row, fmt(v_hi5))
+        put(3, row, fmt(v_lo5))
+        put(4, row, fmt(v_hib5))
+        put(5, row, fmt(v_lob5))
+    if part == 3
+        put(1, row, fmt(v_hi10_h))
+        put(2, row, fmt(v_lo10_l))
+        put(3, row, fmt(v_hib10_h))
+        put(4, row, fmt(v_lob10_l))
+plot(bar_index, "bi", display=display.data_window)

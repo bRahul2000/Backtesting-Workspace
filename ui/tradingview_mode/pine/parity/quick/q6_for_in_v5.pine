@@ -1,0 +1,115 @@
+//@version=5
+// Pine P2.2-A2 parity - FOR...IN OBSERVATION ORACLE (v5): cases that cannot raise an error.
+// Real TradingView is the oracle: the table shows observed values only (no expected values, no PASS/FAIL).
+// Setup: any chart (BINANCE:BTCUSDT 1m preferred); everything runs once per execution on the last bar and uses
+// only fixed arrays (no prices). Risky cases (incl. Q4 push) are in the companions q6r / q6c_x / q6c_i / q6d / q6e.
+indicator("q6 for...in v5", overlay=true)
+sq(array<int> a) =>
+    string out = "na"
+    if not na(a)
+        out := "["
+        if array.size(a) > 0
+            for k = 0 to array.size(a) - 1
+                out += str.tostring(array.get(a, k)) + " "
+        out += "]"
+    out
+
+var table t = table.new(position.top_right, 2, 16, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int col, int row, string txt) =>
+    table.cell(t, col, row, txt, text_color=color.black, text_size=size.small, text_halign=text.align_left)
+
+if barstate.islast
+    // Q1 basic value iteration
+    array<int> a1 = array.from(10, 20, 30)
+    string s1 = ""
+    int n1 = 0
+    for x in a1
+        s1 += str.tostring(x) + " "
+        n1 += 1
+    // Q1b is x a value? set element 0 to 999 during the first iteration, after x was bound
+    array<int> a1b = array.from(10, 20, 30)
+    string s1b = ""
+    int n1b = 0
+    for x in a1b
+        if n1b == 0
+            array.set(a1b, 0, 999)
+        s1b += str.tostring(x) + " "
+        n1b += 1
+    // Q2 indexed destructuring
+    array<int> a2 = array.from(10, 20, 30)
+    string s2 = ""
+    for [i, x] in a2
+        s2 += str.tostring(i) + ":" + str.tostring(x) + " "
+    // Q3 set a LATER element during the first iteration
+    array<int> a3 = array.from(10, 20, 30, 40)
+    string s3 = ""
+    int n3 = 0
+    for x in a3
+        if n3 == 0
+            array.set(a3, 2, 99)
+        s3 += str.tostring(x) + " "
+        n3 += 1
+    // Q9 empty array
+    array<int> a9 = array.new_int()
+    int n9 = 0
+    for x in a9
+        n9 += 1
+    // Q12 nested loops (distinct variable names)
+    array<int> o12 = array.from(1, 2)
+    array<int> i12 = array.from(10, 20)
+    string s12 = ""
+    for x in o12
+        for y in i12
+            s12 += str.tostring(x) + "/" + str.tostring(y) + " "
+    // Q13 continue on 2, break on 4
+    array<int> a13 = array.from(1, 2, 3, 4, 5)
+    string s13 = ""
+    for x in a13
+        if x == 2
+            continue
+        if x == 4
+            break
+        s13 += str.tostring(x) + " "
+    // Q14 iterate a copy while mutating the original, and the original while mutating a copy
+    array<int> a14 = array.from(1, 2, 3)
+    array<int> c14 = array.copy(a14)
+    string s14a = ""
+    int n14a = 0
+    for x in c14
+        if n14a == 0
+            array.set(a14, 1, 77)
+            array.push(a14, 8)
+        s14a += str.tostring(x) + " "
+        n14a += 1
+    array<int> b14 = array.from(1, 2, 3)
+    array<int> d14 = array.copy(b14)
+    string s14b = ""
+    int n14b = 0
+    for x in b14
+        if n14b == 0
+            array.set(d14, 1, 77)
+            array.push(d14, 8)
+        s14b += str.tostring(x) + " "
+        n14b += 1
+
+    put(0, 0, "q6 FOR...IN (v5) - observed values only")
+    table.merge_cells(t, 0, 0, 1, 0)
+    put(0, 1, "Q1 for x in [10,20,30]")
+    put(1, 1, "iterations " + str.tostring(n1) + " | x sequence: " + s1)
+    put(0, 2, "Q1b set a[0]=999 in the 1st iteration")
+    put(1, 2, "x sequence: " + s1b + "| array after: " + sq(a1b))
+    put(0, 3, "Q2 for [i, x] in [10,20,30]")
+    put(1, 3, "i:x sequence: " + s2)
+    put(0, 4, "Q3 [10,20,30,40], set a[2]=99 in 1st iteration")
+    put(1, 4, "iterations " + str.tostring(n3) + " | x sequence: " + s3 + "| array after: " + sq(a3))
+    put(0, 5, "Q9 empty array")
+    put(1, 5, "iterations " + str.tostring(n9))
+    put(0, 6, "Q12 nested (outer [1,2], inner [10,20])")
+    put(1, 6, "outer/inner sequence: " + s12)
+    put(0, 7, "Q13 [1..5], continue on 2, break on 4")
+    put(1, 7, "recorded: " + s13)
+    put(0, 8, "Q14a iterate copy, mutate original (set [1]=77, push 8)")
+    put(1, 8, "iterations " + str.tostring(n14a) + " | x sequence: " + s14a + "| original after: " + sq(a14) + " copy after: " + sq(c14))
+    put(0, 9, "Q14b iterate original, mutate copy (set [1]=77, push 8)")
+    put(1, 9, "iterations " + str.tostring(n14b) + " | x sequence: " + s14b + "| original after: " + sq(b14) + " copy after: " + sq(d14))
+plot(close, "close", display=display.none)

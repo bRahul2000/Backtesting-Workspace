@@ -1,0 +1,16 @@
+//@version=6
+// P2.1 real-terminal check 1 (overlay part). Chart: Live · Binance Futures · BTCUSDT · 15m.
+// Binance data exists only in Live mode in this terminal; the requested contexts cover the chart's loaded history.
+// Requested: HTF1 = 1h (native Binance interval), HTF2 = 4h (native Binance interval).
+indicator("P2.1 Binance request.security", overlay=true)
+htf1 = input.timeframe("60", "Requested timeframe 1")
+htf2 = input.timeframe("240", "Requested timeframe 2")
+mid(float h, float l) => (h + l) / 2
+[c1, c1prev, ema1] = request.security(syminfo.tickerid, htf1, [close, close[1], ta.ema(close, 5)])
+c2 = request.security(syminfo.tickerid, htf2, close)
+m1 = request.security(syminfo.tickerid, htf1, mid(high, low))
+plot(c1, "HTF1 close", color=color.blue, linewidth=2, style=plot.style_stepline)
+plot(c1prev, "HTF1 close[1]", color=color.gray, style=plot.style_stepline)
+plot(ema1, "HTF1 EMA 5", color=color.orange, linewidth=2)
+plot(c2, "HTF2 close", color=color.purple, linewidth=2, style=plot.style_stepline)
+plot(m1, "HTF1 mid (user function)", color=color.teal, style=plot.style_stepline)

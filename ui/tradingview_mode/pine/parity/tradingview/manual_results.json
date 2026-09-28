@@ -1,0 +1,83 @@
+{
+  "s01_averages": {
+    "status": "match",
+    "checked": [
+      "0/1",
+      "0/2",
+      "1/1",
+      "1/2",
+      "2/1",
+      "2/2",
+      "3/1",
+      "3/2"
+    ],
+    "note": "Real TradingView (Basic plan). Page 2 / Columns 2 failed before the na fix and matched all 50 cells after it (s01_averages.spot.csv); all pages verified by the user 2026-09-27."
+  },
+  "s02_oscillators": {
+    "status": "match",
+    "checked": [
+      "0/1",
+      "0/2",
+      "0/3",
+      "1/1",
+      "1/2",
+      "1/3",
+      "2/1",
+      "2/2",
+      "2/3",
+      "3/1",
+      "3/2",
+      "3/3"
+    ],
+    "note": "Real TradingView (Basic plan): every page and column group verified by the user, 2026-09-27."
+  },
+  "s03_history": {
+    "status": "match",
+    "checked": [
+      "0/1",
+      "0/2",
+      "1/1",
+      "1/2"
+    ],
+    "note": "Real TradingView (Basic plan): every page and column group verified by the user, 2026-09-27."
+  },
+  "s04_cross": {
+    "status": "match",
+    "checked": [
+      "0/1",
+      "0/2",
+      "1/1",
+      "1/2",
+      "2/1",
+      "2/2",
+      "3/1",
+      "3/2",
+      "4/1",
+      "4/2"
+    ],
+    "note": "Real TradingView (Basic plan): every page and column group verified by the user, 2026-09-27."
+  },
+  "s05_extremes": {
+    "status": "match",
+    "checked": [
+      "0/1",
+      "0/2",
+      "0/3",
+      "1/1",
+      "1/2",
+      "1/3",
+      "2/1",
+      "2/2",
+      "2/3"
+    ],
+    "note": "Real TradingView (Basic plan): manual pages 0-2, all column groups; the complete fixture (1404 cells incl. every manual cell) then passed in quick/q1_main_v6."
+  },
+  "m02_na_gap_visual": {
+    "status": "match",
+    "note": "Real TradingView: the default-style line (plot.style_line) bridges the na gaps; plot.style_linebr leaves visible breaks."
+  },
+  "m03_live_var_varip_table": {
+    "status": "match",
+    "note": "Real TradingView, BTCUSDT 1-minute live chart: barstate.isrealtime = T; across several updates of the same live bar var count stayed fixed while varip count / ticks this bar advanced. Not observed: the transition to a new bar and barstate.isnew."
+  }
+}

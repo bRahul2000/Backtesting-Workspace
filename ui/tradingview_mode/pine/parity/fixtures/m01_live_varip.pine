@@ -1,0 +1,15 @@
+//@version=6
+// Pine parity manual check: var vs varip on realtime ticks. Add to a LIVE 1-minute chart and watch the Data Window.
+indicator("parity m01 live varip", overlay=false)
+varip int ticksThisBar = 0
+if barstate.isnew
+    ticksThisBar := 0
+ticksThisBar += 1
+var int varPerBar = 0
+varPerBar += 1
+varip int varipTotal = 0
+varipTotal += 1
+plot(bar_index, "bi")
+plot(ticksThisBar, "varip ticks this bar")
+plot(varPerBar, "var count")
+plot(varipTotal, "varip count")

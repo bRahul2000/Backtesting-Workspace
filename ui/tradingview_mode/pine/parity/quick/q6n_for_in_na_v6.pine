@@ -1,0 +1,49 @@
+//@version=6
+// Pine P2.2-A2 parity - Q10 DIAGNOSTIC ORACLE (v6): `for x in a` where `a` is an na array<int>.
+// The loop runs on ONE historical bar K = last_bar_index - 3, never on the last bar, with independent probes:
+//   var probes (table on the last bar): bar reached BEFORE the loop, iterations, bar reached AFTER the loop,
+//   number of bars executed after K;  Pine Logs: BEFORE / ITER / AFTER messages;
+//   Data Window series "stage" (1 = before loop, 2 = after loop) and "iters", readable per bar by hovering.
+// Input "Run the na loop" = false is the control run (same probes, loop skipped). Observation only.
+indicator("q6n for...in na array v6", overlay=true)
+runNa = input.bool(true, "Run the na loop")
+int K = last_bar_index - 3
+
+var int reachedBefore = -1
+var int iters = 0
+var int reachedAfter = -1
+var int barsAfterK = 0
+int stage = 0
+
+if bar_index > K
+    barsAfterK += 1
+if bar_index == K
+    array<int> a = na
+    reachedBefore := bar_index
+    stage := 1
+    log.info("q6n BEFORE for...in, bar {0}", bar_index)
+    if runNa
+        for x in a
+            iters += 1
+            log.info("q6n ITER x = {0}", x)
+    reachedAfter := bar_index
+    stage := 2
+    log.info("q6n AFTER for...in, bar {0}", bar_index)
+
+plot(stage, "stage", display=display.data_window)
+plot(iters, "iters", display=display.data_window)
+
+var table t = table.new(position.top_right, 2, 6, bgcolor=color.white, border_color=color.gray, border_width=1)
+if barstate.islast
+    table.cell(t, 0, 0, "q6n NA-ARRAY FOR...IN (v6) - runNa " + str.tostring(runNa), text_color=color.black, text_size=size.small)
+    table.merge_cells(t, 0, 0, 1, 0)
+    table.cell(t, 0, 1, "K (loop bar)", text_color=color.black, text_size=size.small)
+    table.cell(t, 1, 1, str.tostring(K), text_color=color.black, text_size=size.small)
+    table.cell(t, 0, 2, "reached BEFORE loop at bar", text_color=color.black, text_size=size.small)
+    table.cell(t, 1, 2, str.tostring(reachedBefore), text_color=color.black, text_size=size.small)
+    table.cell(t, 0, 3, "iterations", text_color=color.black, text_size=size.small)
+    table.cell(t, 1, 3, str.tostring(iters), text_color=color.black, text_size=size.small)
+    table.cell(t, 0, 4, "reached AFTER loop at bar", text_color=color.black, text_size=size.small)
+    table.cell(t, 1, 4, str.tostring(reachedAfter), text_color=color.black, text_size=size.small)
+    table.cell(t, 0, 5, "bars executed after K", text_color=color.black, text_size=size.small)
+    table.cell(t, 1, 5, str.tostring(barsAfterK), text_color=color.black, text_size=size.small)

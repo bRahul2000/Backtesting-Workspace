@@ -1,0 +1,32 @@
+{
+  "q1_main_v6": {
+    "fixtures": {
+      "s00_data": "PASS 350/350",
+      "s05_extremes": "PASS 1404/1404",
+      "s06_pivots": "PASS 1404/1404",
+      "s07_var_varip": "PASS 210/210 (historical bars only)",
+      "s10_control": "PASS 240/240",
+      "s11_na": "PASS 216/216"
+    },
+    "self_test": "PASS: with the self-test checkbox the first fixture showed exactly 1 failure and the overall result turned FAIL",
+    "note": "Real TradingView. First run: s11 failed 3/216 (na_highest bars 5, 10, 15; see q1_main_v6.confirmed.json); rerun after the ta.highest/ta.lowest na fix: 3824 checked, 0 failed. Max numeric difference about 2e-12."
+  },
+  "q2_s08_loops_v6": {
+    "fixtures": {
+      "s08_loops_v6": "PASS 180/180"
+    },
+    "note": "Real TradingView: 0 failed; keys for_dynamic_end = 7, div_const = 3.5, and_stateful @ bar 6 = 1."
+  },
+  "q3_s09_loops_v5": {
+    "fixtures": {
+      "s09_loops_v5": "PASS 180/180"
+    },
+    "note": "Real TradingView: 0 failed; keys for_dynamic_end = 4, div_const = 3, and_stateful @ bar 6 = 0."
+  },
+  "q4_security_historical": {
+    "status": "PASS",
+    "fixtures": {},
+    "note": "Real TradingView, BINANCE:BTCUSDT 1-minute: 134,400 / 134,400 cells, 0 failed; KEY patterns equal the documented hypotheses (5m PPPPC / CCCCC / nnnnC / Cnnnn, 15m likewise, same timeframe C); single-value and tuple calls matched; self-test produced exactly 1 failure and turned the result FAIL. Historical semantics only.",
+    "script_sha256": "0a0095c14a5a74616507aa39174c290c9b2166efbff4bdadc4d9f689407b7f0d"
+  }
+}

@@ -1,0 +1,12 @@
+//@version=6
+// Pine P2.3 parity - COMPILE ORACLE: comparing drawing IDs with `==` / `!=`.
+// Arrays: TradingView rejects `==` on arrays. If this script does not compile, the exact compiler message IS the
+// result; if it compiles, the table shows the comparisons. Any chart works.
+indicator("q8e drawing equality", overlay=true)
+var table t = table.new(position.top_right, 1, 2, bgcolor=color.white)
+if barstate.islast
+    line a = line.new(bar_index, 1.0, bar_index + 1, 1.0)
+    line b = a
+    line c = line.copy(a)
+    table.cell(t, 0, 0, "compiled; a == b: " + str.tostring(a == b) + ", a == copy: " + str.tostring(a == c) + ", a != copy: " + str.tostring(a != c), text_color=color.black)
+plot(close, "close", display=display.none)

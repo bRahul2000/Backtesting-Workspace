@@ -1,0 +1,11 @@
+//@version=6
+// P2.1 real-terminal check 1 (pane part: oscillator scale). Chart: Live · Binance Futures · BTCUSDT · 15m.
+indicator("P2.1 Binance request.security (pane)", overlay=false)
+htf1 = input.timeframe("60", "Requested timeframe 1")
+htf2 = input.timeframe("240", "Requested timeframe 2")
+range(float h, float l) => h - l
+rsi2 = request.security(syminfo.tickerid, htf2, ta.rsi(close, 5))
+range1 = request.security(syminfo.tickerid, htf1, range(high, low))
+plot(rsi2, "HTF2 RSI 5", color=color.purple, linewidth=2)
+plot(range1, "HTF1 high-low (user function)", color=color.teal, style=plot.style_histogram)
+hline(50, "RSI 50", color=color.gray)

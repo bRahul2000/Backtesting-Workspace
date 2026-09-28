@@ -1,0 +1,10 @@
+//@version=6
+// P2.1 real-terminal check 3: the forming requested bar in Live.
+// Chart: Live · Binance Futures · BTCUSDT · 15m. Requested: 1h (native Binance interval), lookahead_on.
+indicator("P2.1 Live forming HTF", overlay=true)
+htf = input.timeframe("60", "Requested timeframe")
+[fh, fl, fc] = request.security(syminfo.tickerid, htf, [high, low, close], lookahead=barmerge.lookahead_on)
+plot(fh, "HTF high (forming)", color=color.green, linewidth=2, style=plot.style_stepline)
+plot(fl, "HTF low (forming)", color=color.red, linewidth=2, style=plot.style_stepline)
+plot(fc, "HTF close (forming)", color=color.blue, linewidth=2, style=plot.style_stepline)
+plot(close, "chart close", color=color.gray)

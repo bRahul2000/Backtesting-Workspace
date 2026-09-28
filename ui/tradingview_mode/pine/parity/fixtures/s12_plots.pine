@@ -1,0 +1,36 @@
+//@version=6
+// Pine parity fixture `s12_plots` (synthetic track). Paste into TradingView's Pine Editor,
+// add to chart, then export the chart data (see parity/README.md).
+indicator("parity s12_plots", overlay=false, precision=10)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+plot(bar_index, "bi")
+float g = k % 10 < 3 ? na : c
+plot(g, "line_gappy")
+plot(g, "line_explicit", style=plot.style_line)
+plot(g, "linebr", style=plot.style_linebr)
+bool up = ta.crossover(ta.ema(c, 5), ta.sma(c, 20))
+bool dn = ta.crossunder(ta.ema(c, 5), ta.sma(c, 20))
+plot(up ? 1 : 0, "up_cond")
+plot(dn ? 1 : 0, "dn_cond")
+plotshape(up, "shape_up", shape.triangleup, location.belowbar, color.green)
+plotchar(dn, "char_dn", "v", location.abovebar, color.red)
+bgcolor(up ? color.new(color.green, 80) : na, title="bg_up")
+barcolor(dn ? color.orange : na, title="bar_dn")

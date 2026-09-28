@@ -1,0 +1,49 @@
+//@version=6
+// Pine P2.2 parity - HISTORICAL OBSERVATION ORACLE, companion C: mutating an array obtained through the history
+// operator. Separate because TradingView may reject it at compile time or stop the script at run time; either
+// diagnostic IS the observation and must not hide q5 / q5b.
+// Setup: BINANCE:BTCUSDT, 1-minute chart. Window bars r0..r2 are the 3 historical bars before the last bar.
+indicator("q5c mutate a[1] (historical)", overlay=true)
+
+int W = 3
+int start = last_bar_index - W
+bool inWin = not barstate.isrealtime and bar_index >= start and bar_index <= last_bar_index - 1
+int r = bar_index - start
+
+sz(array<float> x) =>
+    int n = -1
+    if not na(x)
+        n := array.size(x)
+    n
+lst(array<float> x) =>
+    float out = na
+    if not na(x)
+        if array.size(x) > 0
+            out := array.last(x)
+    out
+s(int n) => str.tostring(n)
+f(float x) => na(x) ? "-" : str.tostring(x)
+tag() => "r" + str.tostring(r) + " (bar " + str.tostring(bar_index) + "): "
+
+var array<float> m = array.new_float()
+array<float> mPrev = m[1]                        // taken BEFORE this bar's push
+var string sm = ""
+if inWin
+    int m0 = sz(m)
+    int p0 = sz(mPrev)
+    array.push(m, 10 + r)
+    int m1 = sz(m)
+    int p1 = sz(mPrev)
+    if r >= 1
+        array.push(mPrev, 100 + r)               // mutate the history-referenced array
+    sm += tag() + "BEFORE size(m)=" + s(m0) + " size(m[1])=" + s(p0) + " | after push m: size(m)=" + s(m1) + " size(m[1])=" + s(p1) + (r >= 1 ? " | after push into m[1]: size(m)=" + s(sz(m)) + " last(m)=" + f(lst(m)) + " size(m[1])=" + s(sz(mPrev)) + " last(m[1])=" + f(lst(mPrev)) : " | (no push into m[1] on r0)") + "\n"
+
+var table t = table.new(position.top_right, 2, 4, bgcolor=color.white, border_color=color.gray, border_width=1, frame_color=color.gray, frame_width=1)
+put(int col, int row, string txt, color bg) =>
+    table.cell(t, col, row, txt, text_color=color.black, bgcolor=bg, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, 0, "q5c MUTATE a[1] (historical) - observed values only", color.silver)
+    table.merge_cells(t, 0, 0, 1, 0)
+    put(0, 1, "Q4 mutation", color.white)
+    put(1, 1, sm + "LAST BAR (no push): size(m)=" + s(sz(m)) + " last(m)=" + f(lst(m)) + " size(m[1])=" + s(sz(mPrev)) + " last(m[1])=" + f(lst(mPrev)), color.white)
+plot(close, "close", display=display.none)

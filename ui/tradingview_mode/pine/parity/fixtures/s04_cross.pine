@@ -1,0 +1,37 @@
+//@version=6
+// Pine parity fixture `s04_cross` (synthetic track). Paste into TradingView's Pine Editor,
+// add to chart, then export the chart data (see parity/README.md).
+indicator("parity s04_cross", overlay=false, precision=10)
+// ---- fixture data: a pure function of bar_index; the chart's own prices are NOT used ----
+// Every price is a multiple of 0.25, so TradingView and the local engine start from identical values.
+fxClose(int i) =>
+    int kk = i % 240
+    int noise = (kk * 37 + 11) % 17 - 8
+    int tri = kk % 80 < 40 ? kk % 80 : 80 - kk % 80
+    float amp = kk >= 150 and kk < 170 ? 8.0 : 1.0
+    kk >= 210 and kk < 222 ? 110.0 : 100.0 + tri * 0.5 + noise * 0.25 * amp
+fxWick(int kk, int mult, int add, int m) =>
+    kk >= 211 and kk < 222 ? 0.0 : ((kk * mult + add) % m) * 0.25
+int k = bar_index % 240
+float c = fxClose(bar_index)
+float o = bar_index == 0 ? c - 0.5 : fxClose(bar_index - 1)
+bool topTie = k == 184 or k == 186 or k == 190 or k == 191 or k == 196 or k == 199
+bool bottomTie = k == 203 or k == 205 or k == 226 or k == 227
+float h = topTie ? 120.0 : k % 37 == 0 ? math.max(o, c) : math.max(o, c) + fxWick(k, 53, 5, 13)
+float l = bottomTie ? 95.0 : k % 37 == 0 ? math.min(o, c) : math.min(o, c) - fxWick(k, 29, 3, 11)
+float v = 100.0 + ((k * 29) % 41) * 5
+// ---- end of fixture data ----
+plot(bar_index, "bi")
+float fast = ta.ema(c, 5)
+float slow = ta.sma(c, 20)
+plot(ta.crossover(fast, slow) ? 1 : 0, "xover")
+plot(ta.crossunder(fast, slow) ? 1 : 0, "xunder")
+plot(ta.cross(fast, slow) ? 1 : 0, "xany")
+plot(ta.crossover(k - 100, 0) ? 1 : 0, "xover_touch")
+plot(ta.crossunder(100 - k, 0) ? 1 : 0, "xunder_touch")
+plot(ta.crossover(c, 110.0) ? 1 : 0, "xover_flat")
+plot(ta.rising(c, 3) ? 1 : 0, "rising3")
+plot(ta.falling(c, 3) ? 1 : 0, "falling3")
+plot(ta.barssince(ta.crossover(fast, slow)), "since_xover")
+plot(ta.valuewhen(ta.crossover(fast, slow), c, 0), "valuewhen0")
+plot(ta.valuewhen(ta.crossover(fast, slow), c, 1), "valuewhen1")

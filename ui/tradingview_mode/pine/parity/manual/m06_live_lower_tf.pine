@@ -1,0 +1,89 @@
+//@version=6
+// Pine P2.2-A4 parity - MANUAL OBSERVATION ORACLE: request.security_lower_tf() on the realtime (forming) chart bar.
+// Real TradingView is the oracle: no expected values, no PASS/FAIL.
+// Setup: BINANCE:BTCUSDT, 5-minute chart, watch while the current bar receives realtime ticks for 6+ minutes
+// (so at least one new 1-minute intrabar and one new chart bar occur).
+// Question: does the forming chart bar's array include the still-forming 1-minute intrabar (updated every tick),
+// or only completed intrabars? Minute offsets are counted from the chart bar's open (0 = first minute).
+indicator("m06 live lower-tf oracle", overlay=true)
+testHigher = input.bool(false, "Step 2: also request a HIGHER timeframe with ignore_invalid_timeframe = true")
+
+[tA, cA] = request.security_lower_tf(syminfo.tickerid, "1", [time, close])
+array<float> sameTf = request.security_lower_tf(syminfo.tickerid, timeframe.period, close)
+
+int n = array.size(tA)
+float firstOff = n > 0 ? (array.first(tA) - time) / 60000.0 : na
+float lastOff = n > 0 ? (array.last(tA) - time) / 60000.0 : na
+int formingMin = int(math.floor((timenow - time) / 60000.0))
+bool lastIsForming = n > 0 and lastOff == formingMin
+bool lastEqClose = n > 0 and array.last(cA) == close
+int nSame = array.size(sameTf)
+bool sameEqClose = nSame > 0 and array.last(sameTf) == close
+
+string higherResult = "not requested"
+if testHigher
+    array<float> higher = request.security_lower_tf(syminfo.tickerid, timeframe.from_seconds(timeframe.in_seconds() * 3), close, ignore_invalid_timeframe = true)
+    higherResult := na(higher) ? "na array" : "array of size " + str.tostring(array.size(higher))
+
+// ---- realtime bookkeeping (varip survives every tick) ----
+bool rt = barstate.isrealtime
+varip int execs = 0
+varip int tickInBar = 0
+varip int rtExecs = 0
+varip int formingTrue = 0
+varip int closeTrue = 0
+if rt
+    execs += 1
+    if barstate.isnew
+        tickInBar := 0
+    tickInBar += 1
+    rtExecs += 1
+    formingTrue += lastIsForming ? 1 : 0
+    closeTrue += lastEqClose ? 1 : 0
+
+s(v) => str.tostring(v)
+b(bool v) => v ? "T" : "F"
+string state = "bar " + s(bar_index) + " n=" + s(n) + " first=" + s(firstOff) + " last=" + s(lastOff) + " formingMin=" + s(formingMin) + " lastIsForming=" + b(lastIsForming) + " lastEqClose=" + b(lastEqClose)
+
+// change log: a row is added only when (bar, n, last offset, lastIsForming) changes
+varip string key = ""
+varip string log1 = ""
+varip string log2 = ""
+varip string log3 = ""
+varip string log4 = ""
+varip string log5 = ""
+varip string log6 = ""
+varip string log7 = ""
+varip string log8 = ""
+string newKey = s(bar_index) + "/" + s(n) + "/" + s(lastOff) + "/" + b(lastIsForming)
+if rt and newKey != key
+    key := newKey
+    log8 := log7
+    log7 := log6
+    log6 := log5
+    log5 := log4
+    log4 := log3
+    log3 := log2
+    log2 := log1
+    log1 := "exec " + s(execs) + " tick " + s(tickInBar) + (barstate.isnew ? " NEW" : "") + " | " + state
+
+var table t = table.new(position.top_right, 1, 16, bgcolor=color.white, border_color=color.gray, border_width=1)
+put(int row, string txt, color bg) =>
+    table.cell(t, 0, row, txt, text_color=color.black, bgcolor=bg, text_size=size.small, text_halign=text.align_left)
+if barstate.islast
+    put(0, "m06 LOWER-TF ORACLE - observation only (5m chart, 1m intrabars)", color.silver)
+    put(1, "isrealtime " + b(rt) + " · realtime executions " + s(rtExecs) + " · lastIsForming true in " + s(formingTrue) + " · lastEqClose true in " + s(closeTrue), rt ? color.white : color.orange)
+    put(2, "NOW: " + state, color.white)
+    put(3, "PREVIOUS (confirmed) bar: n=" + s(n[1]) + " first=" + s(firstOff[1]) + " last=" + s(lastOff[1]), color.white)
+    put(4, "SAME timeframe (" + timeframe.period + "): n=" + s(nSame) + " lastEqClose=" + b(sameEqClose) + " · previous bar n=" + s(nSame[1]), color.white)
+    put(5, "HIGHER timeframe, ignore_invalid_timeframe = true: " + higherResult, color.white)
+    put(6, "CHANGE LOG (newest first): exec / tick / state", color.silver)
+    put(7, log1, color.white)
+    put(8, log2, color.white)
+    put(9, log3, color.white)
+    put(10, log4, color.white)
+    put(11, log5, color.white)
+    put(12, log6, color.white)
+    put(13, log7, color.white)
+    put(14, log8, color.white)
+plot(close, "close", display=display.none)

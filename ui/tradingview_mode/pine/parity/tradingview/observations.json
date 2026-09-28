@@ -1,0 +1,8 @@
+{
+  "observer": "user",
+  "observed_on": "2026-09-28",
+  "plot_default_bridges_na": true,
+  "plot_style_linebr_breaks_at_na": true,
+  "varip_counts_ticks_within_bar": true,
+  "var_unchanged_within_realtime_bar": true
+}

@@ -1,0 +1,32 @@
+//@version=6
+// P2.2 REAL-LIVE VALIDATION L1 - Binance: request.security_lower_tf() on a Live 15m chart (BTCUSDT Perpetual).
+// Every value is a plot so the harness can read it from the live chart payload. Nothing here trades.
+indicator("L1 lower-tf live (Binance)", overlay=false)
+
+// 1-minute intrabars: order, first/last offsets (minutes from the chart bar's open), the last one vs the chart close
+[t1, c1] = request.security_lower_tf(syminfo.tickerid, "1", [time, close])
+int n1 = t1.size()
+bool ordered = true
+if n1 > 1
+    for i = 1 to n1 - 1
+        if t1.get(i) - t1.get(i - 1) != 60000
+            ordered := false
+plot(n1, "n1")
+plot(n1 > 0 ? (t1.first() - time) / 60000 : na, "first1")
+plot(n1 > 0 ? (t1.last() - time) / 60000 : na, "last1")
+plot(n1 > 0 ? c1.last() - close : na, "last1MinusClose")
+plot(n1 > 0 ? c1.last() : na, "last1Close")
+plot(ordered ? 1 : 0, "ordered1")
+plot(n1 > 0 ? (t1.last() - timenow) / 1000 : na, "last1OpenMinusNowSec")
+
+// 10-minute intrabars (not native: aggregated from a received 5m stream; do not divide 15m)
+[t10] = request.security_lower_tf(syminfo.tickerid, "10", [time])
+plot(t10.size(), "n10")
+plot(t10.size() > 0 ? (t10.last() - time) / 60000 : na, "last10")
+
+// same timeframe, and request.security() to a higher timeframe (P2.1 must be unaffected)
+same = request.security_lower_tf(syminfo.tickerid, timeframe.period, close)
+plot(same.size(), "sameN")
+plot(same.size() > 0 ? same.last() - close : na, "sameMinusClose")
+plot(request.security(syminfo.tickerid, "60", close), "htf60Close")
+plot(close, "chartClose")

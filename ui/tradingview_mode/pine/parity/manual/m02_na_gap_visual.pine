@@ -1,0 +1,11 @@
+//@version=6
+// Pine parity manual VISUAL check: how lines are drawn across na values. Generated from manual.py.
+// Expected (TradingView documentation): the upper line (default style = plot.style_line) is drawn straight
+// across the na bars; the lower line (plot.style_linebr) stops and leaves an empty gap.
+indicator("parity m02 na-gap visual", overlay=false)
+int k = bar_index % 40
+float wave = k < 20 ? k : 40 - k
+float gappy = bar_index % 10 < 3 ? na : wave
+plot(gappy + 30, "A default / style_line (should bridge gaps)", color=color.blue, linewidth=2)
+plot(gappy, "B style_linebr (should leave gaps)", color=color.red, linewidth=2, style=plot.style_linebr)
+plot(bar_index % 10 < 3 ? 1 : 0, "na bar (1 = value missing)", display=display.data_window)
