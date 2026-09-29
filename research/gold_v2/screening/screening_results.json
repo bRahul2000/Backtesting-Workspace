@@ -1,0 +1,126 @@
+{
+ "dev": {
+  "label": "V2 development candidate 2023-01-01 \u2192 2025-12-22",
+  "bars": 70313,
+  "sessions": 770,
+  "first": "2023-01-02 23:00:00+00:00",
+  "last": "2025-12-22 21:45:00+00:00",
+  "months": 36,
+  "C1_round50_first_touches": 963,
+  "C1_round100_first_touches": 454,
+  "C1_placebo_touches_offset_17.30": 1063,
+  "C1_placebo_touches_offset_32.70": 1104,
+  "C1_per_month": 26.8,
+  "C1_per_year": {
+   "2023": 162,
+   "2024": 280,
+   "2025": 521
+  },
+  "C1_mde_pp_vs_2_placebo_grids": 5.5,
+  "C2_days_with_AM_window": 768,
+  "C2_days_with_PM_window": 768,
+  "C2_mde_corr": 0.101,
+  "C3_valid_days": 743,
+  "C3_mde_corr": 0.103,
+  "C4_us_then_asia_pairs": 741,
+  "C4_mde_corr": 0.103,
+  "C6_0830_shocks": 315,
+  "C6_per_month": 8.8,
+  "C6_placebo_pool_same_size_0900_1500": 1212,
+  "C7_week_opens": 155,
+  "C7_gaps_ge_0.5atr": 97,
+  "cost_scale_by_year": {
+   "2023": {
+    "median_spread_usd": 0.2,
+    "spread_zero_share": 0.0006797518905599456,
+    "median_atr_usd": 1.873,
+    "spread_over_atr_pct": 10.68,
+    "median_close": 1945.0
+   },
+   "2024": {
+    "median_spread_usd": 0.199,
+    "spread_zero_share": 0.0,
+    "median_atr_usd": 2.761,
+    "spread_over_atr_pct": 7.21,
+    "median_close": 2380.9
+   },
+   "2025": {
+    "median_spread_usd": 0.16,
+    "spread_zero_share": 0.0,
+    "median_atr_usd": 4.859,
+    "spread_over_atr_pct": 3.29,
+    "median_close": 3341.3
+   }
+  }
+ },
+ "rep": {
+  "label": "V2 replication candidate (repaired) 2017-06-01 \u2192 2021-08-31",
+  "bars": 98318,
+  "sessions": 1084,
+  "first": "2017-06-01 00:00:00+00:00",
+  "last": "2021-08-31 20:45:00+00:00",
+  "months": 51,
+  "C1_round50_first_touches": 690,
+  "C1_round100_first_touches": 411,
+  "C1_placebo_touches_offset_17.30": 701,
+  "C1_placebo_touches_offset_32.70": 776,
+  "C1_per_month": 13.5,
+  "C1_per_year": {
+   "2017": 41,
+   "2018": 121,
+   "2019": 118,
+   "2020": 274,
+   "2021": 136
+  },
+  "C1_mde_pp_vs_2_placebo_grids": 6.5,
+  "C2_days_with_AM_window": 1079,
+  "C2_days_with_PM_window": 1080,
+  "C2_mde_corr": 0.085,
+  "C3_valid_days": 1046,
+  "C3_mde_corr": 0.087,
+  "C4_us_then_asia_pairs": 1042,
+  "C4_mde_corr": 0.087,
+  "C6_0830_shocks": 377,
+  "C6_per_month": 7.4,
+  "C6_placebo_pool_same_size_0900_1500": 1596,
+  "C7_week_opens": 220,
+  "C7_gaps_ge_0.5atr": 155,
+  "cost_scale_by_year": {
+   "2017": {
+    "median_spread_usd": 0.0,
+    "spread_zero_share": 1.0,
+    "median_atr_usd": 0.976,
+    "spread_over_atr_pct": 0.0,
+    "median_close": 1276.1
+   },
+   "2018": {
+    "median_spread_usd": 0.0,
+    "spread_zero_share": 1.0,
+    "median_atr_usd": 1.025,
+    "spread_over_atr_pct": 0.0,
+    "median_close": 1260.6
+   },
+   "2019": {
+    "median_spread_usd": 0.0,
+    "spread_zero_share": 1.0,
+    "median_atr_usd": 1.147,
+    "spread_over_atr_pct": 0.0,
+    "median_close": 1387.2
+   },
+   "2020": {
+    "median_spread_usd": 0.0,
+    "spread_zero_share": 1.0,
+    "median_atr_usd": 2.565,
+    "spread_over_atr_pct": 0.0,
+    "median_close": 1774.3
+   },
+   "2021": {
+    "median_spread_usd": 0.0,
+    "spread_zero_share": 0.7534307780685517,
+    "median_atr_usd": 2.024,
+    "spread_over_atr_pct": 0.0,
+    "median_close": 1801.0
+   }
+  }
+ }
+}
