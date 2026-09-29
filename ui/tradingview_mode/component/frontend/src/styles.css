@@ -32,7 +32,8 @@ input { font: inherit; color: var(--text); }
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 228px;
   grid-template-rows: 38px minmax(0, 1fr) auto 22px;
-  grid-template-areas: "top top top" "tools chart watch" "tools bottom watch" "status status status";
+  /* the bottom dock spans under the chart and the watchlist (TradingView layout) */
+  grid-template-areas: "top top top" "tools chart watch" "tools bottom bottom" "status status status";
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
