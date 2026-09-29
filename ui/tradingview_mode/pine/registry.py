@@ -61,6 +61,9 @@ class Builtin:
     variadic: str | None = None           # name of a trailing *args parameter
     overloads: tuple[tuple[Param, ...], ...] = ()
     note: str = ""
+    # The return qualifier is the strongest qualifier among the arguments (Pine's const/input/simple/series
+    # overloads, e.g. `color.new(color.blue, 85)` is a `const color`); ``returns`` then names the series form.
+    polymorphic: bool = False
 
     def signatures(self) -> tuple[tuple[Param, ...], ...]:
         return (self.params, *self.overloads)
@@ -80,11 +83,12 @@ CONSTANTS: dict[str, tuple[Any, str]] = {}     # name -> (value, "const type")
 
 
 def builtin(name: str, *params: Param, returns: str = "series float", kind: str = "function", stateful: bool = False,
-            variadic: str | None = None, overloads: tuple = (), note: str = ""):
+            variadic: str | None = None, overloads: tuple = (), note: str = "", polymorphic: bool = False):
     def register(fn: Callable) -> Callable:
         if name in FUNCTIONS:
             raise ValueError(f"duplicate built-in {name}")
-        FUNCTIONS[name] = Builtin(name, tuple(params), fn, returns, kind, stateful, variadic, tuple(overloads), note)
+        FUNCTIONS[name] = Builtin(name, tuple(params), fn, returns, kind, stateful, variadic, tuple(overloads),
+                                  note, polymorphic)
         return fn
     return register
 

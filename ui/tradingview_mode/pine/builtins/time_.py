@@ -1,8 +1,10 @@
 """Time, barstate.*, syminfo.* and timeframe.* built-ins (exchange time zone: UTC)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..errors import PineRuntimeError
 from ..registry import Param as P, builtin, constant, variable
@@ -30,13 +32,38 @@ def _check_tz(tz) -> None:
         raise PineRuntimeError(f"Time zone {tz!r} is not implemented yet (this engine uses UTC).", 0)
 
 
+_OFFSET = re.compile(r"^(?:UTC|GMT)(?:([+-])(\d{1,2})(?::?(\d{2}))?)?$")
+
+
+@lru_cache(maxsize=64)
+def zone(tz: str):
+    """A Pine time zone argument: UTC/GMT offset notation ("UTC+5", "UTC+05:30", "GMT+0530") or an IANA name
+    ("Asia/Kolkata"). The exchange time zone (no argument) is UTC in this engine."""
+    if tz == "":
+        return UTC
+    match = _OFFSET.match(tz.upper())
+    if match:
+        sign, hours, minutes = match.groups()
+        if sign is None:
+            return UTC
+        delta = timedelta(hours=int(hours), minutes=int(minutes or 0))
+        return timezone(-delta if sign == "-" else delta)
+    try:
+        return ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise PineRuntimeError(f"Invalid time zone {tz!r}.", 0) from None
+
+
+def local(ms, tz) -> datetime:
+    return datetime.fromtimestamp(ms / 1000, UTC if is_na(tz) else zone(tz))
+
+
 for _name, _part in _PARTS.items():
     variable(_name, returns="series int")(
         lambda rt, bar, _part=_part: NA if (t := rt.series_at("time", bar)) is NA else _part(_dt(t)))
 
     def _fn(rt, site, a, _part=_part):
-        _check_tz(a["timezone"])
-        return NA if is_na(a["time"]) else _part(_dt(a["time"]))
+        return NA if is_na(a["time"]) else _part(local(a["time"], a["timezone"]))
 
     builtin(_name, P("time", "series int"), P("timezone", "series string", NA), returns="series int")(_fn)
 
@@ -82,18 +109,67 @@ def floor_time(ms: int, seconds: int) -> int:
     return ms // (seconds * 1000) * (seconds * 1000)
 
 
+# ---- sessions ------------------------------------------------------------------------------------------------
+
+_SESSION = re.compile(r"^(\d{4})-(\d{4})$")
+
+
+@lru_cache(maxsize=64)
+def parse_session(text: str) -> tuple[tuple[tuple[int, int], ...], frozenset]:
+    """"HHmm-HHmm[,HHmm-HHmm...][:days]" -> ((start, end) minutes, days 1=Sunday..7=Saturday). Without days the
+    session applies every day; "24x7" is the whole week (Pine manual, Sessions)."""
+    if text.strip().lower() == "24x7":
+        return ((0, 0),), frozenset(range(1, 8))
+    periods, _, days = text.strip().partition(":")
+    if days and (not days.isdigit() or any(d not in "1234567" for d in days)):
+        raise PineRuntimeError(f"Invalid session {text!r}: days must be digits 1 (Sunday) to 7 (Saturday).", 0)
+    spans = []
+    for period in periods.split(","):
+        match = _SESSION.match(period.strip())
+        if not match:
+            raise PineRuntimeError(f"Invalid session {text!r} (expected \"HHmm-HHmm\").", 0)
+        start, end = (int(v[:2]) * 60 + int(v[2:]) for v in match.groups())
+        if max(start, end) > 24 * 60 or int(match.group(1)[2:]) > 59 or int(match.group(2)[2:]) > 59:
+            raise PineRuntimeError(f"Invalid session {text!r}.", 0)
+        spans.append((start, end))
+    return tuple(spans), frozenset(int(d) for d in days) if days else frozenset(range(1, 8))
+
+
+def in_session(ms: int, session: str, tz) -> bool:
+    """Is the instant ``ms`` (a bar's open time) inside ``session``, read in ``tz`` (exchange time zone = UTC)?
+    Each period is [start, end); an overnight period (end <= start) belongs to the day on which it ends."""
+    spans, days = parse_session(session)
+    d = local(ms, tz)
+    minute = d.hour * 60 + d.minute + d.second / 60
+    day = (d.weekday() + 1) % 7 + 1
+    for start, end in spans:
+        if start < end or start == end == 0:
+            if (start == end == 0 or start <= minute < end) and day in days:
+                return True
+        elif minute >= start:
+            if day % 7 + 1 in days:                     # the session that ends tomorrow
+                return True
+        elif minute < end and day in days:
+            return True
+    return False
+
+
 @builtin("time", P("timeframe", "series string", ""), P("session", "series string", NA), P("timezone", "series string", NA),
          returns="series int")
 def _time(rt, site, a):
-    if not is_na(a["session"]):
-        raise PineRuntimeError("time() with a session argument is not implemented yet.", 0)
-    _check_tz(a["timezone"])
+    if not is_na(a["timezone"]):
+        zone(a["timezone"])                             # validated; it only affects how `session` is read
     t = rt.series_at("time", rt.bar)
     if t is NA:
         return NA
     seconds = timeframe_seconds(a["timeframe"], rt.data.timeframe_seconds)
     if seconds < rt.data.timeframe_seconds:
         raise PineRuntimeError("time() for a lower timeframe than the chart is not implemented yet.", 0)
+    if not is_na(a["session"]) and a["session"] != "":
+        if seconds != rt.data.timeframe_seconds:
+            raise PineRuntimeError("time() with a session for a timeframe other than the chart's is not implemented "
+                                   "yet.", 0)
+        return t if in_session(t, a["session"], a["timezone"]) else NA
     return floor_time(t, seconds)
 
 

@@ -7,7 +7,7 @@ import { AreaSeries, HistogramSeries, LineSeries, LineStyle, LineType, createSer
 import { diffSeries, indexOfTime } from "./chartView.js";
 import { dashFor, extendBox, extendSegment, labelPrice, logicalOf, tableLayout } from "./drawingGeometry.js";
 import { firstColor, seriesData } from "./pineData.js";
-import { strategyMarkers } from "./strategyMarkers.js";
+import { fillsAt, strategyMarkers } from "./strategyMarkers.js";
 
 const SIZE_PX = { tiny: 7, small: 10, normal: 14, large: 20, huge: 28, auto: 10 };
 const LINE_STYLES = { solid: LineStyle.Solid, dotted: LineStyle.Dotted, dashed: LineStyle.Dashed };
@@ -360,15 +360,52 @@ export class PineLayer {
     this.barColors = new Map(); // time -> css color (barcolor)
     this.strategyMarkers = null; // P3.1: Pine strategy fills on the price candles (Python-computed)
     this.strategySig = null;
+    this.strategyFills = [];     // every reported fill of the visible strategies (source of truth for markers)
+    this.strategyTrades = [];
+    this.strategyAudit = { fills: 0, entries: 0, exits: 0, inside: 0, outside: 0, rendered: 0 };
+    this.selectedTrade = null;   // { key, entry_time, exit_time, entry_price, exit_price, fills: Set }
+    this.tradeLines = [];
   }
 
+  // One marker per fill on a loaded bar; the audit reconciles fills against markers. Rebuilt whenever the fills, the
+  // loaded bars or the selected trade change.
   syncStrategyMarkers(scripts) {
-    const fills = scripts.filter((s) => s.enabled && !s.error && s.strategy).flatMap((s) => s.strategy.fills || []);
-    const sig = `${fills.length}|${fills.at(-1)?.key ?? ""}|${fills.at(-1)?.time ?? ""}|${fills[0]?.time ?? ""}`;
+    const strategies = scripts.filter((s) => s.enabled && !s.error && s.strategy);
+    const fills = strategies.flatMap((s) => s.strategy.fills || []);
+    this.strategyTrades = strategies.flatMap((s) => s.strategy.trades || []);
+    const bars = this.engine.bars;
+    const sig = `${fills.length}|${fills.at(-1)?.key ?? ""}|${fills.at(-1)?.time ?? ""}|${fills[0]?.time ?? ""}|`
+      + `${bars.length}|${bars[0]?.time ?? ""}|${bars.at(-1)?.time ?? ""}|${this.selectedTrade?.key ?? ""}`;
+    this.strategyFills = fills;
     if (sig === this.strategySig) return;
     this.strategySig = sig;
     if (!this.strategyMarkers) this.strategyMarkers = createSeriesMarkers(this.engine.candles, []);
-    this.strategyMarkers.setMarkers(strategyMarkers(fills));
+    const { markers, audit } = strategyMarkers(fills, new Set(bars.map((b) => b.time)),
+      { selected: this.selectedTrade?.fills || null });
+    this.strategyMarkers.setMarkers(markers);
+    this.strategyAudit = { ...audit, rendered: this.strategyMarkers.markers().length };
+  }
+
+  fillsAt(time) { return time === null || time === undefined ? [] : fillsAt(this.strategyFills, time); }
+
+  // Highlight one Pine trade: its fills drawn larger and entry / exit price lines. null clears.
+  selectTrade(trade) {
+    this.tradeLines.forEach((line) => this.engine.candles.removePriceLine(line));
+    this.tradeLines = [];
+    if (!trade) {
+      this.selectedTrade = null;
+    } else {
+      const keys = new Set(this.strategyFills.filter((f) => (f.time === trade.entry_time && f.price === trade.entry_price
+        && f.side === trade.direction) || (!trade.open && f.time === trade.exit_time && f.price === trade.exit_price
+        && f.side === -trade.direction)).map((f) => f.key));
+      this.selectedTrade = { ...trade, fills: keys };
+      const line = (price, title, color) => this.engine.candles.createPriceLine({ price, color, lineWidth: 1,
+        lineStyle: LineStyle.Dashed, axisLabelVisible: true, title });
+      this.tradeLines.push(line(trade.entry_price, `#${trade.number} entry`, "#4aa3ff"));
+      if (!trade.open) this.tradeLines.push(line(trade.exit_price, `#${trade.number} exit`, trade.profit >= 0 ? "#22ab94" : "#f23645"));
+    }
+    this.strategySig = null;
+    this.syncStrategyMarkers(this.lastScripts || []);
   }
 
   // Structure first (rebuild on change), then data (incremental).
@@ -384,6 +421,7 @@ export class PineLayer {
       this.scripts = layout.map(({ script, pane: p }) => this.build(script, p));
     }
     layout.forEach(({ script }, index) => this.update(this.scripts[index], script));
+    this.lastScripts = visible;
     this.syncStrategyMarkers(visible);
     this.barColors = new Map();
     visible.forEach((s) => s.outputs.filter((o) => o.kind === "barcolor").forEach((o) => o.data.forEach((p) => this.barColors.set(p.time, p.color))));

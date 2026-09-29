@@ -7,9 +7,11 @@ to another renderer.
 """
 import streamlit as st
 
+# TradingView style: the chart dominates. Slim Streamlit header, minimal page padding (this page only).
 _TERMINAL_CSS = """<style>
-[data-testid="stMainBlockContainer"] { padding-top: 3.4rem; padding-bottom: 0; padding-left: 1rem; padding-right: 1rem; max-width: 100%; }
-[data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"] { gap: 0.25rem; }
+[data-testid="stHeader"] { height: 2.25rem; min-height: 2.25rem; }
+[data-testid="stMainBlockContainer"] { padding-top: 2.3rem; padding-bottom: 0; padding-left: 0.35rem; padding-right: 0.35rem; max-width: 100%; }
+[data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"] { gap: 0.15rem; }
 </style>"""
 
 

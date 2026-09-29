@@ -72,8 +72,10 @@ FEATURES: dict[str, Feature] = {f.id: f for f in (
     Feature("math", "builtins", PARTIAL, "math built-ins (`math.*`)", "See the built-in coverage list."),
     Feature("strings", "builtins", PARTIAL, "string built-ins (`str.*`)", "See the built-in coverage list."),
     Feature("color", "builtins", SUPPORTED, "colors (`color.*`, `#RRGGBBAA` literals)"),
-    Feature("inputs", "builtins", PARTIAL, "inputs (`input.*`)", "Defaults, editable values; session/symbol/time inputs are gaps."),
-    Feature("time", "builtins", PARTIAL, "time variables and functions (UTC)", "time() with a session argument is a gap."),
+    Feature("inputs", "builtins", PARTIAL, "inputs (`input.*`)", "Defaults, editable values; input.time() edits a UTC date and time; session/symbol inputs are gaps."),
+    Feature("time", "builtins", PARTIAL, "time variables and functions (UTC)",
+            "Calendar functions accept a time zone (IANA or UTC/GMT offset); time() takes a session on the chart's "
+            "timeframe only; timestamp() with a time zone is a gap."),
     Feature("chart-info", "builtins", PARTIAL, "barstate.*, syminfo.*, timeframe.*", "Fundamental syminfo fields are gaps."),
     Feature("logging", "builtins", PARTIAL, "Pine logs (`log.info()`, `log.warning()`, `log.error()`)",
             "Messages are collected on the run (parity tooling); the terminal does not display them yet."),

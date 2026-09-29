@@ -534,7 +534,9 @@ def test_strategy_report_payload_validates_and_is_simulation_only():
     report = out.strategy
     assert report["metrics"]["total_closed_trades"] == len(broker.state.closed)
     assert report["metrics"]["net_profit"] == pytest.approx(sum(t.profit for t in broker.state.closed))
-    assert {"trades", "fills", "equity", "metrics", "settings", "pending_orders"} == set(report)
+    assert {"trades", "fills", "equity", "metrics", "settings", "pending_orders", "fill_count", "fills_reported",
+            "calc_range"} == set(report)
+    assert report["fill_count"] == report["fills_reported"] == len(broker.state.fills)
     times = {int(t.timestamp()) for t in pd.date_range("2026-01-01", periods=120, freq="1D", tz="UTC")}
     protocol._validate_strategy({"strategy": report}, times)
     forbidden = ("broker", "account", "ticket", "webhook", "send", "api_key")

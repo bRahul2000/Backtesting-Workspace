@@ -39,7 +39,9 @@ def app(tmp_path):
     mt5_folder = tmp_path / "mt5files"
     mt5_folder.mkdir()
     port = _free_port()
-    env = {**os.environ, "TV_MT5_COMMON_FILES": str(mt5_folder)}
+    # Workspace chart history (workspace_data.py) is isolated per test too: a real refresh in data/workspace/ never
+    # leaks into the browser tests, and the tests never write there.
+    env = {**os.environ, "TV_MT5_COMMON_FILES": str(mt5_folder), "TV_WORKSPACE_DATA": str(tmp_path / "workspace")}
     server = subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(ROOT / "app.py"), "--server.headless", "true",
                                "--server.port", str(port), "--browser.gatherUsageStats", "false"],
                               cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

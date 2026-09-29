@@ -42,6 +42,10 @@ _register("input.price", "input float", P("defval", "const float"), P("title", "
 _register("input.text_area", "input string", P("defval", "const string"), P("title", "const string", NA), *COMMON)
 _register("input.timeframe", "input string", P("defval", "const string"), P("title", "const string", NA),
           P("options", "const any", NA), *COMMON)
+# input.time(): a UNIX timestamp in milliseconds (UTC), qualified `input int`; the inputs panel edits it as a UTC
+# date and time
+_register("input.time", "input int", P("defval", "const int"), P("title", "const string", NA), *COMMON,
+          P("active", "input bool", True))
 _register("input", "input any", P("defval", "const any"), P("title", "const string", NA), *COMMON)
 
 
@@ -55,7 +59,11 @@ def _source(rt, node, override):
 def coerce_input(definition, value):
     """Validate a user-supplied input value against its definition (raises ValueError)."""
     kind = definition.kind
-    if kind == "int":
+    if kind == "time":
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or int(value) != value:
+            raise ValueError("must be a UNIX time in milliseconds")
+        value = int(value)
+    elif kind == "int":
         if isinstance(value, bool) or not isinstance(value, (int, float)) or int(value) != value:
             raise ValueError("must be a whole number")
         value = int(value)

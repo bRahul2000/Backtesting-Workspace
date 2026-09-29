@@ -60,16 +60,40 @@ test("P2.3b tables: top-right layout sized by the largest cell of each column an
   assert.deepEqual(c.lines, ["two", "lines"]);
 });
 
-test("P3.1 strategy fills become chart markers (presentation only)", async () => {
-  const { strategyMarkers } = await import("../../../ui/tradingview_mode/component/frontend/src/chart/strategyMarkers.js");
-  const markers = strategyMarkers([
-    { key: "s:fill:1", time: 200, side: -1, qty: 2, kind: "reversal", exit_kind: "reversal", id: "Short" },
-    { key: "s:fill:0", time: 100, side: 1, qty: 1, kind: "entry", exit_kind: null, id: "Long" },
-    { key: "s:fill:2", time: 300, side: 1, qty: 1, kind: "exit", exit_kind: "trail", id: "Trail" },
+test("P3.1 strategy fills become compact chart markers, reconciled against the fills", async () => {
+  const { strategyMarkers, fillTag, describeFill, fillsAt } = await import("../../../ui/tradingview_mode/component/frontend/src/chart/strategyMarkers.js");
+  const fills = [
+    { key: "s:fill:1", time: 200, side: -1, qty: 2, kind: "reversal", exit_kind: "reversal", id: "Short", price: 10 },
+    { key: "s:fill:0", time: 100, side: 1, qty: 1, kind: "entry", exit_kind: null, id: "Long", price: 9 },
+    { key: "s:fill:2", time: 300, side: 1, qty: 1, kind: "exit", exit_kind: "trail", id: "Trail", price: 8 },
+    { key: "s:fill:3", time: 400, side: 1, qty: 1, kind: "entry", exit_kind: null, id: "BUY", comment: "SETUP_A_BUY", price: 7 },
+    { key: "s:fill:4", time: 500, side: -1, qty: 1, kind: "exit", exit_kind: "stop", id: "BUY EXIT", comment: "TRAIL_SL", price: 6 },
+    { key: "s:fill:5", time: 600, side: -1, qty: 1, kind: "exit", exit_kind: "stop", id: "BUY EXIT", comment: null, price: 5 },
+    // same bar: an exit and a new entry both at 700 - both drawn (stacked), neither hidden
+    { key: "s:fill:6", time: 700, side: -1, qty: 1, kind: "exit", exit_kind: "limit", id: "BUY EXIT", comment: "TP", price: 4 },
+    { key: "s:fill:7", time: 700, side: -1, qty: 1, kind: "entry", exit_kind: null, id: "SELL", comment: "SETUP_B_SELL", price: 4 },
+    // a fill on a bar that is not loaded: counted, not drawn
+    { key: "s:fill:8", time: 50, side: 1, qty: 1, kind: "entry", exit_kind: null, id: "BUY", comment: "SETUP_C_BUY", price: 3 },
+  ];
+  const loaded = new Set([100, 200, 300, 400, 500, 600, 700]);
+  const { markers, audit } = strategyMarkers(fills, loaded, { selected: new Set(["s:fill:4"]) });
+  assert.deepEqual(markers.map((m) => [m.time, m.position, m.shape, m.text, m.size]), [
+    [100, "belowBar", "arrowUp", "", 1],
+    [200, "aboveBar", "arrowDown", "R", 1],
+    [300, "belowBar", "arrowUp", "TS", 1],
+    [400, "belowBar", "arrowUp", "", 1],                  // entries: arrow only; comment in the tooltip
+    [500, "aboveBar", "arrowDown", "TS", 2],              // TRAIL_SL, selected trade: larger
+    [600, "aboveBar", "arrowDown", "SL", 1],
+    [700, "aboveBar", "arrowDown", "TP", 1],
+    [700, "aboveBar", "arrowDown", "", 1],
   ]);
-  assert.deepEqual(markers.map((m) => [m.time, m.position, m.shape, m.text]), [
-    [100, "belowBar", "arrowUp", "Long +1"],
-    [200, "aboveBar", "arrowDown", "Short -2"],
-    [300, "belowBar", "arrowUp", "Trail +1"],
-  ]);
+  assert.deepEqual(audit, { fills: 9, entries: 4, exits: 5, inside: 8, outside: 1 });
+  assert.equal(audit.inside + audit.outside, audit.fills);
+  assert.equal(new Set(markers.map((m) => m.id)).size, markers.length);   // one marker per fill
+  assert.equal(fillTag({ kind: "exit", exit_kind: "stop", comment: "FULL_SL" }), "SL");
+  assert.equal(fillTag({ kind: "entry", comment: "SETUP_A_BUY" }), "");
+  assert.deepEqual(fillsAt(fills, 700).map((f) => f.key), ["s:fill:6", "s:fill:7"]);
+  const trades = [{ open: false, exit_time: 700, exit_price: 4, direction: 1, profit: 12.5, profit_percent: 1.25 }];
+  assert.equal(describeFill(fills[6], trades, 2), "Sell 1 @ 4.00 · TP · P&L +12.50 (1.25%)");
+  assert.equal(describeFill(fills[7], trades, 2), "Sell 1 @ 4.00 · SETUP_B_SELL");
 });

@@ -4,6 +4,7 @@ import { acknowledge, isIdle, onPendingChange, sendEvent } from "./events.js";
 import { intervalMs, tickAction } from "./replayControls.js";
 import { POLL_MS, pollAction } from "./liveControls.js";
 import { formatUtc } from "./format.js";
+import { Icon } from "./components/icons.jsx";
 import { BottomPanel } from "./components/BottomPanel.jsx";
 import { ChartPanel } from "./components/ChartPanel.jsx";
 import { LeftToolbar } from "./components/LeftToolbar.jsx";
@@ -156,6 +157,42 @@ function useTradeFocus(payload, engine) {
   return { selectedKey, selectTrade, tradesByKey, note };
 }
 
+// Pine Strategy Tester rows: select a trade, highlight its fills and entry/exit prices, and bring it into view. A
+// trade on bars older than the loaded window loads them first: the date range's START moves back and its END is
+// kept, so the Pine calculation range (first available bar -> chart end) and therefore every trade stay identical.
+function usePineTradeFocus(payload, engine) {
+  const [selectedKey, setSelectedKey] = useState(null);
+  const [pendingTrade, setPendingTrade] = useState(null);
+  const [note, setNote] = useState(null);
+  const show = useCallback((trade) => {
+    if (!engine || engine.findIndex(trade.entry_time) < 0) return false;
+    engine.selectPineTrade(trade);
+    const lastTime = engine.bars.length ? engine.bars[engine.bars.length - 1].time : trade.entry_time;
+    return engine.focusBars(trade.entry_time, trade.open || trade.exit_time === null ? lastTime : trade.exit_time);
+  }, [engine]);
+  useEffect(() => {
+    if (!pendingTrade) return;
+    if (show(pendingTrade)) { setPendingTrade(null); setNote(null); }
+  }, [payload.bars_rev, pendingTrade, show]);
+  const select = useCallback((trade) => {
+    setSelectedKey(trade.key);
+    if (show(trade)) { setPendingTrade(null); setNote(null); return; }
+    if (payload.replay?.enabled || payload.live?.enabled) {
+      setNote(`Trade #${trade.number} is not on the loaded bars.`);
+      return;
+    }
+    const day = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10);
+    const start = day(trade.entry_time - 2 * 86400);
+    const end = payload.range.end;
+    sendEvent("set_date_range", { start: payload.range.min && start < payload.range.min ? payload.range.min : start, end });
+    setPendingTrade(trade);
+    setNote(`Loading older bars for trade #${trade.number}…`);
+  }, [show, payload.replay?.enabled, payload.live?.enabled, payload.range.end, payload.range.min]);
+  // The chart may be rebuilt (new view): re-apply the highlight.
+  useEffect(() => { if (!selectedKey && engine) engine.selectPineTrade(null); }, [selectedKey, engine]);
+  return { selectedKey, select, note };
+}
+
 // Replay playback: a local timer asks Python for one more bar per tick, but only
 // when no event is in flight, so steps can never pile up behind a slow rerun.
 function useReplayPlayback(replay) {
@@ -206,6 +243,56 @@ function useExportDownload(exportFile) {
   }, [exportFile]);
 }
 
+// ---- layout (TradingView style: the chart dominates) ------------------------------------------------------------
+// Preferences persist in this browser (localStorage). Modes: normal · chart (chart only: no toolbar, watchlist, dock,
+// nor Streamlit's page sidebar) · tester (chart + Strategy Tester) · editor (chart + Pine Editor).
+const LAYOUT_KEY = "tvterm:layout";
+const LAYOUT_DEFAULT = { tools: true, watch: true, watchWidth: 228, mode: "normal" };
+
+function useLayout() {
+  const [layout, setLayout] = useState(() => {
+    try { return { ...LAYOUT_DEFAULT, ...JSON.parse(window.localStorage.getItem(LAYOUT_KEY) || "{}") }; } catch { return LAYOUT_DEFAULT; }
+  });
+  useEffect(() => { try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* unavailable */ } }, [layout]);
+  // Chart only also hides Streamlit's page sidebar: a rule in the parent page keyed to this iframe's attribute
+  // (it cannot outlive the terminal: without the iframe the selector no longer matches).
+  useEffect(() => {
+    try {
+      const frame = window.frameElement;
+      if (!frame) return;
+      frame.dataset.tvLayout = layout.mode;
+      const doc = window.parent.document;
+      if (!doc.getElementById("tvterm-layout-style")) {
+        const style = doc.createElement("style");
+        style.id = "tvterm-layout-style";
+        style.textContent = 'body:has(iframe[data-tv-layout="chart"]) [data-testid="stSidebar"] { display: none !important; }'
+          + ' body:has(iframe[data-tv-layout="chart"]) [data-testid="stMainBlockContainer"] { padding-left: 0.25rem !important; padding-right: 0.25rem !important; }';
+        doc.head.appendChild(style);
+      }
+    } catch { /* cross-origin parent: only the terminal's own panels change */ }
+  }, [layout.mode]);
+  const update = useCallback((patch) => setLayout((prev) => ({ ...prev, ...patch })), []);
+  const setMode = useCallback((mode) => {
+    update({ mode });
+    if (mode === "tester") sendEvent("set_bottom_panel", { panel: "strategy_tester", open: true });
+    if (mode === "editor") sendEvent("set_bottom_panel", { panel: "pine", open: true });
+  }, [update]);
+  const normal = layout.mode === "normal";
+  return { layout, update, setMode, showTools: normal && layout.tools, showWatch: normal && layout.watch,
+    showDock: layout.mode !== "chart" };
+}
+
+// Drag the watchlist's left edge to resize it (160-440 px).
+function WatchResize({ width, onWidth }) {
+  const drag = useRef(null);
+  return (
+    <div className="watch-resize" title="Drag to resize the watchlist"
+      onPointerDown={(e) => { drag.current = { x: e.clientX, width }; e.currentTarget.setPointerCapture(e.pointerId); }}
+      onPointerMove={(e) => { if (drag.current) onWidth(Math.round(Math.min(440, Math.max(160, drag.current.width + drag.current.x - e.clientX)))); }}
+      onPointerUp={() => { drag.current = null; }} />
+  );
+}
+
 function Terminal({ payload, fallbackHeight }) {
   const height = useFrameHeight(fallbackHeight);
   const [engine, setEngine] = useState(null);
@@ -230,7 +317,10 @@ function Terminal({ payload, fallbackHeight }) {
     setCrosshairModeState(mode);
     engine?.setCrosshairMode(mode);
   }, [engine]);
+  const layoutApi = useLayout();
+  const { layout, showTools, showWatch, showDock } = layoutApi;
   const focus = useTradeFocus(payload, engine);
+  const pineFocus = usePineTradeFocus(payload, engine);
   useExportDownload(payload.tester.export);
   useReplayPlayback(payload.replay);
   useLivePolling(payload.live);
@@ -241,16 +331,31 @@ function Terminal({ payload, fallbackHeight }) {
   }), [engine]);
 
   return (
-    <div className="terminal" style={{ height }}>
+    <div className={`terminal layout-${layout.mode}`} style={{ height,
+      gridTemplateColumns: `${showTools ? 40 : layout.mode === "normal" ? 14 : 0}px minmax(0, 1fr) ${showWatch ? layout.watchWidth : layout.mode === "normal" ? 14 : 0}px` }}>
       <TopBar payload={payload} pending={pending} crosshairMode={crosshairMode}
-        setCrosshairMode={setCrosshairMode} engineActions={engineActions} />
-      <LeftToolbar crosshairMode={crosshairMode} setCrosshairMode={setCrosshairMode}
-        engineActions={engineActions} drawingsEnabled={payload.capabilities.drawings} />
+        setCrosshairMode={setCrosshairMode} engineActions={engineActions} layoutApi={layoutApi} />
+      {showTools ? (
+        <LeftToolbar crosshairMode={crosshairMode} setCrosshairMode={setCrosshairMode}
+          engineActions={engineActions} drawingsEnabled={payload.capabilities.drawings} onCollapse={() => layoutApi.update({ tools: false })} />
+      ) : layout.mode === "normal" && (
+        <button type="button" className="rail left-rail" title="Show chart tools" onClick={() => layoutApi.update({ tools: true })}>
+          <Icon name="chevronRight" size={12} /></button>
+      )}
       <ChartPanel payload={payload} onEngine={setEngine} onCrosshairTime={setCrosshairTime}
         tradesByKey={focus.tradesByKey} selectedKey={focus.selectedKey} busy={!!pending} />
-      <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} live={payload.live?.phase === "streaming"} timeframe={payload.timeframe} />
-      <BottomPanel payload={payload} clientLogs={clientLogs} pending={pending}
-        selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note} />
+      {showWatch ? (
+        <div className="watch-wrap">
+          <WatchResize width={layout.watchWidth} onWidth={(w) => layoutApi.update({ watchWidth: w })} />
+          <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} live={payload.live?.phase === "streaming"}
+            timeframe={payload.timeframe} onCollapse={() => layoutApi.update({ watch: false })} />
+        </div>
+      ) : layout.mode === "normal" && (
+        <button type="button" className="rail right-rail" title="Show watchlist" onClick={() => layoutApi.update({ watch: true })}>
+          <Icon name="chevronLeft" size={12} /></button>
+      )}
+      {showDock && <BottomPanel payload={payload} clientLogs={clientLogs} pending={pending}
+        selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note} pineFocus={pineFocus} />}
       <StatusBar payload={payload} crosshairTime={crosshairTime} />
     </div>
   );

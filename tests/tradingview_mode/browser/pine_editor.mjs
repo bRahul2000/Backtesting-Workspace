@@ -115,6 +115,8 @@ async function main() {
 
   // 1. Open the Pine Editor, load an example, Compile, Add to chart.
   await click("Pine Editor tab", ".bottom-tab", "Pine Editor"); await settle();
+  // this walkthrough inspects the editor after each Add to chart: pin it open (otherwise it makes room for the chart)
+  if (!(await evaluate("__tv.doc().querySelector('.pine-pin input').checked"))) await click("Keep editor open", ".pine-pin input");
   check("editor visible", (await evaluate("__tv.box('.pine-text')")).visible);
   check("example loaded", (await evaluate(`__tv.example("Moving-average crossover")`)) > 100);
   await click("Compile", ".pine-compile"); await settle();

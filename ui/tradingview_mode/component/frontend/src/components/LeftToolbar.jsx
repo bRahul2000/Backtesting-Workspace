@@ -11,7 +11,7 @@ const DRAWING_TOOLS = [
   ["measure", "Measure"],
 ];
 
-export function LeftToolbar({ crosshairMode, setCrosshairMode, engineActions, drawingsEnabled }) {
+export function LeftToolbar({ crosshairMode, setCrosshairMode, engineActions, drawingsEnabled, onCollapse }) {
   return (
     <nav className="lefttools" aria-label="Chart tools">
       <button type="button" className={`side-btn ${crosshairMode === "normal" ? "is-active" : ""}`}
@@ -28,6 +28,7 @@ export function LeftToolbar({ crosshairMode, setCrosshairMode, engineActions, dr
       <button type="button" className="side-btn" title="Go to latest bar" onClick={engineActions.latest}><Icon name="latest" /></button>
       <div className="side-fill" />
       <button type="button" className="side-btn" disabled={!drawingsEnabled} title="Delete drawings — not in this phase"><Icon name="trash" /></button>
+      {onCollapse && <button type="button" className="side-btn tools-collapse" title="Hide chart tools" onClick={onCollapse}><Icon name="chevronLeft" size={14} /></button>}
     </nav>
   );
 }

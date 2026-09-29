@@ -14,7 +14,8 @@ for _name, _hex in PINE_COLORS.items():
     constant(f"color.{_name}", Color.from_hex(_hex), "color")
 
 
-@builtin("color.new", P("color", "series color"), P("transp", "series float", 0), returns="series color")
+@builtin("color.new", P("color", "series color"), P("transp", "series float", 0), returns="series color",
+         polymorphic=True)
 def _new(rt, site, a):
     color, transp = a["color"], a["transp"]
     if is_na(color):
@@ -23,7 +24,7 @@ def _new(rt, site, a):
 
 
 @builtin("color.rgb", P("red", "series float"), P("green", "series float"), P("blue", "series float"),
-         P("transp", "series float", 0), returns="series color")
+         P("transp", "series float", 0), returns="series color", polymorphic=True)
 def _rgb(rt, site, a):
     parts = [a["red"], a["green"], a["blue"]]
     if any(is_na(p) for p in parts):
