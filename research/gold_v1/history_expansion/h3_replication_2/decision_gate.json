@@ -1,0 +1,17 @@
+{
+ "classification": "FAILED TO REPLICATE",
+ "gate_A_statistical_persistence": false,
+ "gate_A_criteria": {
+  "pooled_lift_gt_0": false,
+  "ci_lower_gt_0": false,
+  "long_and_short_non_negative": false,
+  "not_dependent_on_one_year_all_loyo_positive": false
+ },
+ "gate_B_practical_size_ge_5pp": false,
+ "pooled_lift_2R_pp": -0.05423264972383435,
+ "ci_lo_pp": -3.1725085152886594,
+ "ci_hi_pp": 3.2538186284430655,
+ "long_lift_pp": 2.2024953896277344,
+ "short_lift_pp": -2.129838512478166,
+ "loyo_min_lift_pp": -1.3781457478788062
+}

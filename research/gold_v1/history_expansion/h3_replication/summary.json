@@ -1,0 +1,177 @@
+{
+ "decision": "INCONCLUSIVE",
+ "tests": {
+  "a_pooled_lift_positive_ci_above_0": true,
+  "b_pooled_lift_ge_5pp": false,
+  "c1_positive_in_at_least_2_of_3_years": true,
+  "c2_positive_without_best_year": true,
+  "d_no_side_below_minus_5pp": true,
+  "e_median_mfe32_event_ge_control": true,
+  "years_positive": 3,
+  "best_year": "2024",
+  "lift_without_best_year_pp": 2.289940073951291
+ },
+ "gate": "PASS",
+ "counts": {
+  "raw_compression_structures": 2414,
+  "raw_displacement_bars": 5458,
+  "candidate_displacements": {
+   "long": 379,
+   "short": 330
+  },
+  "candidates_two_sided": 33,
+  "no_acceptance_bar": 2,
+  "acceptance_failed": {
+   "long": 78,
+   "short": 79
+  },
+  "accepted_breakouts": {
+   "long": 299,
+   "short": 251
+  },
+  "suppressed_duplicates": 19,
+  "no_entry_bar": 1,
+  "rejected_risk_le_0": 0,
+  "events_in_warmup_excluded": 4
+ },
+ "events": 526,
+ "controls": 2630,
+ "unique_control_bars": 2495,
+ "lifts": {
+  "1.0": {
+   "event_p": 0.5222437137330754,
+   "event_n": 517,
+   "control_p": 0.5157159487776485,
+   "control_n": 2577,
+   "lift_pp": 0.6527764955426951,
+   "ci_lo_pp": -3.905592024368812,
+   "ci_hi_pp": 5.36457700319567,
+   "event_wilson": [
+    0.47918074218368956,
+    0.564978556919915
+   ]
+  },
+  "2.0": {
+   "event_p": 0.3679060665362035,
+   "event_n": 511,
+   "control_p": 0.32305258995650454,
+   "control_n": 2529,
+   "lift_pp": 4.485347657969896,
+   "ci_lo_pp": 0.03831892675155998,
+   "ci_hi_pp": 9.086980390646062,
+   "event_wilson": [
+    0.327223960482806,
+    0.41055946649745356
+   ]
+  },
+  "3.0": {
+   "event_p": 0.2823061630218688,
+   "event_n": 503,
+   "control_p": 0.23238018525976642,
+   "control_n": 2483,
+   "lift_pp": 4.9925977762102365,
+   "ci_lo_pp": 0.8388998911520049,
+   "ci_hi_pp": 9.387749631216174,
+   "event_wilson": [
+    0.2447337530783193,
+    0.32317858876575983
+   ]
+  },
+  "4.0": {
+   "event_p": 0.21138211382113822,
+   "event_n": 492,
+   "control_p": 0.17155849524596942,
+   "control_n": 2419,
+   "lift_pp": 3.9823618575168807,
+   "ci_lo_pp": 0.1248765369833165,
+   "ci_hi_pp": 7.894521522504164,
+   "event_wilson": [
+    0.17761087614226528,
+    0.2496255638821296
+   ]
+  }
+ },
+ "side_lift_2R_pp": {
+  "long": 4.52911803059699,
+  "short": 4.438422382539276
+ },
+ "pooled": {
+  "period": "2023-2025 pooled",
+  "events": 526,
+  "controls": 2630,
+  "p1R": 0.5222437137330754,
+  "p2R": 0.3679060665362035,
+  "p3R": 0.2823061630218688,
+  "p4R": 0.21138211382113822,
+  "control_p2R": 0.32305258995650454,
+  "lift_2R_pp": 4.485347657969896,
+  "ci_lo_pp": 0.03831892675155998,
+  "ci_hi_pp": 9.086980390646062,
+  "median_mfe32": 1.876637327386563,
+  "median_mae32": 1.7396491854351361,
+  "control_median_mfe32": 1.6555147175728975,
+  "control_median_mae32": 1.6546696274263983,
+  "long": 281,
+  "short": 245
+ },
+ "years": [
+  {
+   "period": "2023",
+   "events": 171,
+   "controls": 855,
+   "p1R": 0.5,
+   "p2R": 0.3212121212121212,
+   "p3R": 0.23780487804878048,
+   "p4R": 0.19631901840490798,
+   "control_p2R": 0.31393939393939396,
+   "lift_2R_pp": 0.7272727272727264,
+   "ci_lo_pp": -6.999478761714665,
+   "ci_hi_pp": 8.548944471264846,
+   "median_mfe32": 1.9334931096467,
+   "median_mae32": 2.0986739469578475,
+   "control_median_mfe32": 1.6789289176210573,
+   "control_median_mae32": 1.7721714653845184,
+   "long": 94,
+   "short": 77
+  },
+  {
+   "period": "2024",
+   "events": 172,
+   "controls": 860,
+   "p1R": 0.5621301775147929,
+   "p2R": 0.40963855421686746,
+   "p3R": 0.3148148148148148,
+   "p4R": 0.21518987341772153,
+   "control_p2R": 0.3191747572815534,
+   "lift_2R_pp": 9.046379693531403,
+   "ci_lo_pp": 0.8468054767118137,
+   "ci_hi_pp": 17.224190673778217,
+   "median_mfe32": 1.8301311244808494,
+   "median_mae32": 1.7386518986203279,
+   "control_median_mfe32": 1.5765830162203978,
+   "control_median_mae32": 1.548486504661991,
+   "long": 96,
+   "short": 76
+  },
+  {
+   "period": "2025",
+   "events": 183,
+   "controls": 915,
+   "p1R": 0.5055555555555555,
+   "p2R": 0.37222222222222223,
+   "p3R": 0.2937853107344633,
+   "p4R": 0.2222222222222222,
+   "control_p2R": 0.3352272727272727,
+   "lift_2R_pp": 3.6994949494949525,
+   "ci_lo_pp": -3.821832317773081,
+   "ci_hi_pp": 11.457075509890274,
+   "median_mfe32": 1.830868470736406,
+   "median_mae32": 1.534477825464949,
+   "control_median_mfe32": 1.6910719527328637,
+   "control_median_mae32": 1.6787702982746944,
+   "long": 91,
+   "short": 92
+  }
+ ],
+ "hole_flagged_events": 57
+}

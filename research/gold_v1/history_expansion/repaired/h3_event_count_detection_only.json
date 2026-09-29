@@ -1,0 +1,49 @@
+{
+ "events_era": 1007,
+ "warmup_events_excluded": 5,
+ "sessions_era": 1084,
+ "full_sessions_era": 1078,
+ "by_year": {
+  "2017": {
+   "long": 88,
+   "short": 79
+  },
+  "2018": {
+   "long": 104,
+   "short": 137
+  },
+  "2019": {
+   "long": 98,
+   "short": 117
+  },
+  "2020": {
+   "long": 114,
+   "short": 107
+  },
+  "2021": {
+   "long": 77,
+   "short": 86
+  }
+ },
+ "detection_counts": {
+  "raw_compression_structures": 3442,
+  "raw_displacement_bars": 7558,
+  "candidate_displacements": {
+   "long": 568,
+   "short": 652
+  },
+  "candidates_two_sided": 48,
+  "no_acceptance_bar": 8,
+  "acceptance_failed": {
+   "long": 68,
+   "short": 98
+  },
+  "accepted_breakouts": {
+   "long": 499,
+   "short": 547
+  },
+  "suppressed_duplicates": 32,
+  "no_entry_bar": 2,
+  "rejected_risk_le_0": 0
+ }
+}

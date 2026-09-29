@@ -1,0 +1,4598 @@
+{
+ "M15": {
+  "header_equal": true,
+  "row_groups_new_export": {
+   "NEW": 141816,
+   "DEV": 10355,
+   "SEALED": 7126,
+   "POST": 596
+  },
+  "row_groups_phase2a": {
+   "NEW": 0,
+   "DEV": 10355,
+   "SEALED": 7125,
+   "POST": 0
+  },
+  "overlap_dev_full": {
+   "rows_new": 10355,
+   "rows_phase2a": 10355,
+   "timestamps_in_both": 10355,
+   "only_in_new": 0,
+   "only_in_phase2a": 0,
+   "open_text_equal": 10355,
+   "high_text_equal": 10355,
+   "low_text_equal": 10355,
+   "close_text_equal": 10355,
+   "tick_volume_equal": 10355,
+   "tick_volume_diff_examples": [],
+   "spread_equal": 10355,
+   "spread_diff_examples": [],
+   "real_volume_equal": 10355,
+   "real_volume_diff_examples": [],
+   "identical_lines": 10355
+  },
+  "overlap_sealed_text_only": {
+   "rows_new": 7126,
+   "rows_phase2a": 7125,
+   "identical_lines": 7125,
+   "timestamps_in_both": 7125,
+   "timestamps_only_new": 1,
+   "timestamps_only_phase2a": 0
+  },
+  "quality_new_plus_dev": {
+   "rows": 152171,
+   "first": "2019-12-23 00:00:00+00:00",
+   "last": "2026-06-02 23:45:00+00:00",
+   "monotonic": true,
+   "duplicates": 0,
+   "misaligned_timestamps": 0,
+   "invalid_ohlc": 0,
+   "gaps_by_kind": {
+    "daily_break": 1279,
+    "weekend": 240,
+    "UNEXPLAINED": 170,
+    "holiday/early_close": 63,
+    "weekend+holiday": 4
+   },
+   "unexplained_gaps": [
+    {
+     "prev_bar": "2019-12-27 21:45:00+00:00",
+     "next_bar": "2019-12-29 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2019
+    },
+    {
+     "prev_bar": "2019-12-29 00:00:00+00:00",
+     "next_bar": "2019-12-29 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2019
+    },
+    {
+     "prev_bar": "2020-01-03 21:45:00+00:00",
+     "next_bar": "2020-01-05 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-05 00:00:00+00:00",
+     "next_bar": "2020-01-05 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-10 21:45:00+00:00",
+     "next_bar": "2020-01-12 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-12 00:00:00+00:00",
+     "next_bar": "2020-01-12 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-17 21:45:00+00:00",
+     "next_bar": "2020-01-19 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-19 00:00:00+00:00",
+     "next_bar": "2020-01-19 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-24 21:45:00+00:00",
+     "next_bar": "2020-01-26 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-26 00:00:00+00:00",
+     "next_bar": "2020-01-26 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-31 21:45:00+00:00",
+     "next_bar": "2020-02-02 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-02 00:00:00+00:00",
+     "next_bar": "2020-02-02 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-07 21:45:00+00:00",
+     "next_bar": "2020-02-09 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-09 00:00:00+00:00",
+     "next_bar": "2020-02-09 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-14 21:45:00+00:00",
+     "next_bar": "2020-02-16 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-16 00:00:00+00:00",
+     "next_bar": "2020-02-16 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-21 21:45:00+00:00",
+     "next_bar": "2020-02-23 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-23 00:00:00+00:00",
+     "next_bar": "2020-02-23 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-28 21:45:00+00:00",
+     "next_bar": "2020-03-01 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-01 00:00:00+00:00",
+     "next_bar": "2020-03-01 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-06 21:45:00+00:00",
+     "next_bar": "2020-03-08 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-08 00:00:00+00:00",
+     "next_bar": "2020-03-08 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-13 20:45:00+00:00",
+     "next_bar": "2020-03-15 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-15 00:00:00+00:00",
+     "next_bar": "2020-03-15 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-20 20:45:00+00:00",
+     "next_bar": "2020-03-22 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-22 00:00:00+00:00",
+     "next_bar": "2020-03-22 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-27 20:45:00+00:00",
+     "next_bar": "2020-03-29 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-29 00:00:00+00:00",
+     "next_bar": "2020-03-29 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-03 20:45:00+00:00",
+     "next_bar": "2020-04-05 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-05 00:00:00+00:00",
+     "next_bar": "2020-04-05 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-12 00:00:00+00:00",
+     "next_bar": "2020-04-12 22:45:00+00:00",
+     "gap_min": 1350.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:45",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-17 20:45:00+00:00",
+     "next_bar": "2020-04-19 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-19 00:00:00+00:00",
+     "next_bar": "2020-04-19 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-24 20:45:00+00:00",
+     "next_bar": "2020-04-26 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-26 00:00:00+00:00",
+     "next_bar": "2020-04-26 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-01 20:45:00+00:00",
+     "next_bar": "2020-05-03 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-03 00:00:00+00:00",
+     "next_bar": "2020-05-03 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-08 20:45:00+00:00",
+     "next_bar": "2020-05-10 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-10 00:00:00+00:00",
+     "next_bar": "2020-05-10 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-15 20:45:00+00:00",
+     "next_bar": "2020-05-17 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-17 00:00:00+00:00",
+     "next_bar": "2020-05-17 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-22 20:45:00+00:00",
+     "next_bar": "2020-05-24 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-24 00:00:00+00:00",
+     "next_bar": "2020-05-24 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-29 20:45:00+00:00",
+     "next_bar": "2020-05-31 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-31 00:00:00+00:00",
+     "next_bar": "2020-05-31 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-05 20:45:00+00:00",
+     "next_bar": "2020-06-07 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-07 00:00:00+00:00",
+     "next_bar": "2020-06-07 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-12 20:45:00+00:00",
+     "next_bar": "2020-06-14 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-14 00:00:00+00:00",
+     "next_bar": "2020-06-14 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-19 20:45:00+00:00",
+     "next_bar": "2020-06-21 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-21 00:00:00+00:00",
+     "next_bar": "2020-06-21 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-26 20:45:00+00:00",
+     "next_bar": "2020-06-28 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-28 00:00:00+00:00",
+     "next_bar": "2020-06-28 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-05 00:00:00+00:00",
+     "next_bar": "2020-07-05 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-10 20:45:00+00:00",
+     "next_bar": "2020-07-12 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-12 00:00:00+00:00",
+     "next_bar": "2020-07-12 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-17 20:45:00+00:00",
+     "next_bar": "2020-07-19 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-19 00:00:00+00:00",
+     "next_bar": "2020-07-19 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-24 20:45:00+00:00",
+     "next_bar": "2020-07-26 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-26 00:00:00+00:00",
+     "next_bar": "2020-07-26 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-31 20:45:00+00:00",
+     "next_bar": "2020-08-02 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-02 00:00:00+00:00",
+     "next_bar": "2020-08-02 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-07 20:45:00+00:00",
+     "next_bar": "2020-08-09 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-09 00:00:00+00:00",
+     "next_bar": "2020-08-09 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-14 20:45:00+00:00",
+     "next_bar": "2020-08-16 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-16 00:00:00+00:00",
+     "next_bar": "2020-08-16 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-21 20:45:00+00:00",
+     "next_bar": "2020-08-23 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-23 00:00:00+00:00",
+     "next_bar": "2020-08-23 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-28 20:45:00+00:00",
+     "next_bar": "2020-08-30 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-30 00:00:00+00:00",
+     "next_bar": "2020-08-30 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-04 20:45:00+00:00",
+     "next_bar": "2020-09-06 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-06 00:00:00+00:00",
+     "next_bar": "2020-09-06 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-11 20:45:00+00:00",
+     "next_bar": "2020-09-13 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-13 00:00:00+00:00",
+     "next_bar": "2020-09-13 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-18 20:45:00+00:00",
+     "next_bar": "2020-09-20 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-20 00:00:00+00:00",
+     "next_bar": "2020-09-20 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-25 20:45:00+00:00",
+     "next_bar": "2020-09-27 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-27 00:00:00+00:00",
+     "next_bar": "2020-09-27 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-02 20:45:00+00:00",
+     "next_bar": "2020-10-04 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-04 00:00:00+00:00",
+     "next_bar": "2020-10-04 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-09 20:45:00+00:00",
+     "next_bar": "2020-10-11 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-11 00:00:00+00:00",
+     "next_bar": "2020-10-11 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-16 20:45:00+00:00",
+     "next_bar": "2020-10-18 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-18 00:00:00+00:00",
+     "next_bar": "2020-10-18 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-23 20:45:00+00:00",
+     "next_bar": "2020-10-25 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-25 00:00:00+00:00",
+     "next_bar": "2020-10-25 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-30 20:45:00+00:00",
+     "next_bar": "2020-11-01 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-01 00:00:00+00:00",
+     "next_bar": "2020-11-01 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-06 21:45:00+00:00",
+     "next_bar": "2020-11-08 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-08 00:00:00+00:00",
+     "next_bar": "2020-11-08 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-13 21:45:00+00:00",
+     "next_bar": "2020-11-15 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-15 00:00:00+00:00",
+     "next_bar": "2020-11-15 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-20 21:45:00+00:00",
+     "next_bar": "2020-11-22 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-22 00:00:00+00:00",
+     "next_bar": "2020-11-22 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-29 00:00:00+00:00",
+     "next_bar": "2020-11-29 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-04 21:45:00+00:00",
+     "next_bar": "2020-12-06 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-06 00:00:00+00:00",
+     "next_bar": "2020-12-06 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-11 21:45:00+00:00",
+     "next_bar": "2020-12-13 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-13 00:00:00+00:00",
+     "next_bar": "2020-12-13 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-18 21:45:00+00:00",
+     "next_bar": "2020-12-20 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-20 00:00:00+00:00",
+     "next_bar": "2020-12-20 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-27 00:00:00+00:00",
+     "next_bar": "2020-12-27 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2021-01-03 00:00:00+00:00",
+     "next_bar": "2021-01-03 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-08 21:45:00+00:00",
+     "next_bar": "2021-01-10 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-10 00:00:00+00:00",
+     "next_bar": "2021-01-10 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-15 21:45:00+00:00",
+     "next_bar": "2021-01-17 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-17 00:00:00+00:00",
+     "next_bar": "2021-01-17 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-22 21:45:00+00:00",
+     "next_bar": "2021-01-24 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-24 00:00:00+00:00",
+     "next_bar": "2021-01-24 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-29 21:45:00+00:00",
+     "next_bar": "2021-01-31 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-31 00:00:00+00:00",
+     "next_bar": "2021-01-31 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-05 21:45:00+00:00",
+     "next_bar": "2021-02-07 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-07 00:00:00+00:00",
+     "next_bar": "2021-02-07 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-12 21:45:00+00:00",
+     "next_bar": "2021-02-14 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-14 00:00:00+00:00",
+     "next_bar": "2021-02-14 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-19 21:45:00+00:00",
+     "next_bar": "2021-02-21 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-21 00:00:00+00:00",
+     "next_bar": "2021-02-21 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-26 21:45:00+00:00",
+     "next_bar": "2021-02-28 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-28 00:00:00+00:00",
+     "next_bar": "2021-02-28 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-05 21:45:00+00:00",
+     "next_bar": "2021-03-07 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-07 00:00:00+00:00",
+     "next_bar": "2021-03-07 23:00:00+00:00",
+     "gap_min": 1365.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-12 21:45:00+00:00",
+     "next_bar": "2021-03-14 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-14 00:00:00+00:00",
+     "next_bar": "2021-03-14 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 19:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-19 20:45:00+00:00",
+     "next_bar": "2021-03-21 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-21 00:00:00+00:00",
+     "next_bar": "2021-03-21 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-26 20:45:00+00:00",
+     "next_bar": "2021-03-28 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-28 00:00:00+00:00",
+     "next_bar": "2021-03-28 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-04 00:00:00+00:00",
+     "next_bar": "2021-04-04 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-09 20:45:00+00:00",
+     "next_bar": "2021-04-11 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-11 00:00:00+00:00",
+     "next_bar": "2021-04-11 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-16 20:45:00+00:00",
+     "next_bar": "2021-04-18 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-18 00:00:00+00:00",
+     "next_bar": "2021-04-18 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-23 20:45:00+00:00",
+     "next_bar": "2021-04-25 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-25 00:00:00+00:00",
+     "next_bar": "2021-04-25 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-30 20:45:00+00:00",
+     "next_bar": "2021-05-02 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-02 00:00:00+00:00",
+     "next_bar": "2021-05-02 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-07 20:45:00+00:00",
+     "next_bar": "2021-05-09 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-09 00:00:00+00:00",
+     "next_bar": "2021-05-09 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-14 20:45:00+00:00",
+     "next_bar": "2021-05-16 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-16 00:00:00+00:00",
+     "next_bar": "2021-05-16 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-21 20:45:00+00:00",
+     "next_bar": "2021-05-23 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-23 00:00:00+00:00",
+     "next_bar": "2021-05-23 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-28 20:45:00+00:00",
+     "next_bar": "2021-05-30 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-30 00:00:00+00:00",
+     "next_bar": "2021-05-30 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-04 20:45:00+00:00",
+     "next_bar": "2021-06-06 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-06 00:00:00+00:00",
+     "next_bar": "2021-06-06 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-11 20:45:00+00:00",
+     "next_bar": "2021-06-13 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-13 00:00:00+00:00",
+     "next_bar": "2021-06-13 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-20 00:00:00+00:00",
+     "next_bar": "2021-06-20 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-25 20:45:00+00:00",
+     "next_bar": "2021-06-27 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-27 00:00:00+00:00",
+     "next_bar": "2021-06-27 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-02 20:45:00+00:00",
+     "next_bar": "2021-07-04 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-04 00:00:00+00:00",
+     "next_bar": "2021-07-04 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-09 20:45:00+00:00",
+     "next_bar": "2021-07-11 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-11 00:00:00+00:00",
+     "next_bar": "2021-07-11 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-16 20:45:00+00:00",
+     "next_bar": "2021-07-18 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-18 00:00:00+00:00",
+     "next_bar": "2021-07-18 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-23 20:45:00+00:00",
+     "next_bar": "2021-07-25 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-25 00:00:00+00:00",
+     "next_bar": "2021-07-25 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-30 20:45:00+00:00",
+     "next_bar": "2021-08-01 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-01 00:00:00+00:00",
+     "next_bar": "2021-08-01 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-06 20:45:00+00:00",
+     "next_bar": "2021-08-08 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-08 00:00:00+00:00",
+     "next_bar": "2021-08-08 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-13 20:45:00+00:00",
+     "next_bar": "2021-08-15 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-15 00:00:00+00:00",
+     "next_bar": "2021-08-15 22:00:00+00:00",
+     "gap_min": 1305.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:15",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2022-02-08 23:45:00+00:00",
+     "next_bar": "2022-02-09 01:00:00+00:00",
+     "gap_min": 60.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Tue 19:00",
+     "reopen_ny": "Tue 20:00",
+     "year": 2022
+    },
+    {
+     "prev_bar": "2025-01-03 11:45:00+00:00",
+     "next_bar": "2025-01-03 12:45:00+00:00",
+     "gap_min": 45.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 07:00",
+     "reopen_ny": "Fri 07:45",
+     "year": 2025
+    },
+    {
+     "prev_bar": "2025-04-14 14:00:00+00:00",
+     "next_bar": "2025-04-14 14:30:00+00:00",
+     "gap_min": 15.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Mon 10:15",
+     "reopen_ny": "Mon 10:30",
+     "year": 2025
+    },
+    {
+     "prev_bar": "2025-10-16 15:00:00+00:00",
+     "next_bar": "2025-10-16 17:45:00+00:00",
+     "gap_min": 150.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Thu 11:15",
+     "reopen_ny": "Thu 13:45",
+     "year": 2025
+    },
+    {
+     "prev_bar": "2025-12-07 23:15:00+00:00",
+     "next_bar": "2025-12-07 23:45:00+00:00",
+     "gap_min": 15.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sun 18:30",
+     "reopen_ny": "Sun 18:45",
+     "year": 2025
+    }
+   ],
+   "holiday_gaps": [
+    {
+     "prev_bar": "2019-12-24 17:45:00+00:00",
+     "next_bar": "2019-12-26 00:00:00+00:00",
+     "gap_min": 1800.0,
+     "close_ny": "Tue 13:00",
+     "reopen_ny": "Wed 19:00"
+    },
+    {
+     "prev_bar": "2019-12-26 00:00:00+00:00",
+     "next_bar": "2019-12-26 06:00:00+00:00",
+     "gap_min": 345.0,
+     "close_ny": "Wed 19:15",
+     "reopen_ny": "Thu 01:00"
+    },
+    {
+     "prev_bar": "2019-12-31 17:45:00+00:00",
+     "next_bar": "2020-01-02 00:00:00+00:00",
+     "gap_min": 1800.0,
+     "close_ny": "Tue 13:00",
+     "reopen_ny": "Wed 19:00"
+    },
+    {
+     "prev_bar": "2020-01-02 00:00:00+00:00",
+     "next_bar": "2020-01-02 01:00:00+00:00",
+     "gap_min": 45.0,
+     "close_ny": "Wed 19:15",
+     "reopen_ny": "Wed 20:00"
+    },
+    {
+     "prev_bar": "2020-01-20 17:45:00+00:00",
+     "next_bar": "2020-01-20 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-02-17 17:45:00+00:00",
+     "next_bar": "2020-02-17 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-04-09 20:45:00+00:00",
+     "next_bar": "2020-04-12 00:00:00+00:00",
+     "gap_min": 3060.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2020-05-25 16:45:00+00:00",
+     "next_bar": "2020-05-25 22:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-07-03 16:45:00+00:00",
+     "next_bar": "2020-07-05 00:00:00+00:00",
+     "gap_min": 1860.0,
+     "close_ny": "Fri 13:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2020-09-07 16:45:00+00:00",
+     "next_bar": "2020-09-07 22:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-11-26 17:45:00+00:00",
+     "next_bar": "2020-11-26 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Thu 13:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2020-11-27 18:30:00+00:00",
+     "next_bar": "2020-11-29 00:00:00+00:00",
+     "gap_min": 1755.0,
+     "close_ny": "Fri 13:45",
+     "reopen_ny": "Sat 19:00"
+    },
+    {
+     "prev_bar": "2020-12-24 17:45:00+00:00",
+     "next_bar": "2020-12-27 00:00:00+00:00",
+     "gap_min": 3240.0,
+     "close_ny": "Thu 13:00",
+     "reopen_ny": "Sat 19:00"
+    },
+    {
+     "prev_bar": "2020-12-31 17:45:00+00:00",
+     "next_bar": "2021-01-03 00:00:00+00:00",
+     "gap_min": 3240.0,
+     "close_ny": "Thu 13:00",
+     "reopen_ny": "Sat 19:00"
+    },
+    {
+     "prev_bar": "2021-01-18 17:30:00+00:00",
+     "next_bar": "2021-01-18 23:00:00+00:00",
+     "gap_min": 315.0,
+     "close_ny": "Mon 12:45",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-02-15 17:30:00+00:00",
+     "next_bar": "2021-02-15 23:00:00+00:00",
+     "gap_min": 315.0,
+     "close_ny": "Mon 12:45",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-04-01 20:45:00+00:00",
+     "next_bar": "2021-04-04 00:00:00+00:00",
+     "gap_min": 3060.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2021-05-31 17:00:00+00:00",
+     "next_bar": "2021-05-31 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Mon 13:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-06-18 20:45:00+00:00",
+     "next_bar": "2021-06-20 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2021-07-05 16:45:00+00:00",
+     "next_bar": "2021-07-05 22:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-09-06 17:00:00+00:00",
+     "next_bar": "2021-09-06 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Mon 13:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-11-25 17:30:00+00:00",
+     "next_bar": "2021-11-25 23:00:00+00:00",
+     "gap_min": 315.0,
+     "close_ny": "Thu 12:45",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2021-12-23 21:45:00+00:00",
+     "next_bar": "2021-12-26 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2022-01-17 19:00:00+00:00",
+     "next_bar": "2022-01-17 23:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-02-21 19:00:00+00:00",
+     "next_bar": "2022-02-21 23:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-04-14 20:45:00+00:00",
+     "next_bar": "2022-04-17 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2022-05-30 17:15:00+00:00",
+     "next_bar": "2022-05-30 22:00:00+00:00",
+     "gap_min": 270.0,
+     "close_ny": "Mon 13:30",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-06-20 17:00:00+00:00",
+     "next_bar": "2022-06-20 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Mon 13:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-07-04 17:15:00+00:00",
+     "next_bar": "2022-07-04 22:00:00+00:00",
+     "gap_min": 270.0,
+     "close_ny": "Mon 13:30",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-09-05 17:15:00+00:00",
+     "next_bar": "2022-09-05 22:00:00+00:00",
+     "gap_min": 270.0,
+     "close_ny": "Mon 13:30",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-11-24 19:30:00+00:00",
+     "next_bar": "2022-11-24 23:00:00+00:00",
+     "gap_min": 195.0,
+     "close_ny": "Thu 14:45",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2022-12-23 21:45:00+00:00",
+     "next_bar": "2022-12-26 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-12-30 21:45:00+00:00",
+     "next_bar": "2023-01-02 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-01-16 19:15:00+00:00",
+     "next_bar": "2023-01-16 23:00:00+00:00",
+     "gap_min": 210.0,
+     "close_ny": "Mon 14:30",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-02-20 19:00:00+00:00",
+     "next_bar": "2023-02-20 23:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-04-06 20:45:00+00:00",
+     "next_bar": "2023-04-09 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2023-05-29 17:00:00+00:00",
+     "next_bar": "2023-05-29 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Mon 13:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-06-19 17:00:00+00:00",
+     "next_bar": "2023-06-19 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Mon 13:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-07-04 18:00:00+00:00",
+     "next_bar": "2023-07-04 22:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Tue 14:15",
+     "reopen_ny": "Tue 18:00"
+    },
+    {
+     "prev_bar": "2023-09-04 17:00:00+00:00",
+     "next_bar": "2023-09-04 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Mon 13:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-11-23 18:00:00+00:00",
+     "next_bar": "2023-11-23 23:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Thu 13:15",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2023-12-22 21:45:00+00:00",
+     "next_bar": "2023-12-25 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-12-29 21:45:00+00:00",
+     "next_bar": "2024-01-01 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-01-15 19:00:00+00:00",
+     "next_bar": "2024-01-15 23:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-02-19 19:00:00+00:00",
+     "next_bar": "2024-02-19 23:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-03-28 20:45:00+00:00",
+     "next_bar": "2024-03-31 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2024-05-27 17:00:00+00:00",
+     "next_bar": "2024-05-27 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Mon 13:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-06-19 17:00:00+00:00",
+     "next_bar": "2024-06-19 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Wed 13:15",
+     "reopen_ny": "Wed 18:00"
+    },
+    {
+     "prev_bar": "2024-07-04 17:00:00+00:00",
+     "next_bar": "2024-07-04 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Thu 13:15",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2024-09-02 17:15:00+00:00",
+     "next_bar": "2024-09-02 22:00:00+00:00",
+     "gap_min": 270.0,
+     "close_ny": "Mon 13:30",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-11-28 18:00:00+00:00",
+     "next_bar": "2024-11-28 23:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Thu 13:15",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2024-12-24 18:15:00+00:00",
+     "next_bar": "2024-12-25 23:00:00+00:00",
+     "gap_min": 1710.0,
+     "close_ny": "Tue 13:30",
+     "reopen_ny": "Wed 18:00"
+    },
+    {
+     "prev_bar": "2024-12-31 21:45:00+00:00",
+     "next_bar": "2025-01-01 23:00:00+00:00",
+     "gap_min": 1500.0,
+     "close_ny": "Tue 17:00",
+     "reopen_ny": "Wed 18:00"
+    },
+    {
+     "prev_bar": "2025-01-20 19:00:00+00:00",
+     "next_bar": "2025-01-20 23:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-02-17 19:00:00+00:00",
+     "next_bar": "2025-02-17 23:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-04-17 20:45:00+00:00",
+     "next_bar": "2025-04-20 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2025-05-26 18:00:00+00:00",
+     "next_bar": "2025-05-26 22:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-06-19 17:00:00+00:00",
+     "next_bar": "2025-06-19 22:00:00+00:00",
+     "gap_min": 285.0,
+     "close_ny": "Thu 13:15",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2025-09-01 18:00:00+00:00",
+     "next_bar": "2025-09-01 22:00:00+00:00",
+     "gap_min": 225.0,
+     "close_ny": "Mon 14:15",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-11-27 19:15:00+00:00",
+     "next_bar": "2025-11-27 23:00:00+00:00",
+     "gap_min": 210.0,
+     "close_ny": "Thu 14:30",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2025-11-28 08:00:00+00:00",
+     "next_bar": "2025-11-28 08:45:00+00:00",
+     "gap_min": 30.0,
+     "close_ny": "Fri 03:15",
+     "reopen_ny": "Fri 03:45"
+    },
+    {
+     "prev_bar": "2025-12-24 18:15:00+00:00",
+     "next_bar": "2025-12-25 23:00:00+00:00",
+     "gap_min": 1710.0,
+     "close_ny": "Wed 13:30",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2025-12-31 21:45:00+00:00",
+     "next_bar": "2026-01-01 23:00:00+00:00",
+     "gap_min": 1500.0,
+     "close_ny": "Wed 17:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2026-01-19 19:15:00+00:00",
+     "next_bar": "2026-01-19 23:00:00+00:00",
+     "gap_min": 210.0,
+     "close_ny": "Mon 14:30",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2026-02-16 19:15:00+00:00",
+     "next_bar": "2026-02-16 23:00:00+00:00",
+     "gap_min": 210.0,
+     "close_ny": "Mon 14:30",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2026-04-02 20:45:00+00:00",
+     "next_bar": "2026-04-05 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2026-05-25 18:15:00+00:00",
+     "next_bar": "2026-05-25 22:00:00+00:00",
+     "gap_min": 210.0,
+     "close_ny": "Mon 14:30",
+     "reopen_ny": "Mon 18:00"
+    }
+   ],
+   "break_variants": [],
+   "daily_break_pattern_by_year": {
+    "2019": {
+     "17:00->18:00 (60m)": 3
+    },
+    "2020": {
+     "17:00->18:00 (60m)": 201
+    },
+    "2021": {
+     "17:00->18:00 (60m)": 200
+    },
+    "2022": {
+     "17:00->18:00 (60m)": 199
+    },
+    "2023": {
+     "17:00->18:00 (60m)": 198
+    },
+    "2024": {
+     "17:00->18:00 (60m)": 198
+    },
+    "2025": {
+     "17:00->18:00 (60m)": 197,
+     "17:00->18:15 (75m)": 1
+    },
+    "2026": {
+     "17:00->18:00 (60m)": 81,
+     "17:00->18:15 (75m)": 1
+    }
+   }
+  },
+  "by_year": {
+   "2019": {
+    "m15_bars": 490,
+    "trading_days": 8,
+    "bars_per_day": {
+     "1": 2,
+     "64": 1,
+     "76": 2,
+     "88": 1,
+     "92": 2
+    },
+    "price_decimals": {
+     "3": 490
+    },
+    "share_last_digit_zero": 0.1102,
+    "close_min": 1478.682,
+    "close_max": 1524.564,
+    "spread_points": {
+     "zero_share": 1.0,
+     "min": 0,
+     "median": 0.0,
+     "p90": 0.0,
+     "max": 0
+    },
+    "tick_volume": {
+     "median": 487.0,
+     "p10": 318.9,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 0.797,
+    "median_range_pct": 0.0531,
+    "bars_range_gt_10x_median": 1,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.004,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Sun 19:00": 1
+    }
+   },
+   "2020": {
+    "m15_bars": 23729,
+    "trading_days": 312,
+    "bars_per_day": {
+     "1": 53,
+     "76": 8,
+     "79": 1,
+     "84": 1,
+     "89": 1,
+     "92": 248
+    },
+    "price_decimals": {
+     "3": 23729
+    },
+    "share_last_digit_zero": 0.101,
+    "close_min": 1453.968,
+    "close_max": 2070.449,
+    "spread_points": {
+     "zero_share": 1.0,
+     "min": 0,
+     "median": 0.0,
+     "p90": 0.0,
+     "max": 0
+    },
+    "tick_volume": {
+     "median": 861.0,
+     "p10": 458.0,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 2.294,
+    "median_range_pct": 0.1287,
+    "bars_range_gt_10x_median": 31,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.163,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Wed 19:00": 1,
+     "Sat 20:00": 1,
+     "Sat 19:00": 1
+    }
+   },
+   "2021": {
+    "m15_bars": 23650,
+    "trading_days": 291,
+    "bars_per_day": {
+     "1": 33,
+     "75": 3,
+     "76": 1,
+     "77": 2,
+     "78": 1,
+     "84": 1,
+     "92": 250
+    },
+    "price_decimals": {
+     "3": 23650
+    },
+    "share_last_digit_zero": 0.0972,
+    "close_min": 1678.189,
+    "close_max": 1957.72,
+    "spread_points": {
+     "zero_share": 0.5021,
+     "min": 0,
+     "median": 0.0,
+     "p90": 300.0,
+     "max": 1287
+    },
+    "tick_volume": {
+     "median": 854.0,
+     "p10": 417.0,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 1.686,
+    "median_range_pct": 0.0938,
+    "bars_range_gt_10x_median": 21,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.227,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Sun 18:00": 19,
+     "Sat 19:00": 1,
+     "Sat 20:00": 1
+    }
+   },
+   "2022": {
+    "m15_bars": 23630,
+    "trading_days": 259,
+    "bars_per_day": {
+     "4": 1,
+     "77": 1,
+     "78": 4,
+     "81": 2,
+     "83": 1,
+     "84": 1,
+     "92": 249
+    },
+    "price_decimals": {
+     "3": 23630
+    },
+    "share_last_digit_zero": 0.1003,
+    "close_min": 1616.646,
+    "close_max": 2069.449,
+    "spread_points": {
+     "zero_share": 0.0056,
+     "min": 0,
+     "median": 200.0,
+     "p90": 200.0,
+     "max": 2080
+    },
+    "tick_volume": {
+     "median": 955.0,
+     "p10": 478.0,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 1.857,
+    "median_range_pct": 0.1035,
+    "bars_range_gt_10x_median": 20,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.039,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Sun 18:00": 51,
+     "Mon 18:00": 1
+    }
+   },
+   "2023": {
+    "m15_bars": 23538,
+    "trading_days": 257,
+    "bars_per_day": {
+     "77": 4,
+     "78": 1,
+     "81": 2,
+     "82": 1,
+     "92": 249
+    },
+    "price_decimals": {
+     "3": 23538
+    },
+    "share_last_digit_zero": 0.1001,
+    "close_min": 1807.8,
+    "close_max": 2131.484,
+    "spread_points": {
+     "zero_share": 0.0007,
+     "min": 0,
+     "median": 200.0,
+     "p90": 200.0,
+     "max": 1880
+    },
+    "tick_volume": {
+     "median": 924.0,
+     "p10": 502.0,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 1.63,
+    "median_range_pct": 0.0841,
+    "bars_range_gt_10x_median": 31,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.025,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Sun 18:00": 50,
+     "Mon 18:00": 2
+    }
+   },
+   "2024": {
+    "m15_bars": 23704,
+    "trading_days": 259,
+    "bars_per_day": {
+     "77": 4,
+     "78": 3,
+     "81": 2,
+     "92": 250
+    },
+    "price_decimals": {
+     "3": 23704
+    },
+    "share_last_digit_zero": 0.0996,
+    "close_min": 1985.994,
+    "close_max": 2789.056,
+    "spread_points": {
+     "zero_share": 0.0,
+     "min": 64,
+     "median": 199.0,
+     "p90": 200.0,
+     "max": 1199
+    },
+    "tick_volume": {
+     "median": 1334.0,
+     "p10": 695.0,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 2.422,
+    "median_range_pct": 0.1005,
+    "bars_range_gt_10x_median": 11,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.109,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Sun 18:00": 52,
+     "Mon 18:00": 1
+    }
+   },
+   "2025": {
+    "m15_bars": 23609,
+    "trading_days": 260,
+    "bars_per_day": {
+     "13": 1,
+     "37": 1,
+     "52": 1,
+     "69": 1,
+     "75": 1,
+     "77": 1,
+     "78": 1,
+     "81": 5,
+     "82": 1,
+     "91": 3,
+     "92": 244
+    },
+    "price_decimals": {
+     "3": 23609
+    },
+    "share_last_digit_zero": 0.1006,
+    "close_min": 2621.833,
+    "close_max": 4546.678,
+    "spread_points": {
+     "zero_share": 0.0,
+     "min": 159,
+     "median": 160.0,
+     "p90": 160.0,
+     "max": 3352
+    },
+    "tick_volume": {
+     "median": 2424.0,
+     "p10": 1184.0,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 4.435,
+    "median_range_pct": 0.1299,
+    "bars_range_gt_10x_median": 19,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.099,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Sun 18:00": 52,
+     "Wed 18:00": 1
+    }
+   },
+   "2026": {
+    "m15_bars": 9821,
+    "trading_days": 108,
+    "bars_per_day": {
+     "8": 1,
+     "82": 3,
+     "91": 1,
+     "92": 103
+    },
+    "price_decimals": {
+     "3": 9821
+    },
+    "share_last_digit_zero": 0.0992,
+    "close_min": 4130.579,
+    "close_max": 5586.158,
+    "spread_points": {
+     "zero_share": 0.0,
+     "min": 160,
+     "median": 280.0,
+     "p90": 280.0,
+     "max": 540
+    },
+    "tick_volume": {
+     "median": 3033.0,
+     "p10": 1488.0,
+     "zero_bars": 0
+    },
+    "real_volume_nonzero": 0,
+    "median_range": 9.946,
+    "median_range_pct": 0.2076,
+    "bars_range_gt_10x_median": 22,
+    "intraday_open_jumps_gt_0.5pct": 0,
+    "max_intraday_open_jump_pct": 0.011,
+    "flat_bars_o_h_l_c_equal": 0,
+    "first_bar_of_week_ny": {
+     "Sun 18:00": 22,
+     "Thu 18:00": 1
+    }
+   }
+  },
+  "largest_open_jumps": [
+   {
+    "bar": "2021-08-08 22:00:00+00:00",
+    "jump_pct": 2.465,
+    "same_session": false,
+    "prev_close": 1719.053,
+    "open": 1761.426
+   },
+   {
+    "bar": "2026-02-01 23:00:00+00:00",
+    "jump_pct": 2.003,
+    "same_session": false,
+    "prev_close": 4891.496,
+    "open": 4793.519
+   },
+   {
+    "bar": "2022-02-27 23:00:00+00:00",
+    "jump_pct": 1.696,
+    "same_session": false,
+    "prev_close": 1889.003,
+    "open": 1921.032
+   },
+   {
+    "bar": "2026-04-12 22:00:00+00:00",
+    "jump_pct": 1.665,
+    "same_session": false,
+    "prev_close": 4749.325,
+    "open": 4670.253
+   },
+   {
+    "bar": "2020-01-05 00:00:00+00:00",
+    "jump_pct": 1.575,
+    "same_session": false,
+    "prev_close": 1551.883,
+    "open": 1576.329
+   },
+   {
+    "bar": "2020-03-15 00:00:00+00:00",
+    "jump_pct": 1.48,
+    "same_session": false,
+    "prev_close": 1529.245,
+    "open": 1551.879
+   },
+   {
+    "bar": "2025-05-11 22:00:00+00:00",
+    "jump_pct": 1.339,
+    "same_session": false,
+    "prev_close": 3326.805,
+    "open": 3282.255
+   },
+   {
+    "bar": "2020-03-08 00:00:00+00:00",
+    "jump_pct": 1.312,
+    "same_session": false,
+    "prev_close": 1674.32,
+    "open": 1696.28
+   },
+   {
+    "bar": "2025-04-22 22:00:00+00:00",
+    "jump_pct": 1.296,
+    "same_session": false,
+    "prev_close": 3381.379,
+    "open": 3337.566
+   },
+   {
+    "bar": "2026-01-18 23:00:00+00:00",
+    "jump_pct": 1.279,
+    "same_session": false,
+    "prev_close": 4596.588,
+    "open": 4655.358
+   },
+   {
+    "bar": "2026-04-19 22:00:00+00:00",
+    "jump_pct": 1.21,
+    "same_session": false,
+    "prev_close": 4832.939,
+    "open": 4774.48
+   },
+   {
+    "bar": "2023-10-08 22:00:00+00:00",
+    "jump_pct": 1.173,
+    "same_session": false,
+    "prev_close": 1831.9,
+    "open": 1853.39
+   },
+   {
+    "bar": "2023-05-03 22:00:00+00:00",
+    "jump_pct": 1.107,
+    "same_session": false,
+    "prev_close": 2039.418,
+    "open": 2061.996
+   },
+   {
+    "bar": "2024-04-14 22:00:00+00:00",
+    "jump_pct": 1.055,
+    "same_session": false,
+    "prev_close": 2344.382,
+    "open": 2369.105
+   },
+   {
+    "bar": "2020-02-23 00:00:00+00:00",
+    "jump_pct": 1.0,
+    "same_session": false,
+    "prev_close": 1643.319,
+    "open": 1659.76
+   }
+  ]
+ },
+ "H1": {
+  "header_equal": true,
+  "row_groups_new_export": {
+   "NEW": 35548,
+   "DEV": 2591,
+   "SEALED": 1782,
+   "POST": 149
+  },
+  "row_groups_phase2a": {
+   "NEW": 0,
+   "DEV": 2591,
+   "SEALED": 1781,
+   "POST": 0
+  },
+  "overlap_dev_full": {
+   "rows_new": 2591,
+   "rows_phase2a": 2591,
+   "timestamps_in_both": 2591,
+   "only_in_new": 0,
+   "only_in_phase2a": 0,
+   "open_text_equal": 2591,
+   "high_text_equal": 2591,
+   "low_text_equal": 2591,
+   "close_text_equal": 2591,
+   "tick_volume_equal": 2591,
+   "tick_volume_diff_examples": [],
+   "spread_equal": 2591,
+   "spread_diff_examples": [],
+   "real_volume_equal": 2591,
+   "real_volume_diff_examples": [],
+   "identical_lines": 2591
+  },
+  "overlap_sealed_text_only": {
+   "rows_new": 1782,
+   "rows_phase2a": 1781,
+   "identical_lines": 1781,
+   "timestamps_in_both": 1781,
+   "timestamps_only_new": 1,
+   "timestamps_only_phase2a": 0
+  },
+  "quality_new_plus_dev": {
+   "rows": 38139,
+   "first": "2019-12-23 00:00:00+00:00",
+   "last": "2026-06-02 23:00:00+00:00",
+   "monotonic": true,
+   "duplicates": 0,
+   "misaligned_timestamps": 0,
+   "invalid_ohlc": 0,
+   "gaps_by_kind": {
+    "daily_break": 1279,
+    "weekend": 240,
+    "UNEXPLAINED": 167,
+    "holiday/early_close": 61,
+    "weekend+holiday": 4
+   },
+   "unexplained_gaps": [
+    {
+     "prev_bar": "2019-12-27 21:00:00+00:00",
+     "next_bar": "2019-12-29 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2019
+    },
+    {
+     "prev_bar": "2019-12-29 00:00:00+00:00",
+     "next_bar": "2019-12-29 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2019
+    },
+    {
+     "prev_bar": "2020-01-03 21:00:00+00:00",
+     "next_bar": "2020-01-05 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-05 00:00:00+00:00",
+     "next_bar": "2020-01-05 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-10 21:00:00+00:00",
+     "next_bar": "2020-01-12 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-12 00:00:00+00:00",
+     "next_bar": "2020-01-12 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-17 21:00:00+00:00",
+     "next_bar": "2020-01-19 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-19 00:00:00+00:00",
+     "next_bar": "2020-01-19 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-24 21:00:00+00:00",
+     "next_bar": "2020-01-26 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-26 00:00:00+00:00",
+     "next_bar": "2020-01-26 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-01-31 21:00:00+00:00",
+     "next_bar": "2020-02-02 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-02 00:00:00+00:00",
+     "next_bar": "2020-02-02 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-07 21:00:00+00:00",
+     "next_bar": "2020-02-09 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-09 00:00:00+00:00",
+     "next_bar": "2020-02-09 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-14 21:00:00+00:00",
+     "next_bar": "2020-02-16 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-16 00:00:00+00:00",
+     "next_bar": "2020-02-16 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-21 21:00:00+00:00",
+     "next_bar": "2020-02-23 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-23 00:00:00+00:00",
+     "next_bar": "2020-02-23 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-02-28 21:00:00+00:00",
+     "next_bar": "2020-03-01 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-01 00:00:00+00:00",
+     "next_bar": "2020-03-01 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-06 21:00:00+00:00",
+     "next_bar": "2020-03-08 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-08 00:00:00+00:00",
+     "next_bar": "2020-03-08 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-13 20:00:00+00:00",
+     "next_bar": "2020-03-15 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-15 00:00:00+00:00",
+     "next_bar": "2020-03-15 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-20 20:00:00+00:00",
+     "next_bar": "2020-03-22 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-22 00:00:00+00:00",
+     "next_bar": "2020-03-22 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-27 20:00:00+00:00",
+     "next_bar": "2020-03-29 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-03-29 00:00:00+00:00",
+     "next_bar": "2020-03-29 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-03 20:00:00+00:00",
+     "next_bar": "2020-04-05 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-05 00:00:00+00:00",
+     "next_bar": "2020-04-05 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-12 00:00:00+00:00",
+     "next_bar": "2020-04-12 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-17 20:00:00+00:00",
+     "next_bar": "2020-04-19 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-19 00:00:00+00:00",
+     "next_bar": "2020-04-19 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-24 20:00:00+00:00",
+     "next_bar": "2020-04-26 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-04-26 00:00:00+00:00",
+     "next_bar": "2020-04-26 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-01 20:00:00+00:00",
+     "next_bar": "2020-05-03 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-03 00:00:00+00:00",
+     "next_bar": "2020-05-03 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-08 20:00:00+00:00",
+     "next_bar": "2020-05-10 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-10 00:00:00+00:00",
+     "next_bar": "2020-05-10 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-15 20:00:00+00:00",
+     "next_bar": "2020-05-17 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-17 00:00:00+00:00",
+     "next_bar": "2020-05-17 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-22 20:00:00+00:00",
+     "next_bar": "2020-05-24 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-24 00:00:00+00:00",
+     "next_bar": "2020-05-24 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-29 20:00:00+00:00",
+     "next_bar": "2020-05-31 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-05-31 00:00:00+00:00",
+     "next_bar": "2020-05-31 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-05 20:00:00+00:00",
+     "next_bar": "2020-06-07 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-07 00:00:00+00:00",
+     "next_bar": "2020-06-07 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-12 20:00:00+00:00",
+     "next_bar": "2020-06-14 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-14 00:00:00+00:00",
+     "next_bar": "2020-06-14 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-19 20:00:00+00:00",
+     "next_bar": "2020-06-21 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-21 00:00:00+00:00",
+     "next_bar": "2020-06-21 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-26 20:00:00+00:00",
+     "next_bar": "2020-06-28 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-06-28 00:00:00+00:00",
+     "next_bar": "2020-06-28 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-05 00:00:00+00:00",
+     "next_bar": "2020-07-05 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-10 20:00:00+00:00",
+     "next_bar": "2020-07-12 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-12 00:00:00+00:00",
+     "next_bar": "2020-07-12 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-17 20:00:00+00:00",
+     "next_bar": "2020-07-19 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-19 00:00:00+00:00",
+     "next_bar": "2020-07-19 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-24 20:00:00+00:00",
+     "next_bar": "2020-07-26 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-26 00:00:00+00:00",
+     "next_bar": "2020-07-26 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-07-31 20:00:00+00:00",
+     "next_bar": "2020-08-02 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-02 00:00:00+00:00",
+     "next_bar": "2020-08-02 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-07 20:00:00+00:00",
+     "next_bar": "2020-08-09 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-09 00:00:00+00:00",
+     "next_bar": "2020-08-09 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-14 20:00:00+00:00",
+     "next_bar": "2020-08-16 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-16 00:00:00+00:00",
+     "next_bar": "2020-08-16 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-21 20:00:00+00:00",
+     "next_bar": "2020-08-23 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-23 00:00:00+00:00",
+     "next_bar": "2020-08-23 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-28 20:00:00+00:00",
+     "next_bar": "2020-08-30 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-08-30 00:00:00+00:00",
+     "next_bar": "2020-08-30 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-04 20:00:00+00:00",
+     "next_bar": "2020-09-06 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-06 00:00:00+00:00",
+     "next_bar": "2020-09-06 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-11 20:00:00+00:00",
+     "next_bar": "2020-09-13 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-13 00:00:00+00:00",
+     "next_bar": "2020-09-13 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-18 20:00:00+00:00",
+     "next_bar": "2020-09-20 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-20 00:00:00+00:00",
+     "next_bar": "2020-09-20 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-25 20:00:00+00:00",
+     "next_bar": "2020-09-27 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-09-27 00:00:00+00:00",
+     "next_bar": "2020-09-27 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-02 20:00:00+00:00",
+     "next_bar": "2020-10-04 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-04 00:00:00+00:00",
+     "next_bar": "2020-10-04 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-09 20:00:00+00:00",
+     "next_bar": "2020-10-11 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-11 00:00:00+00:00",
+     "next_bar": "2020-10-11 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-16 20:00:00+00:00",
+     "next_bar": "2020-10-18 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-18 00:00:00+00:00",
+     "next_bar": "2020-10-18 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-23 20:00:00+00:00",
+     "next_bar": "2020-10-25 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-25 00:00:00+00:00",
+     "next_bar": "2020-10-25 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-10-30 20:00:00+00:00",
+     "next_bar": "2020-11-01 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-01 00:00:00+00:00",
+     "next_bar": "2020-11-01 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-06 21:00:00+00:00",
+     "next_bar": "2020-11-08 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-08 00:00:00+00:00",
+     "next_bar": "2020-11-08 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-13 21:00:00+00:00",
+     "next_bar": "2020-11-15 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-15 00:00:00+00:00",
+     "next_bar": "2020-11-15 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-20 21:00:00+00:00",
+     "next_bar": "2020-11-22 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-22 00:00:00+00:00",
+     "next_bar": "2020-11-22 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-11-29 00:00:00+00:00",
+     "next_bar": "2020-11-29 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-04 21:00:00+00:00",
+     "next_bar": "2020-12-06 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-06 00:00:00+00:00",
+     "next_bar": "2020-12-06 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-11 21:00:00+00:00",
+     "next_bar": "2020-12-13 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-13 00:00:00+00:00",
+     "next_bar": "2020-12-13 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-18 21:00:00+00:00",
+     "next_bar": "2020-12-20 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-20 00:00:00+00:00",
+     "next_bar": "2020-12-20 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2020-12-27 00:00:00+00:00",
+     "next_bar": "2020-12-27 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2020
+    },
+    {
+     "prev_bar": "2021-01-03 00:00:00+00:00",
+     "next_bar": "2021-01-03 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-08 21:00:00+00:00",
+     "next_bar": "2021-01-10 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-10 00:00:00+00:00",
+     "next_bar": "2021-01-10 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-15 21:00:00+00:00",
+     "next_bar": "2021-01-17 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-17 00:00:00+00:00",
+     "next_bar": "2021-01-17 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-22 21:00:00+00:00",
+     "next_bar": "2021-01-24 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-24 00:00:00+00:00",
+     "next_bar": "2021-01-24 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-29 21:00:00+00:00",
+     "next_bar": "2021-01-31 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-01-31 00:00:00+00:00",
+     "next_bar": "2021-01-31 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-05 21:00:00+00:00",
+     "next_bar": "2021-02-07 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-07 00:00:00+00:00",
+     "next_bar": "2021-02-07 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-12 21:00:00+00:00",
+     "next_bar": "2021-02-14 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-14 00:00:00+00:00",
+     "next_bar": "2021-02-14 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-19 21:00:00+00:00",
+     "next_bar": "2021-02-21 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-21 00:00:00+00:00",
+     "next_bar": "2021-02-21 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-26 21:00:00+00:00",
+     "next_bar": "2021-02-28 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-02-28 00:00:00+00:00",
+     "next_bar": "2021-02-28 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-05 21:00:00+00:00",
+     "next_bar": "2021-03-07 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-07 00:00:00+00:00",
+     "next_bar": "2021-03-07 23:00:00+00:00",
+     "gap_min": 1320.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-12 21:00:00+00:00",
+     "next_bar": "2021-03-14 00:00:00+00:00",
+     "gap_min": 1560.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 19:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-14 00:00:00+00:00",
+     "next_bar": "2021-03-14 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 20:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-19 20:00:00+00:00",
+     "next_bar": "2021-03-21 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-21 00:00:00+00:00",
+     "next_bar": "2021-03-21 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-26 20:00:00+00:00",
+     "next_bar": "2021-03-28 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-03-28 00:00:00+00:00",
+     "next_bar": "2021-03-28 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-04 00:00:00+00:00",
+     "next_bar": "2021-04-04 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-09 20:00:00+00:00",
+     "next_bar": "2021-04-11 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-11 00:00:00+00:00",
+     "next_bar": "2021-04-11 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-16 20:00:00+00:00",
+     "next_bar": "2021-04-18 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-18 00:00:00+00:00",
+     "next_bar": "2021-04-18 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-23 20:00:00+00:00",
+     "next_bar": "2021-04-25 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-25 00:00:00+00:00",
+     "next_bar": "2021-04-25 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-04-30 20:00:00+00:00",
+     "next_bar": "2021-05-02 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-02 00:00:00+00:00",
+     "next_bar": "2021-05-02 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-07 20:00:00+00:00",
+     "next_bar": "2021-05-09 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-09 00:00:00+00:00",
+     "next_bar": "2021-05-09 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-14 20:00:00+00:00",
+     "next_bar": "2021-05-16 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-16 00:00:00+00:00",
+     "next_bar": "2021-05-16 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-21 20:00:00+00:00",
+     "next_bar": "2021-05-23 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-23 00:00:00+00:00",
+     "next_bar": "2021-05-23 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-28 20:00:00+00:00",
+     "next_bar": "2021-05-30 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-05-30 00:00:00+00:00",
+     "next_bar": "2021-05-30 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-04 20:00:00+00:00",
+     "next_bar": "2021-06-06 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-06 00:00:00+00:00",
+     "next_bar": "2021-06-06 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-11 20:00:00+00:00",
+     "next_bar": "2021-06-13 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-13 00:00:00+00:00",
+     "next_bar": "2021-06-13 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-20 00:00:00+00:00",
+     "next_bar": "2021-06-20 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-25 20:00:00+00:00",
+     "next_bar": "2021-06-27 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-06-27 00:00:00+00:00",
+     "next_bar": "2021-06-27 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-02 20:00:00+00:00",
+     "next_bar": "2021-07-04 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-04 00:00:00+00:00",
+     "next_bar": "2021-07-04 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-09 20:00:00+00:00",
+     "next_bar": "2021-07-11 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-11 00:00:00+00:00",
+     "next_bar": "2021-07-11 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-16 20:00:00+00:00",
+     "next_bar": "2021-07-18 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-18 00:00:00+00:00",
+     "next_bar": "2021-07-18 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-23 20:00:00+00:00",
+     "next_bar": "2021-07-25 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-25 00:00:00+00:00",
+     "next_bar": "2021-07-25 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-07-30 20:00:00+00:00",
+     "next_bar": "2021-08-01 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-01 00:00:00+00:00",
+     "next_bar": "2021-08-01 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-06 20:00:00+00:00",
+     "next_bar": "2021-08-08 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-08 00:00:00+00:00",
+     "next_bar": "2021-08-08 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-13 20:00:00+00:00",
+     "next_bar": "2021-08-15 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2021-08-15 00:00:00+00:00",
+     "next_bar": "2021-08-15 22:00:00+00:00",
+     "gap_min": 1260.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Sat 21:00",
+     "reopen_ny": "Sun 18:00",
+     "year": 2021
+    },
+    {
+     "prev_bar": "2022-02-08 23:00:00+00:00",
+     "next_bar": "2022-02-09 01:00:00+00:00",
+     "gap_min": 60.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Tue 19:00",
+     "reopen_ny": "Tue 20:00",
+     "year": 2022
+    },
+    {
+     "prev_bar": "2025-10-16 15:00:00+00:00",
+     "next_bar": "2025-10-16 17:00:00+00:00",
+     "gap_min": 60.0,
+     "kind": "UNEXPLAINED",
+     "close_ny": "Thu 12:00",
+     "reopen_ny": "Thu 13:00",
+     "year": 2025
+    }
+   ],
+   "holiday_gaps": [
+    {
+     "prev_bar": "2019-12-24 17:00:00+00:00",
+     "next_bar": "2019-12-26 00:00:00+00:00",
+     "gap_min": 1800.0,
+     "close_ny": "Tue 13:00",
+     "reopen_ny": "Wed 19:00"
+    },
+    {
+     "prev_bar": "2019-12-26 00:00:00+00:00",
+     "next_bar": "2019-12-26 06:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Wed 20:00",
+     "reopen_ny": "Thu 01:00"
+    },
+    {
+     "prev_bar": "2019-12-31 17:00:00+00:00",
+     "next_bar": "2020-01-02 00:00:00+00:00",
+     "gap_min": 1800.0,
+     "close_ny": "Tue 13:00",
+     "reopen_ny": "Wed 19:00"
+    },
+    {
+     "prev_bar": "2020-01-20 17:00:00+00:00",
+     "next_bar": "2020-01-20 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-02-17 17:00:00+00:00",
+     "next_bar": "2020-02-17 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-04-09 20:00:00+00:00",
+     "next_bar": "2020-04-12 00:00:00+00:00",
+     "gap_min": 3060.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2020-05-25 16:00:00+00:00",
+     "next_bar": "2020-05-25 22:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-07-03 16:00:00+00:00",
+     "next_bar": "2020-07-05 00:00:00+00:00",
+     "gap_min": 1860.0,
+     "close_ny": "Fri 13:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2020-09-07 16:00:00+00:00",
+     "next_bar": "2020-09-07 22:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2020-11-26 17:00:00+00:00",
+     "next_bar": "2020-11-26 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Thu 13:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2020-11-27 18:00:00+00:00",
+     "next_bar": "2020-11-29 00:00:00+00:00",
+     "gap_min": 1740.0,
+     "close_ny": "Fri 14:00",
+     "reopen_ny": "Sat 19:00"
+    },
+    {
+     "prev_bar": "2020-12-24 17:00:00+00:00",
+     "next_bar": "2020-12-27 00:00:00+00:00",
+     "gap_min": 3240.0,
+     "close_ny": "Thu 13:00",
+     "reopen_ny": "Sat 19:00"
+    },
+    {
+     "prev_bar": "2020-12-31 17:00:00+00:00",
+     "next_bar": "2021-01-03 00:00:00+00:00",
+     "gap_min": 3240.0,
+     "close_ny": "Thu 13:00",
+     "reopen_ny": "Sat 19:00"
+    },
+    {
+     "prev_bar": "2021-01-18 17:00:00+00:00",
+     "next_bar": "2021-01-18 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-02-15 17:00:00+00:00",
+     "next_bar": "2021-02-15 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-04-01 20:00:00+00:00",
+     "next_bar": "2021-04-04 00:00:00+00:00",
+     "gap_min": 3060.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2021-05-31 17:00:00+00:00",
+     "next_bar": "2021-05-31 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-06-18 20:00:00+00:00",
+     "next_bar": "2021-06-20 00:00:00+00:00",
+     "gap_min": 1620.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Sat 20:00"
+    },
+    {
+     "prev_bar": "2021-07-05 16:00:00+00:00",
+     "next_bar": "2021-07-05 22:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Mon 13:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-09-06 17:00:00+00:00",
+     "next_bar": "2021-09-06 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2021-11-25 17:00:00+00:00",
+     "next_bar": "2021-11-25 23:00:00+00:00",
+     "gap_min": 300.0,
+     "close_ny": "Thu 13:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2021-12-23 21:00:00+00:00",
+     "next_bar": "2021-12-26 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2022-01-17 19:00:00+00:00",
+     "next_bar": "2022-01-17 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-02-21 19:00:00+00:00",
+     "next_bar": "2022-02-21 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-04-14 20:00:00+00:00",
+     "next_bar": "2022-04-17 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2022-05-30 17:00:00+00:00",
+     "next_bar": "2022-05-30 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-06-20 17:00:00+00:00",
+     "next_bar": "2022-06-20 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-07-04 17:00:00+00:00",
+     "next_bar": "2022-07-04 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-09-05 17:00:00+00:00",
+     "next_bar": "2022-09-05 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-11-24 19:00:00+00:00",
+     "next_bar": "2022-11-24 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Thu 15:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2022-12-23 21:00:00+00:00",
+     "next_bar": "2022-12-26 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2022-12-30 21:00:00+00:00",
+     "next_bar": "2023-01-02 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-01-16 19:00:00+00:00",
+     "next_bar": "2023-01-16 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-02-20 19:00:00+00:00",
+     "next_bar": "2023-02-20 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-04-06 20:00:00+00:00",
+     "next_bar": "2023-04-09 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2023-05-29 17:00:00+00:00",
+     "next_bar": "2023-05-29 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-06-19 17:00:00+00:00",
+     "next_bar": "2023-06-19 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-07-04 18:00:00+00:00",
+     "next_bar": "2023-07-04 22:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Tue 15:00",
+     "reopen_ny": "Tue 18:00"
+    },
+    {
+     "prev_bar": "2023-09-04 17:00:00+00:00",
+     "next_bar": "2023-09-04 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-11-23 18:00:00+00:00",
+     "next_bar": "2023-11-23 23:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Thu 14:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2023-12-22 21:00:00+00:00",
+     "next_bar": "2023-12-25 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2023-12-29 21:00:00+00:00",
+     "next_bar": "2024-01-01 23:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Fri 17:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-01-15 19:00:00+00:00",
+     "next_bar": "2024-01-15 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-02-19 19:00:00+00:00",
+     "next_bar": "2024-02-19 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-03-28 20:00:00+00:00",
+     "next_bar": "2024-03-31 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2024-05-27 17:00:00+00:00",
+     "next_bar": "2024-05-27 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-06-19 17:00:00+00:00",
+     "next_bar": "2024-06-19 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Wed 14:00",
+     "reopen_ny": "Wed 18:00"
+    },
+    {
+     "prev_bar": "2024-07-04 17:00:00+00:00",
+     "next_bar": "2024-07-04 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Thu 14:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2024-09-02 17:00:00+00:00",
+     "next_bar": "2024-09-02 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Mon 14:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2024-11-28 18:00:00+00:00",
+     "next_bar": "2024-11-28 23:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Thu 14:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2024-12-24 18:00:00+00:00",
+     "next_bar": "2024-12-25 23:00:00+00:00",
+     "gap_min": 1680.0,
+     "close_ny": "Tue 14:00",
+     "reopen_ny": "Wed 18:00"
+    },
+    {
+     "prev_bar": "2024-12-31 21:00:00+00:00",
+     "next_bar": "2025-01-01 23:00:00+00:00",
+     "gap_min": 1500.0,
+     "close_ny": "Tue 17:00",
+     "reopen_ny": "Wed 18:00"
+    },
+    {
+     "prev_bar": "2025-01-20 19:00:00+00:00",
+     "next_bar": "2025-01-20 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-02-17 19:00:00+00:00",
+     "next_bar": "2025-02-17 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-04-17 20:00:00+00:00",
+     "next_bar": "2025-04-20 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2025-05-26 18:00:00+00:00",
+     "next_bar": "2025-05-26 22:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-06-19 17:00:00+00:00",
+     "next_bar": "2025-06-19 22:00:00+00:00",
+     "gap_min": 240.0,
+     "close_ny": "Thu 14:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2025-09-01 18:00:00+00:00",
+     "next_bar": "2025-09-01 22:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2025-11-27 19:00:00+00:00",
+     "next_bar": "2025-11-27 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Thu 15:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2025-12-24 18:00:00+00:00",
+     "next_bar": "2025-12-25 23:00:00+00:00",
+     "gap_min": 1680.0,
+     "close_ny": "Wed 14:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2025-12-31 21:00:00+00:00",
+     "next_bar": "2026-01-01 23:00:00+00:00",
+     "gap_min": 1500.0,
+     "close_ny": "Wed 17:00",
+     "reopen_ny": "Thu 18:00"
+    },
+    {
+     "prev_bar": "2026-01-19 19:00:00+00:00",
+     "next_bar": "2026-01-19 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2026-02-16 19:00:00+00:00",
+     "next_bar": "2026-02-16 23:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    },
+    {
+     "prev_bar": "2026-04-02 20:00:00+00:00",
+     "next_bar": "2026-04-05 22:00:00+00:00",
+     "gap_min": 4380.0,
+     "close_ny": "Thu 17:00",
+     "reopen_ny": "Sun 18:00"
+    },
+    {
+     "prev_bar": "2026-05-25 18:00:00+00:00",
+     "next_bar": "2026-05-25 22:00:00+00:00",
+     "gap_min": 180.0,
+     "close_ny": "Mon 15:00",
+     "reopen_ny": "Mon 18:00"
+    }
+   ],
+   "break_variants": [],
+   "daily_break_pattern_by_year": {
+    "2019": {
+     "17:00->18:00 (60m)": 3
+    },
+    "2020": {
+     "17:00->18:00 (60m)": 201
+    },
+    "2021": {
+     "17:00->18:00 (60m)": 200
+    },
+    "2022": {
+     "17:00->18:00 (60m)": 199
+    },
+    "2023": {
+     "17:00->18:00 (60m)": 198
+    },
+    "2024": {
+     "17:00->18:00 (60m)": 198
+    },
+    "2025": {
+     "17:00->18:00 (60m)": 198
+    },
+    "2026": {
+     "17:00->18:00 (60m)": 82
+    }
+   }
+  },
+  "m15_h1_alignment": {
+   "hours_both": 38139,
+   "hours_only_in_m15": 0,
+   "hours_only_in_h1": 0,
+   "open_mismatch": 0,
+   "high_mismatch": 0,
+   "low_mismatch": 0,
+   "close_mismatch": 0,
+   "tick_volume_mismatch": 0,
+   "partial_hours_m15_lt_4_bars": 141,
+   "ohlc_mismatch_examples": []
+  },
+  "h1_by_year": {
+   "2019": 124,
+   "2020": 5973,
+   "2021": 5940,
+   "2022": 5912,
+   "2023": 5890,
+   "2024": 5932,
+   "2025": 5911,
+   "2026": 2457
+  }
+ }
+}

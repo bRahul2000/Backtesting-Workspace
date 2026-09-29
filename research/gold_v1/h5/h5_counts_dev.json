@@ -1,0 +1,18 @@
+{
+ "days_studied": 114,
+ "days_with_or": 113,
+ "raw_outside_closes": {
+  "long": 425,
+  "short": 363
+ },
+ "confirmations": {
+  "long": 336,
+  "short": 289
+ },
+ "suppressed_duplicates": {
+  "long": 283,
+  "short": 244
+ },
+ "no_entry_bar": 0,
+ "rejected_risk_le_0": 0
+}

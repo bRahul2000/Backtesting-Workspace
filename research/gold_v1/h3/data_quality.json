@@ -1,0 +1,54 @@
+{
+ "1_continuity": {
+  "gaps": 113,
+  "unexplained": [],
+  "pass": true
+ },
+ "2_utc": {
+  "pass": true,
+  "evidence": "daily break at 17:00 America/New_York in both EST and EDT (22:00 / 21:00 UTC)"
+ },
+ "3_london_dst": {
+  "pass": true
+ },
+ "4_new_york_dst": {
+  "pass": true
+ },
+ "5_sessions": {
+  "pass": true
+ },
+ "6_7_tvwap": {
+  "pass": true,
+  "days_checked": 13,
+  "definition": "reset at the first bar after the daily break; weighted mean and weighted (population) variance of typical price, weights = tick volume"
+ },
+ "8_previous_day": {
+  "pass": true
+ },
+ "9_asia_frozen": {
+  "pass": true
+ },
+ "10_no_future_leak": {
+  "pass": true,
+  "method": "prefix invariance at 70 %"
+ },
+ "11_spread_field": {
+  "pass": true,
+  "status": "UNRESOLVED semantics (documented)",
+  "evidence": "MT5 MqlRates.spread is not specified by MetaQuotes as open/close/min; most common values {280: np.int64(4661), 160: np.int64(3085), 240: np.int64(1354), 360: np.int64(769)} points, uncorrelated with bar range (r = -0.042). Used only as a descriptive spread/risk ratio; no conclusion depends on it."
+ },
+ "12_intrabar_ambiguity": {
+  "pass": true,
+  "method": "forward race marks a target and -1R reached in the same M15 bar as AMBIGUOUS_INTRABAR (reported separately)"
+ },
+ "result": "PASS",
+ "h3_prefix_invariance": {
+  "pass": true,
+  "events_in_prefix": 44,
+  "method": "features and events at 70 %"
+ },
+ "h3_structure_causal": {
+  "pass": true,
+  "method": "box = bars k\u22127..k < D (same day), D\u2212k \u2264 8, A = D+1, E = D+2, stop = displacement bar's opposite side"
+ }
+}

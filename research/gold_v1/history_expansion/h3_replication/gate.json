@@ -1,0 +1,12 @@
+{
+ "h3_prefix_invariance": {
+  "pass": true,
+  "events_in_prefix": 357,
+  "method": "features and events at 70 %"
+ },
+ "h3_structure_causal": {
+  "pass": true,
+  "method": "box = bars k\u22127..k < D (same day), D\u2212k \u2264 8, A = D+1, E = D+2, stop = displacement bar's opposite side"
+ },
+ "result": "PASS"
+}

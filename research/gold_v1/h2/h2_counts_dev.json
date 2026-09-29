@@ -1,0 +1,16 @@
+{
+ "raw_qualifying_bars": {
+  "long": 132,
+  "short": 60
+ },
+ "unique_sequences": {
+  "long": 65,
+  "short": 41
+ },
+ "sequences_started": {
+  "long": 916,
+  "short": 598
+ },
+ "rejected_risk_le_0": 0,
+ "rejected_no_next_bar": 0
+}

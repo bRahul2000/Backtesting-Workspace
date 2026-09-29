@@ -1,0 +1,21 @@
+{
+ "raw_compression_structures": 293,
+ "raw_displacement_bars": 708,
+ "candidate_displacements": {
+  "long": 46,
+  "short": 54
+ },
+ "candidates_two_sided": 4,
+ "no_acceptance_bar": 0,
+ "acceptance_failed": {
+  "long": 11,
+  "short": 9
+ },
+ "accepted_breakouts": {
+  "long": 35,
+  "short": 45
+ },
+ "suppressed_duplicates": 2,
+ "no_entry_bar": 1,
+ "rejected_risk_le_0": 0
+}

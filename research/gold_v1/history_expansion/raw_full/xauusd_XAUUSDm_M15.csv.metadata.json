@@ -1,0 +1,12 @@
+{
+  "source": "MT5 CopyRates broker history",
+  "symbol": "XAUUSDm",
+  "timeframe": "M15",
+  "timestamp_field_timezone": "broker trade-server time; see server_utc_offset_seconds",
+  "server_utc_offset_seconds_at_capture": 0,
+  "account_server": "Exness-MT5Trial5",
+  "bars_exported": 222635,
+  "current_incomplete_bar_excluded": true,
+  "capture_server_time": "2026.09.29 09:25:32",
+  "output_file": "C:\\users\\user\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files\\xauusd_XAUUSDm_M15.csv"
+}

@@ -1,0 +1,47 @@
+{
+ "raw_2sigma_closes": {
+  "long": 466,
+  "short": 698
+ },
+ "eligible_2sigma_closes": {
+  "long": 372,
+  "short": 585
+ },
+ "streaks": {
+  "long": 285,
+  "short": 330
+ },
+ "reentries_within_2": {
+  "long": 58,
+  "short": 46
+ },
+ "expired_no_reentry": {
+  "long": 120,
+  "short": 159
+ },
+ "cancelled_opposite_2sigma": {
+  "long": 4,
+  "short": 6
+ },
+ "excluded_not_range_regime": {
+  "long": 32,
+  "short": 30
+ },
+ "excluded_ny_open_hour": {
+  "long": 2,
+  "short": 2
+ },
+ "events": {
+  "long": 22,
+  "short": 11
+ },
+ "no_entry_bar": 0,
+ "rejected_risk_le_0": 0,
+ "rejected_target_le_0": 5,
+ "controls": {
+  "discarded_target_le_0": 1,
+  "dist_relaxed_events": 10,
+  "atr_relaxed_events": 9,
+  "events_without_controls": 0
+ }
+}

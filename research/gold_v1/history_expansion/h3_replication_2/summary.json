@@ -1,0 +1,95 @@
+{
+ "classification": "FAILED TO REPLICATE",
+ "gate": "PASS",
+ "counts": {
+  "raw_compression_structures": 3442,
+  "raw_displacement_bars": 7558,
+  "candidate_displacements": {
+   "long": 568,
+   "short": 652
+  },
+  "candidates_two_sided": 48,
+  "no_acceptance_bar": 8,
+  "acceptance_failed": {
+   "long": 68,
+   "short": 98
+  },
+  "accepted_breakouts": {
+   "long": 499,
+   "short": 547
+  },
+  "suppressed_duplicates": 32,
+  "no_entry_bar": 2,
+  "rejected_risk_le_0": 0,
+  "events_in_warmup_excluded": 5
+ },
+ "events": 1007,
+ "controls": 5035,
+ "unique_control_bars": 4676,
+ "lifts": {
+  "1.0": {
+   "event_p": 0.4979919678714859,
+   "event_n": 996,
+   "control_p": 0.5067553942327082,
+   "control_n": 4959,
+   "lift_pp": -0.8763426361222293,
+   "ci_lo_pp": -4.248941923615172,
+   "ci_hi_pp": 2.5562968851942878,
+   "event_wilson": [
+    0.46700715633350326,
+    0.5289922099661187
+   ]
+  },
+  "2.0": {
+   "event_p": 0.33163265306122447,
+   "event_n": 980,
+   "control_p": 0.3321749795584628,
+   "control_n": 4892,
+   "lift_pp": -0.05423264972383435,
+   "ci_lo_pp": -3.1725085152886594,
+   "ci_hi_pp": 3.2538186284430655,
+   "event_wilson": [
+    0.3028636073462457,
+    0.3617165445806499
+   ]
+  },
+  "3.0": {
+   "event_p": 0.237551867219917,
+   "event_n": 964,
+   "control_p": 0.250888563662973,
+   "control_n": 4783,
+   "lift_pp": -1.3336696443056018,
+   "ci_lo_pp": -4.254076711280351,
+   "ci_hi_pp": 1.6978477702332568,
+   "event_wilson": [
+    0.21176079772390485,
+    0.26542637835945426
+   ]
+  },
+  "4.0": {
+   "event_p": 0.17446808510638298,
+   "event_n": 940,
+   "control_p": 0.1892357373519914,
+   "control_n": 4645,
+   "lift_pp": -1.4767652245608414,
+   "ci_lo_pp": -4.1086905876867155,
+   "ci_hi_pp": 1.305390669515173,
+   "event_wilson": [
+    0.151544786785009,
+    0.20004132681710396
+   ]
+  }
+ },
+ "ambiguous_events_any_target": 18,
+ "ambiguous_controls_any_target": 99,
+ "unresolved_2R": 23,
+ "provenance_flags": {
+  "lookback_has_repaired_location": 767,
+  "lookback_has_genuine_outage": 47,
+  "race_near_session_regime_transition": 41
+ },
+ "median_mfe32": 1.7432228915663395,
+ "median_mae32": 1.8657516339869498,
+ "control_median_mfe32": 1.615499076949337,
+ "control_median_mae32": 1.5417017088894265
+}

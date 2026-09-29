@@ -1,0 +1,12 @@
+{
+ "M15": {
+  "rows_before": 100557,
+  "rows_removed": 164,
+  "rows_after": 100393
+ },
+ "H1": {
+  "rows_before": 25277,
+  "rows_removed": 164,
+  "rows_after": 25113
+ }
+}

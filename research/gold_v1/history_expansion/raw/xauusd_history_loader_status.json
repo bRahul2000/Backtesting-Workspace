@@ -1,0 +1,12 @@
+{
+  "symbol": "XAUUSDm",
+  "server": "Exness-MT5Trial5",
+  "target_date": "2020.01.01 00:00",
+  "server_first_date": "2014.01.14 00:00",
+  "terminal_first_date_before_run": "2026.01.01 00:00",
+  "max_bars_in_chart": 100000000,
+  "estimated_m15_bars_needed": 161878,
+  "run_finished_server_time": "2026.09.29 08:55",
+  "M15": {"timeframe": "M15", "first_bar": "2019.12.23 00:00", "last_completed_bar": "2026.09.29 08:30", "bars": 159893, "synchronized": true, "target_reached": true, "stop_reason": "TARGET_REACHED", "rounds": 64, "last_error": 0},
+  "H1": {"timeframe": "H1", "first_bar": "2019.12.23 00:00", "last_completed_bar": "2026.09.29 07:00", "bars": 40070, "synchronized": true, "target_reached": true, "stop_reason": "TARGET_REACHED", "rounds": 1, "last_error": 0}
+}
