@@ -51,6 +51,34 @@ function IndicatorMenu({ payload, onClose }) {
   );
 }
 
+// Freshness of the local history (Python: workspace_data.py). Presentation only; Refresh data asks Python to append
+// the local MT5 sources' newer CLOSED bars to the workspace copy (frozen research datasets are never written).
+const STATUS_TEXT = { CURRENT: "Current", STALE: "Stale", UNKNOWN: "Unknown" };
+
+function DataStatusMenu({ status, onClose }) {
+  const row = (label, value) => <div className="ds-row"><span>{label}</span><b className="mono">{value || "—"}</b></div>;
+  return (
+    <div className="form-menu data-status-menu">
+      <div className="menu-heading">Historical data · {status.label}</div>
+      {row("Last local bar", status.last_local && `${status.last_local} UTC`)}
+      {row("Latest available", status.latest_available && `${status.latest_available} UTC`)}
+      {row("Status", STATUS_TEXT[status.status])}
+      {row("Source checked", status.source_captured && `${status.source_captured} UTC · ${status.source === "mt5_export" ? "MT5 history export" : "MT5 Live feed seed"}`)}
+      {status.problems && status.problems.length > 0 && <div className="menu-hint is-warn">{status.problems.join(" · ")}</div>}
+      <div className="menu-hint">
+        {status.status === "UNKNOWN" ? "No local source is known for this dataset, so its freshness cannot be confirmed."
+          : "Closed bars only. Refreshed bars go to this terminal's workspace copy; the frozen research dataset is never changed."}
+        {status.workspace_extended ? " Workspace history is active." : ""}
+      </div>
+      {status.refreshable && (
+        <div className="button-row">
+          <button type="button" className="btn primary data-refresh" onClick={() => { sendEvent("refresh_data"); onClose(); }}>Refresh data</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RangeMenu({ payload, onClose }) {
   const [start, setStart] = useState(payload.range.start || "");
   const [end, setEnd] = useState(payload.range.end || "");
@@ -184,6 +212,23 @@ export function TopBar({ payload, pending, crosshairMode, setCrosshairMode, engi
         </button>
         <Popover open={menu === "range"} onClose={close} width={260}><RangeMenu payload={payload} onClose={close} /></Popover>
       </div>
+      {payload.data_status && !live && (
+        <div className="anchor ds-anchor">
+          <button type="button" className={`tool-btn data-status is-${payload.data_status.status.toLowerCase()} ${menu === "data" ? "is-open" : ""}`}
+            onClick={() => toggle("data")}
+            title={`Historical data ${STATUS_TEXT[payload.data_status.status].toLowerCase()} · Last local bar ${payload.data_status.last_local || "—"} UTC · latest available ${payload.data_status.latest_available ? `${payload.data_status.latest_available} UTC` : "unknown"}`}>
+            <span className="ds-dot" /><span className="ds-text">{STATUS_TEXT[payload.data_status.status]}</span>
+            <span className="mono ds-last">{payload.data_status.last_local || "—"}</span>
+          </button>
+          {payload.data_status.refreshable && payload.data_status.status === "STALE" && !replay && (
+            <button type="button" className="tool-btn data-refresh" title="Refresh data: append the newer closed MT5 bars to the workspace history"
+              onClick={() => sendEvent("refresh_data")}>↻ Refresh</button>
+          )}
+          <Popover open={menu === "data"} onClose={close} width={320}>
+            <DataStatusMenu status={payload.data_status} onClose={close} />
+          </Popover>
+        </div>
+      )}
       <div className="anchor">
         <button type="button" className={`tool-btn icon-only ${menu === "settings" ? "is-open" : ""}`} onClick={() => toggle("settings")} title="Settings">
           <Icon name="gear" size={16} />

@@ -35,11 +35,11 @@ import numpy as np
 import pandas as pd
 
 from services.market_datasets import MarketDataset, all_datasets
-from utils.data_validation import load_ohlcv_csv
 
 from ..pine.security import (MAX_BARS_PER_CONTEXT, BarGrid, Bars, LIMIT, ReceivedBars, Requested,
                              SecurityDataError, Timeframe, _aggregate, parse_timeframe)
 from . import binance
+from . import workspace_data
 
 FAMILY_LABELS = {"exness": "Exness MT5", "binance": "Binance Futures", "bitstamp": "Bitstamp"}
 _BROKER_FAMILY = {"Exness Technologies Ltd": "exness", "Bitstamp (public exchange API)": "bitstamp"}
@@ -208,13 +208,18 @@ class DatasetProvider:
         return cached.bars, self._provenance(symbol, timeframe, base, base, loaded), grid
 
     def _load(self, entry: MarketDataset) -> _Loaded:
-        mtime = entry.path.stat().st_mtime
+        # TradingView Mode: the frozen dataset plus its workspace extension (refreshed closed bars, workspace_data.py)
+        mtime = workspace_data.marker(entry)
         key = (str(entry.path), mtime, entry.step_seconds)
         with self._lock:
             loaded = self._cache.get(key)
         if loaded is None:
-            loaded = _Loaded(_frame_bars(load_ohlcv_csv(entry.path), entry.step_seconds), _fingerprint(entry.path),
-                             mtime)
+            fingerprint = _fingerprint(entry.path)
+            meta = workspace_data._read_meta(workspace_data.metadata_path(entry)) \
+                if workspace_data.extension_path(entry).exists() else None
+            if meta and meta.get("extension_sha256"):
+                fingerprint = f"{fingerprint}+workspace:sha256:{meta['extension_sha256']}"
+            loaded = _Loaded(_frame_bars(workspace_data.load(entry), entry.step_seconds), fingerprint, mtime)
             with self._lock:
                 self._cache[key] = loaded
         return loaded

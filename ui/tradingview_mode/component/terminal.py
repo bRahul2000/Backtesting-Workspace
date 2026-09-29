@@ -43,8 +43,10 @@ from . import pine_bridge
 from . import security_data
 from . import source_roles
 from . import tester
+from . import workspace_data
 from .protocol import (
     CONTRACT_VERSION,
+    DATA_EVENTS,
     PINE_EVENTS,
     TESTER_EVENTS,
     EventValidationError,
@@ -98,22 +100,27 @@ def _mtime(path: Path) -> float:
         return 0.0
 
 
+def _workspace_loader(path) -> pd.DataFrame:
+    """TradingView Mode reads a registered dataset as frozen file + its workspace extension (workspace_data.py)."""
+    return workspace_data.load_path(Path(path), all_datasets())
+
+
 @st.cache_data(show_spinner=False, max_entries=16)
-def _resolved_frame(dataset_key: str, timeframe: str, _mtime_marker: float) -> pd.DataFrame:
+def _resolved_frame(dataset_key: str, timeframe: str, mtime_marker) -> pd.DataFrame:
     resolution = resolve_timeframe(dataset(dataset_key), timeframe)
-    return load_resolution_data(resolution, load_ohlcv_csv)
+    return load_resolution_data(resolution, _workspace_loader)
 
 
 @st.cache_data(show_spinner=False, max_entries=32)
-def _last_closes(path_text: str, _mtime_marker: float) -> tuple[float | None, float | None, int]:
-    closes = load_ohlcv_csv(Path(path_text))["close"]
+def _last_closes(path_text: str, mtime_marker) -> tuple[float | None, float | None, int]:
+    closes = _workspace_loader(path_text)["close"]
     last = float(closes.iloc[-1]) if len(closes) else None
     previous = float(closes.iloc[-2]) if len(closes) > 1 else None
     return last, previous, price_precision(closes)
 
 
 @st.cache_data(show_spinner=False, max_entries=32)
-def _file_bounds(path_text: str, _mtime_marker: float) -> tuple[date, date] | None:
+def _file_bounds(path_text: str, mtime_marker: float) -> tuple[date, date] | None:
     stamps = load_ohlcv_csv(Path(path_text))["timestamp"]
     return (stamps.iloc[0].date(), stamps.iloc[-1].date()) if len(stamps) else None
 
@@ -253,7 +260,7 @@ def watchlist_payload(selected: MarketDataset, live_rows: list[dict] | None = No
         if not available:
             continue
         primary = available[0]
-        last, previous, precision = _last_closes(str(primary.path), _mtime(primary.path))
+        last, previous, precision = _last_closes(str(primary.path), workspace_data.marker(primary))
         change = None if last is None or not previous else (last - previous) / previous * 100.0
         items.append({
             "dataset_key": primary.key, "kind": "dataset", "symbol": primary.symbol, "provider": primary.broker,
@@ -271,7 +278,7 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
                            watchlist: list[dict], ack: str | None = None,
                            tester_payload: dict | None = None, replay_status: dict | None = None,
                            live_status: dict | None = None, sources: dict | None = None,
-                           pine: dict | None = None) -> dict:
+                           pine: dict | None = None, data_status: dict | None = None) -> dict:
     bars = bars_from_frame(frame)
     times = [bar["time"] for bar in bars]
     overlays, panes, indicator_notices = indicator_payload(frame, times, state.indicators)
@@ -334,6 +341,9 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
         "sources": sources,
         # Pine scripts: editor state and each script's outputs on these bars (see pine_bridge.py).
         "pine": pine,
+        # Freshness of the chart's local history (Historical / Replay): last local bar vs the newest closed bar a
+        # known local source has, and whether Refresh data can fetch it (workspace_data.py).
+        "data_status": None if live_status and live_status.get("phase") != "setup" else data_status,
     }
     if live_status and live_status.get("phase") == "setup":
         payload["mode"] = "live"  # setup: the chart still shows the historical dataset
@@ -404,7 +414,7 @@ def consume_event(state: TerminalState, raw, ctx: TerminalContext, last_id: str 
         event = parse_event(raw)
     except EventValidationError as exc:
         return state, LogEntry("error", f"Rejected malformed event: {exc}"), event_id, None
-    if event.type in TESTER_EVENTS or event.type in PINE_EVENTS:
+    if event.type in TESTER_EVENTS or event.type in PINE_EVENTS or event.type in DATA_EVENTS:
         return state, None, event.id, event
     new_state, entry = apply_event(state, event, ctx)
     return new_state, entry, event.id, None
@@ -522,8 +532,40 @@ def _bounds(frame: pd.DataFrame) -> tuple[date, date] | None:
 def _load(state: TerminalState) -> tuple[MarketDataset, TimeframeResolution, pd.DataFrame]:
     selected = dataset(state.dataset_key)
     resolution = resolve_timeframe(selected, state.timeframe)
-    frame = _resolved_frame(selected.key, resolution.target, _mtime(resolution.source.path))
+    frame = _resolved_frame(selected.key, resolution.target, workspace_data.marker(resolution.source))
     return selected, resolution, frame
+
+
+def refresh_workspace_data(state: TerminalState) -> LogEntry:
+    """Refresh data: append the closed bars the local MT5 sources have to the WORKSPACE copies of every refreshable
+    dataset of the chart's symbol (M15 and H1 together, so request.security() stays aligned). Frozen research datasets
+    are never written (workspace_data.py)."""
+    if state.replay is not None or state.live is not None:
+        return LogEntry("error", "Rejected: Refresh data is available in Historical mode.")
+    selected = dataset(state.dataset_key)
+    family = [entry for entry in all_datasets() if entry.symbol == selected.symbol and entry.broker == selected.broker
+              and workspace_data.refreshable(entry)]
+    if not family:
+        return LogEntry("error", f"Rejected: {selected.label} has no local MT5 source to refresh from.")
+    parts, failed = [], []
+    for entry in family:
+        try:
+            result = workspace_data.refresh(entry)
+        except (workspace_data.RefreshError, OSError) as exc:
+            failed.append(f"{entry.timeframe}: not refreshed ({exc}; nothing was written for it)")
+            continue
+        parts.append(f"{entry.timeframe}: +{result['appended']} closed bars through {result['last_closed']} UTC"
+                     if result["appended"] else f"{entry.timeframe}: already current ({result['last_closed']} UTC)")
+    if not parts:
+        return LogEntry("error", f"Refresh failed for {selected.symbol} · " + " · ".join(failed))
+    return LogEntry("warning" if failed else "info",
+                    f"Refreshed {selected.symbol} workspace history · " + " · ".join(parts + failed))
+
+
+def data_status(entry: MarketDataset) -> dict:
+    status = workspace_data.freshness(entry)
+    status["label"] = entry.label
+    return status
 
 
 def live_setup_status(live: providers.LiveState, selected: MarketDataset) -> dict:
@@ -697,7 +739,9 @@ def render_custom_terminal() -> None:
         state, raw_event, context_for(bounds, current_times), st.session_state.get(LAST_EVENT_KEY))
     tester_session = st.session_state.get(TESTER_KEY) or empty_tester_session()
     registry = discover_builtin_strategies()
-    if tester_event is not None and tester_event.type in PINE_EVENTS:
+    if tester_event is not None and tester_event.type in DATA_EVENTS:
+        entry = refresh_workspace_data(state)
+    elif tester_event is not None and tester_event.type in PINE_EVENTS:
         state, entry = pine_bridge.handle_pine_event(tester_event, state, st.session_state)
         state = replace(state, bottom_panel="pine", bottom_open=True)
     elif tester_event is not None:
@@ -784,6 +828,7 @@ def render_custom_terminal() -> None:
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
             logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, rows),
             replay_status=replay_status, live_status=live_status, sources=sources, pine=pine, ack=last_id,
+            data_status=None if streaming else data_status(resolution.source),
             tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
     except ValueError as exc:
         st.error(f"TradingView Mode payload rejected: {exc}")

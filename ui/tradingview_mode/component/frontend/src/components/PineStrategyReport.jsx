@@ -48,15 +48,27 @@ function Metrics({ m }) {
   );
 }
 
-function Trades({ trades, precision }) {
+// Trade-row navigation (as in the Strategy Tester): clicking a row brings its entry..exit bars into view. Entry and
+// exit times are the chart bars' open times (the script ran on exactly these bars).
+function Trades({ trades, precision, onFocusBars }) {
   const rows = [...trades].reverse();
+  const [selectedKey, setSelectedKey] = useState(null);
+  const [note, setNote] = useState(null);
+  const select = (t) => {
+    setSelectedKey(t.key);
+    const shown = onFocusBars ? onFocusBars(t.entry_time, t.open || t.exit_time === null ? t.entry_time : t.exit_time) : false;
+    setNote(shown ? null : `Trade #${t.number} is not on the chart's current bars.`);
+  };
   return (
+    <>
+    {note && <div className="tester-note">{note}</div>}
     <table className="grid-table pine-trades">
       <thead><tr><th>#</th><th>Side</th><th>Entry</th><th>Entry time</th><th>Entry price</th><th>Exit</th>
         <th>Exit time</th><th>Exit price</th><th>Qty</th><th>Profit</th></tr></thead>
       <tbody>
         {rows.map((t) => (
-          <tr key={t.key} className={t.open ? "is-open" : ""}>
+          <tr key={t.key} className={`${t.open ? "is-open" : ""} ${t.key === selectedKey ? "is-selected" : ""}`}
+            onClick={() => select(t)} title="Show this trade on the chart">
             <td className="mono">{t.number}</td>
             <td>{t.direction > 0 ? "Long" : "Short"}</td>
             <td title={t.entry_comment ? `ID ${t.entry_id}` : undefined}>{t.entry_comment || t.entry_id}</td>
@@ -72,10 +84,11 @@ function Trades({ trades, precision }) {
         ))}
       </tbody>
     </table>
+    </>
   );
 }
 
-export function PineStrategyReport({ pine, precision }) {
+export function PineStrategyReport({ pine, precision, onFocusBars }) {
   const strategies = useMemo(() => (pine?.scripts || []).filter((s) => s.kind === "strategy"), [pine]);
   const [selected, setSelected] = useState(null);
   const script = strategies.find((s) => s.id === selected) || strategies[0];
@@ -99,7 +112,7 @@ export function PineStrategyReport({ pine, precision }) {
         <>
           <Metrics m={report.metrics} />
           <EquitySpark equity={report.equity} />
-          <Trades trades={report.trades} precision={precision} />
+          <Trades trades={report.trades} precision={precision} onFocusBars={onFocusBars} />
         </>
       )}
     </div>

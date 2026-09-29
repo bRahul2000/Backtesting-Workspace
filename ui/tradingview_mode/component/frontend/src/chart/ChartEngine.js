@@ -140,6 +140,7 @@ export class ChartEngine {
     const before = newView ? null : timeScale.getVisibleLogicalRange();
     const beforeTime = newView ? null : timeScale.getVisibleRange();
     const wasFollowing = this.follow;
+    const previousLast = this.bars.length ? this.bars[this.bars.length - 1].time : null;
     this.stats.updates += 1;
 
     if (precision !== this.precision) {
@@ -196,7 +197,9 @@ export class ChartEngine {
       const range = shiftedRange(before, replaced.shift);
       if (range) timeScale.setVisibleLogicalRange(range);
       else this.applyRange(beforeTime);
-      if (streaming && wasFollowing) timeScale.scrollToRealTime();
+      // Following the newest bar and newer bars arrived (streaming, or a Historical data refresh): keep following.
+      const grew = previousLast !== null && this.bars.length && this.bars[this.bars.length - 1].time > previousLast;
+      if (wasFollowing && (streaming || grew)) timeScale.scrollToRealTime();
     }
     // (Incremental updates need nothing: an appended bar shifts the view only while the
     //  newest bar is visible - Lightweight Charts' shiftVisibleRangeOnNewBar.)

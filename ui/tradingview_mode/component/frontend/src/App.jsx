@@ -250,7 +250,8 @@ function Terminal({ payload, fallbackHeight }) {
         tradesByKey={focus.tradesByKey} selectedKey={focus.selectedKey} busy={!!pending} />
       <Watchlist items={payload.watchlist} replay={!!payload.replay?.enabled} live={payload.live?.phase === "streaming"} timeframe={payload.timeframe} />
       <BottomPanel payload={payload} clientLogs={clientLogs} pending={pending}
-        selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note} />
+        selectedKey={focus.selectedKey} onSelectTrade={focus.selectTrade} focusNote={focus.note}
+        onFocusBars={(entryTime, exitTime) => !!engine?.focusBars(entryTime, exitTime)} />
       <StatusBar payload={payload} crosshairTime={crosshairTime} />
     </div>
   );

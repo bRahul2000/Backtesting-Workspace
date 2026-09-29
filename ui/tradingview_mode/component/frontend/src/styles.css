@@ -497,3 +497,22 @@ input { font: inherit; color: var(--text); }
 .pine-trades td.pos { color: #26a69a; }
 .pine-trades td.neg { color: #ef5350; }
 .pine-trades tr.is-open td { font-style: italic; }
+
+/* Historical data freshness (workspace_data.py) */
+.tool-btn.data-status { gap: 6px; }
+.tool-btn.data-status .ds-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.tool-btn.data-status.is-current .ds-dot { background: var(--up); }
+.tool-btn.data-status.is-stale .ds-dot { background: var(--warn); }
+.tool-btn.data-status.is-stale .ds-text { color: var(--warn); }
+.tool-btn.data-status .ds-last { color: var(--text-2); font-size: 11px; }
+.anchor.ds-anchor { display: flex; align-items: center; flex-wrap: nowrap; }
+.tool-btn.data-refresh { color: var(--warn); border: 1px solid var(--warn); border-radius: 4px; padding: 1px 7px; margin-left: 2px; white-space: nowrap; }
+.data-status-menu .ds-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 12px; }
+.data-status-menu .ds-row span { color: var(--muted); }
+.menu-hint.is-warn { color: var(--warn); }
+@media (max-width: 1500px) { .tool-btn.data-status .ds-last { display: none; } }
+
+/* Pine Strategy trade-row navigation */
+.pine-trades tbody tr { cursor: pointer; }
+.pine-trades tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.pine-trades tr.is-selected td { background: var(--accent-soft); }

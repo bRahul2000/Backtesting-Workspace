@@ -118,7 +118,7 @@ function useResizableHeight(tab) {
   return { height, handlers: { onPointerDown, onPointerMove, onPointerUp } };
 }
 
-export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelectTrade, focusNote }) {
+export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelectTrade, focusNote, onFocusBars }) {
   // Optimistic echo of the Python-owned panel state; Python's value wins on the next payload.
   const [tab, setTab] = useState(payload.ui.bottom_panel);
   const [open, setOpen] = useState(payload.ui.bottom_open);
@@ -170,7 +170,7 @@ export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelec
             </div>
           )}
           {tab === "pine" && <PineEditor pine={payload.pine} pending={pending} />}
-          {tab === "pine_strategy" && <PineStrategyReport pine={payload.pine} precision={payload.price_precision ?? 2} />}
+          {tab === "pine_strategy" && <PineStrategyReport pine={payload.pine} precision={payload.price_precision ?? 2} onFocusBars={onFocusBars} />}
           {tab === "logs" && <LogsTab logs={payload.logs} clientLogs={clientLogs} />}
         </div>
       )}

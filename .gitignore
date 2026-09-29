@@ -66,3 +66,6 @@ experiments/experiments.sqlite3
 # Feed comparison lab: downloaded Binance history and large per-candle outputs stay local.
 research/feed_comparison/cache/
 research/feed_comparison/output/*_*.csv
+
+# TradingView Mode workspace chart history (refreshed closed bars; never research data)
+/data/workspace/

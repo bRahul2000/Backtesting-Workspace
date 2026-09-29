@@ -530,3 +530,22 @@ whose `max_source_time` is after the cursor bar's close (computed from the paylo
 Replay/Live mode buttons are placeholders. When those features arrive,
 Python supplies the results through new payload fields (bump `contract`) and
 the frontend only renders them.
+
+## Historical data freshness and Refresh data
+
+- `data_status` (Historical, Replay and Live setup; `null` while streaming) describes the chart's source dataset:
+  `{dataset_key, label, last_local, latest_available, status, refreshable, source, source_captured, problems,
+  workspace_extended}`. Times are UTC `YYYY-MM-DD HH:MM`.
+- `status`:
+  - `STALE`: a known local source (MT5 history export or Live feed seed in Common/Files) has newer closed bars.
+  - `CURRENT`: no known source is newer; `source_captured` says how recent that knowledge is.
+  - `UNKNOWN`: no readable source. An old snapshot is never shown as current.
+- `refresh_data {}` (Historical only): Python appends every newer closed bar from those sources to the WORKSPACE
+  history of each refreshable dataset of the chart's symbol (e.g. XAUUSDm M15 and H1 together), under
+  `data/workspace/` (`workspace_data.py`).
+  - The registered research datasets are never written.
+  - The chart, the date range, Pine scripts and Exness `request.security()` read frozen file + extension on the next
+    rerun.
+  - The audited Strategy Tester keeps the frozen, validated dataset.
+- Closed-bar policy: a bar is stored only if `open + step <=` its source's capture time. The forming bar is never
+  stored.

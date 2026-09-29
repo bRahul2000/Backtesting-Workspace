@@ -179,6 +179,16 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
             ids.add(item["id"])
             _validate_series_list(item.get("series"), f"{group}[{item['id']}]", bar_times)
 
+    status = payload.get("data_status")
+    if status is not None:
+        _require(isinstance(status, dict) and status.get("status") in DATA_STATUSES,
+                 "data_status.status must be CURRENT, STALE or UNKNOWN.")
+        _require(isinstance(status.get("refreshable"), bool), "data_status.refreshable must be a boolean.")
+        for key in ("last_local", "latest_available", "source_captured"):
+            _require(status.get(key) is None or isinstance(status[key], str), f"data_status.{key} must be text.")
+        _require(status["status"] != "CURRENT" or status.get("latest_available") is not None,
+                 "data_status CURRENT needs a known latest available bar.")
+
     watchlist = payload.get("watchlist")
     _require(isinstance(watchlist, list), "watchlist must be a list.")
     for item in watchlist:
@@ -583,6 +593,9 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "exit_live": {},
     "live_poll": {},
     "load_live_history": {},  # older candles for the streaming provider (Binance: REST pages)
+    # Historical data: append the local MT5 sources' newer closed bars to the WORKSPACE history of the chart's
+    # symbol (never to a frozen research dataset; see workspace_data.py).
+    "refresh_data": {},
     # Pine editor. Compilation and semantics live in the Pine engine (ui/tradingview_mode/pine).
     "pine_compile": {"source": (True, _is_source)},
     "pine_add": {"source": (True, _is_source)},
@@ -606,6 +619,8 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "export_run": {"history_id": (True, _is_int), "kind": (True, lambda v: v in EXPORT_KINDS)},
 }
 TESTER_EVENTS = ("run_backtest", "clear_backtest", "restore_run", "export_run")
+DATA_EVENTS = ("refresh_data",)
+DATA_STATUSES = ("CURRENT", "STALE", "UNKNOWN")
 PINE_EVENTS = ("pine_compile", "pine_add", "pine_update", "pine_remove", "pine_toggle", "pine_set_input")
 TESTER_STATUSES = ("idle", "completed", "failed")
 
