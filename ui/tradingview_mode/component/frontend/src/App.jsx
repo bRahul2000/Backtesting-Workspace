@@ -12,7 +12,8 @@ import { TopBar } from "./components/TopBar.jsx";
 import { Watchlist } from "./components/Watchlist.jsx";
 
 const MIN_HEIGHT = 560;
-const MAX_HEIGHT = 1200;
+const MAX_HEIGHT = 4000;
+const BOTTOM_EDGE = 6;       // px left between the terminal and the browser's bottom edge (page.py uses the same)
 
 // Fit the iframe to the visible Streamlit viewport when the parent is reachable
 // (same origin); otherwise keep the Python-provided height.
@@ -26,14 +27,19 @@ function useFrameHeight(fallback) {
         parentWindow = window.parent;
         const top = frame.getBoundingClientRect().top;
         if (top < 0) return; // parent scrolled; keep current height
-        setHeight(Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, parentWindow.innerHeight - top - 12))));
+        setHeight(Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, parentWindow.innerHeight - top - BOTTOM_EDGE))));
       } catch {
         setHeight(fallback);
       }
     };
     measure();
+    // the page's own styles may settle after the first measurement
+    const timers = [300, 1000, 2500].map((ms) => setTimeout(measure, ms));
     try { window.parent.addEventListener("resize", measure); } catch { /* cross-origin */ }
-    return () => { try { parentWindow?.removeEventListener("resize", measure); } catch { /* ignore */ } };
+    return () => {
+      timers.forEach(clearTimeout);
+      try { parentWindow?.removeEventListener("resize", measure); } catch { /* ignore */ }
+    };
   }, [fallback]);
   useEffect(() => { Streamlit.setFrameHeight(height); });
   return height;
@@ -247,7 +253,7 @@ function useExportDownload(exportFile) {
 // Preferences persist in this browser (localStorage). Modes: normal · chart (chart only: no toolbar, watchlist, dock,
 // nor Streamlit's page sidebar) · tester (chart + Strategy Tester) · editor (chart + Pine Editor).
 const LAYOUT_KEY = "tvterm:layout";
-const LAYOUT_DEFAULT = { tools: true, watch: true, watchWidth: 228, mode: "normal" };
+const LAYOUT_DEFAULT = { tools: true, watch: true, watchWidth: 240, mode: "normal" };
 
 function useLayout() {
   const [layout, setLayout] = useState(() => {
@@ -265,8 +271,7 @@ function useLayout() {
       if (!doc.getElementById("tvterm-layout-style")) {
         const style = doc.createElement("style");
         style.id = "tvterm-layout-style";
-        style.textContent = 'body:has(iframe[data-tv-layout="chart"]) [data-testid="stSidebar"] { display: none !important; }'
-          + ' body:has(iframe[data-tv-layout="chart"]) [data-testid="stMainBlockContainer"] { padding-left: 0.25rem !important; padding-right: 0.25rem !important; }';
+        style.textContent = 'body:has(iframe[data-tv-layout="chart"]) [data-testid="stSidebar"] { display: none !important; }';
         doc.head.appendChild(style);
       }
     } catch { /* cross-origin parent: only the terminal's own panels change */ }

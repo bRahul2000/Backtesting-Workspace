@@ -55,4 +55,8 @@ def app(tmp_path):
         yield f"http://127.0.0.1:{port}/render_tradingview_mode", mt5_folder
     finally:
         server.terminate()
-        server.wait(10)
+        try:
+            server.wait(10)
+        except subprocess.TimeoutExpired:           # a busy rerun can delay shutdown: never leave a stray server
+            server.kill()
+            server.wait(10)
