@@ -1,0 +1,15 @@
+{
+ "source": "MT5 CopyRates M1 broker history",
+ "symbol": "DXYm",
+ "server": "Exness-MT5Trial5",
+ "server_utc_offset_seconds": 0,
+ "digits": 3,
+ "point": 0.00100000,
+ "server_first_date_m1": "2019.03.01 00:00:00",
+ "loaded_first_bar": "2019.03.01 00:00:00",
+ "load_stop_reason": "TARGET_REACHED",
+ "last_completed_bar": "2026.09.29 12:22:00",
+ "bars_exported": 1365564,
+ "bars_by_year": {"2014": 0, "2015": 0, "2016": 0, "2017": 0, "2018": 0, "2019": 261, "2020": 312, "2021": 58415, "2022": 35957, "2023": 372528, "2024": 373673, "2025": 370754, "2026": 153664},
+ "capture_server_time": "2026.09.29 12:23:42"
+}

@@ -1,0 +1,58 @@
+{
+ "DXYm_2022_11_2026_06": {
+  "bars": 81901,
+  "events": 2273,
+  "events_by_year": {
+   "2022": 38,
+   "2023": 629,
+   "2024": 671,
+   "2025": 660,
+   "2026": 275
+  },
+  "median_beta": -1.003,
+  "median_rolling_R2": 0.202,
+  "detectable_reversal_share_diff_pp_vs_1to1_control": 4.2
+ },
+ "EURUSDm_2022_11_2026_06": {
+  "bars": 81919,
+  "events": 2236,
+  "events_by_year": {
+   "2022": 38,
+   "2023": 620,
+   "2024": 658,
+   "2025": 654,
+   "2026": 266
+  },
+  "median_beta": 0.844,
+  "median_rolling_R2": 0.169,
+  "detectable_reversal_share_diff_pp_vs_1to1_control": 4.2
+ },
+ "USDJPYm_2017_05_2021_08": {
+  "bars": 100971,
+  "events": 2697,
+  "events_by_year": {
+   "2017": 376,
+   "2018": 643,
+   "2019": 630,
+   "2020": 642,
+   "2021": 406
+  },
+  "median_beta": -0.866,
+  "median_rolling_R2": 0.218,
+  "detectable_reversal_share_diff_pp_vs_1to1_control": 3.8
+ },
+ "USDJPYm_2022_11_2026_06": {
+  "bars": 81919,
+  "events": 2210,
+  "events_by_year": {
+   "2022": 35,
+   "2023": 570,
+   "2024": 683,
+   "2025": 635,
+   "2026": 287
+  },
+  "median_beta": -0.623,
+  "median_rolling_R2": 0.135,
+  "detectable_reversal_share_diff_pp_vs_1to1_control": 4.2
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "source": "MT5 CopyRates M1 broker history",
+ "symbol": "XAUUSDm",
+ "server": "Exness-MT5Trial5",
+ "server_utc_offset_seconds": 0,
+ "digits": 3,
+ "point": 0.00100000,
+ "server_first_date_m1": "2014.01.14 00:00:00",
+ "loaded_first_bar": "2014.01.14 00:00:00",
+ "load_stop_reason": "TARGET_REACHED",
+ "last_completed_bar": "2026.09.29 12:19:00",
+ "bars_exported": 2767414,
+ "bars_by_year": {"2014": 302, "2015": 312, "2016": 310, "2017": 238054, "2018": 347565, "2019": 352379, "2020": 354409, "2021": 234661, "2022": 33031, "2023": 352079, "2024": 354427, "2025": 352959, "2026": 146926},
+ "capture_server_time": "2026.09.29 12:20:14"
+}

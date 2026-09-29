@@ -1,0 +1,15 @@
+{
+ "source": "MT5 CopyRates M1 broker history",
+ "symbol": "XAGUSDm",
+ "server": "Exness-MT5Trial5",
+ "server_utc_offset_seconds": 0,
+ "digits": 3,
+ "point": 0.00100000,
+ "server_first_date_m1": "2018.06.28 00:00:00",
+ "loaded_first_bar": "2018.06.28 00:00:00",
+ "load_stop_reason": "TARGET_REACHED",
+ "last_completed_bar": "2026.09.29 12:20:00",
+ "bars_exported": 1291966,
+ "bars_by_year": {"2014": 0, "2015": 0, "2016": 0, "2017": 0, "2018": 159, "2019": 309, "2020": 311, "2021": 56378, "2022": 32501, "2023": 348970, "2024": 354176, "2025": 352567, "2026": 146595},
+ "capture_server_time": "2026.09.29 12:21:22"
+}

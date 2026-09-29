@@ -1,0 +1,3 @@
+# Gold V2 raw MT5 snapshot: large payloads stay local and immutable (verified by SHA256SUMS).
+# Committed: SHA256SUMS, MANIFEST.tsv, README.md and the small *.json probe/metadata files.
+*.csv

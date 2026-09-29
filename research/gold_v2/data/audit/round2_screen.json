@@ -1,0 +1,126 @@
+{
+ "alignment_XAGUSDm_2022_11_to_2026_06": {
+  "pair": "XAUUSDm vs XAGUSDm",
+  "xau_m1": 1239422,
+  "other_m1": 1234809,
+  "xau_minutes_with_other_bar": 0.9961,
+  "xau_m15_with_other_m15": 0.9996,
+  "other_m15_without_xau": 3,
+  "missing_other_minutes_by_ny_hour_top": {
+   "18": 1595,
+   "16": 1129,
+   "19": 637,
+   "23": 302,
+   "0": 281
+  },
+  "xau_ny_hour_coverage_min": 0.9696
+ },
+ "alignment_EURUSDm_2022_11_to_2026_06": {
+  "pair": "XAUUSDm vs EURUSDm",
+  "xau_m1": 1239422,
+  "other_m1": 1303923,
+  "xau_minutes_with_other_bar": 0.9982,
+  "xau_m15_with_other_m15": 1.0,
+  "other_m15_without_xau": 4567,
+  "missing_other_minutes_by_ny_hour_top": {
+   "18": 960,
+   "16": 499,
+   "19": 396,
+   "0": 100,
+   "23": 98
+  },
+  "xau_ny_hour_coverage_min": 0.9817
+ },
+ "alignment_DXYm_2022_11_to_2026_06": {
+  "pair": "XAUUSDm vs DXYm",
+  "xau_m1": 1239422,
+  "other_m1": 1306521,
+  "xau_minutes_with_other_bar": 0.9998,
+  "xau_m15_with_other_m15": 0.9998,
+  "other_m15_without_xau": 4467,
+  "missing_other_minutes_by_ny_hour_top": {
+   "19": 60,
+   "20": 60,
+   "16": 58,
+   "5": 49,
+   "6": 37
+  },
+  "xau_ny_hour_coverage_min": 0.9989
+ },
+ "alignment_USDJPYm_2022_11_to_2026_06": {
+  "pair": "XAUUSDm vs USDJPYm",
+  "xau_m1": 1239422,
+  "other_m1": 1306178,
+  "xau_minutes_with_other_bar": 0.9993,
+  "xau_m15_with_other_m15": 1.0,
+  "other_m15_without_xau": 4569,
+  "missing_other_minutes_by_ny_hour_top": {
+   "16": 308,
+   "18": 152,
+   "19": 69,
+   "0": 60,
+   "13": 47
+  },
+  "xau_ny_hour_coverage_min": 0.9939
+ },
+ "alignment_USDJPYm_2017_2021": {
+  "pair": "XAUUSDm vs USDJPYm",
+  "xau_m1": 1525921,
+  "other_m1": 1605037,
+  "xau_minutes_with_other_bar": 0.9982,
+  "xau_m15_with_other_m15": 0.9998,
+  "other_m15_without_xau": 5455,
+  "missing_other_minutes_by_ny_hour_top": {
+   "18": 577,
+   "16": 534,
+   "19": 385,
+   "0": 132,
+   "15": 119
+  },
+  "xau_ny_hour_coverage_min": 0.8773
+ },
+ "xau_m1_2017_2021": {
+  "bars": 1525921,
+  "isolated_one_bar_sessions": 177,
+  "isolated_by_weekday_time": {
+   "Sun 00:00": 163,
+   "Thu 00:00": 3,
+   "Thu 01:00": 1,
+   "Thu 02:00": 1,
+   "Thu 03:00": 1,
+   "Thu 04:00": 1,
+   "Thu 05:00": 1,
+   "Thu 06:00": 1,
+   "Thu 07:00": 1,
+   "Thu 08:00": 1,
+   "Thu 09:00": 1,
+   "Fri 00:00": 1,
+   "Wed 00:00": 1
+  },
+  "isolated_first": "2017-04-27 00:00:00+00:00",
+  "isolated_last": "2021-08-15 00:00:00+00:00",
+  "intraday_holes_by_year": {
+   "2017": 27,
+   "2018": 40,
+   "2019": 13,
+   "2020": 17,
+   "2021": 7
+  },
+  "dec_2019_bars": 20716,
+  "spread_zero_share": 0.962
+ },
+ "c1_touch_ordering_resolution_dev_2023_2025": {
+  "placebo": {
+   "events": 2167,
+   "touch_located_in_m1": 2167,
+   "unresolvable_at_m15_share": 0.4435,
+   "unresolvable_at_m1_share_of_located": 0.0508
+  },
+  "round": {
+   "events": 963,
+   "touch_located_in_m1": 963,
+   "unresolvable_at_m15_share": 0.5088,
+   "unresolvable_at_m1_share_of_located": 0.0467
+  }
+ }
+}

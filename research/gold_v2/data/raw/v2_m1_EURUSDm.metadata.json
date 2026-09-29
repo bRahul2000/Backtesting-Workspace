@@ -1,0 +1,15 @@
+{
+ "source": "MT5 CopyRates M1 broker history",
+ "symbol": "EURUSDm",
+ "server": "Exness-MT5Trial5",
+ "server_utc_offset_seconds": 0,
+ "digits": 5,
+ "point": 0.00001000,
+ "server_first_date_m1": "2018.07.03 00:00:00",
+ "loaded_first_bar": "2018.07.03 00:00:00",
+ "load_stop_reason": "TARGET_REACHED",
+ "last_completed_bar": "2026.09.29 12:21:00",
+ "bars_exported": 1363368,
+ "bars_by_year": {"2014": 0, "2015": 0, "2016": 0, "2017": 0, "2018": 155, "2019": 311, "2020": 312, "2021": 58614, "2022": 35301, "2023": 367606, "2024": 373646, "2025": 372115, "2026": 155308},
+ "capture_server_time": "2026.09.29 12:22:33"
+}

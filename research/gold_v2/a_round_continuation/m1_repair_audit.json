@@ -1,0 +1,82 @@
+{
+ "removal_categories": {
+  "WEEKEND_SATURDAY_NY": 163,
+  "CHRISTMAS_DAY": 2,
+  "GOOD_FRIDAY_EVE_AFTER_CLOSE": 1,
+  "NEW_YEARS_DAY": 1
+ },
+ "m15_parity": {
+  "ref_bars": 98318,
+  "mismatches": {
+   "open": 0,
+   "high": 0,
+   "low": 0,
+   "close": 0
+  },
+  "extra_m15_bars": 1384,
+  "extra_outside_known_2019_hole": []
+ },
+ "amendment_1_reclassified": [
+  {
+   "prev_bar": "2018-01-31 14:09:00+00:00",
+   "next_bar": "2018-02-02 12:59:00+00:00",
+   "gap_min": 2809.0
+  },
+  {
+   "prev_bar": "2018-08-27 02:29:00+00:00",
+   "next_bar": "2018-08-27 05:32:00+00:00",
+   "gap_min": 182.0
+  },
+  {
+   "prev_bar": "2018-08-27 09:33:00+00:00",
+   "next_bar": "2018-08-27 10:55:00+00:00",
+   "gap_min": 81.0
+  },
+  {
+   "prev_bar": "2019-03-11 20:58:00+00:00",
+   "next_bar": "2019-03-11 23:01:00+00:00",
+   "gap_min": 122.0
+  },
+  {
+   "prev_bar": "2019-03-12 20:58:00+00:00",
+   "next_bar": "2019-03-12 23:01:00+00:00",
+   "gap_min": 122.0
+  },
+  {
+   "prev_bar": "2019-03-13 20:58:00+00:00",
+   "next_bar": "2019-03-13 23:01:00+00:00",
+   "gap_min": 122.0
+  }
+ ],
+ "era_gap_kinds_ge60": {
+  "daily_break_variant": 703,
+  "weekend": 214,
+  "daily_break": 118,
+  "holiday/early_close": 55,
+  "UNEXPLAINED": 6
+ },
+ "unexplained": [],
+ "holiday_gaps_over_4_days": [],
+ "intraday_holes_lt60_by_year": {
+  "2017": 27,
+  "2018": 40,
+  "2019": 13,
+  "2020": 17,
+  "2021": 7
+ },
+ "rows": {
+  "before": 1523802,
+  "removed": 167,
+  "after": 1523635
+ },
+ "checks": {
+  "R1_removals_all_in_known_closures": true,
+  "R2_untouched_rows_identical": true,
+  "R3_no_one_bar_sessions": true,
+  "R3_no_saturday_ny_bars": true,
+  "R4_integrity": true,
+  "R5_m15_parity": true,
+  "R6_all_long_gaps_explained": true
+ },
+ "result": "PASS"
+}

@@ -1,0 +1,15 @@
+{
+ "source": "MT5 CopyRates M1 broker history",
+ "symbol": "USDJPYm",
+ "server": "Exness-MT5Trial5",
+ "server_utc_offset_seconds": 0,
+ "digits": 3,
+ "point": 0.00100000,
+ "server_first_date_m1": "2014.01.14 00:00:00",
+ "loaded_first_bar": "2014.01.14 00:00:00",
+ "load_stop_reason": "TARGET_REACHED",
+ "last_completed_bar": "2026.09.29 12:25:00",
+ "bars_exported": 2913276,
+ "bars_by_year": {"2014": 302, "2015": 312, "2016": 310, "2017": 247434, "2018": 368882, "2019": 371712, "2020": 373135, "2021": 244976, "2022": 35581, "2023": 369627, "2024": 373744, "2025": 372124, "2026": 155137},
+ "capture_server_time": "2026.09.29 12:26:04"
+}
