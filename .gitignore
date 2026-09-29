@@ -69,3 +69,6 @@ research/feed_comparison/output/*_*.csv
 
 # TradingView Mode workspace chart history (refreshed closed bars; never research data)
 /data/workspace/
+
+# a node_modules symlink (e.g. in a git worktree) is ignored like the directory
+node_modules
