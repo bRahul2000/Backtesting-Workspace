@@ -549,3 +549,40 @@ the frontend only renders them.
   - The audited Strategy Tester keeps the frozen, validated dataset.
 - Closed-bar policy: a bar is stored only if `open + step <=` its source's capture time. The forming bar is never
   stored.
+- Automatic refresh (Historical only): on the first render and whenever a symbol or timeframe is selected, then at most
+  every 180 s per symbol, Python runs the same closed-bar append (`terminal.auto_refresh_workspace`).
+  - A failure writes nothing and is logged as a warning; the status stays `STALE` with `problems` listing the error.
+  - `data_status.auto_refresh = {checked, errors}`. The freshness status itself is cached for the same interval, so
+    normal reruns do not read the MT5 folder.
+
+## Pine strategies in the custom workspace
+
+- Historical calculation range:
+  - Pine scripts calculate on every available bar from the dataset's first bar to the chart's last bar (at most
+    `MAX_PINE_BARS` = 20,000, TradingView Premium's bar limit). The chart may render fewer:
+    `pine.scripts[i].display_from` is the first rendered bar's time and `calc_bars` the number of calculated bars.
+  - Plots, shapes and colors are sent for the rendered bars only. Drawings keep their Pine coordinates, with a
+    `first_bar_index` that may be negative (left of the chart).
+  - The strategy report covers the whole calculation range. The protocol accepts report events before `display_from`
+    in Historical mode only, and never after the last rendered bar. Replay and Live calculate on exactly the rendered
+    bars, as before.
+- Lazy navigation: a Strategy Tester trade on bars that are not loaded moves the date range's start back and keeps its
+  end. The calculation range, and so every trade, is unchanged.
+- Strategy report additions:
+  - Trades: `bars_held` (exit bar − entry bar) and `profit_percent` (net P&L / entry price × quantity). Both are engine
+    conventions, not TradingView-verified.
+  - Metrics: `avg_bars_in_trade`.
+  - Report: `fill_count`, `fills_reported` and `calc_range {bars, first_time, last_time}`.
+- Chart markers: the source of truth is the Pine strategy's fills.
+  - Every fill on a loaded bar is exactly one compact marker: an arrow, plus a short tag on exits (TP / SL / TS / X /
+    R / MC). Fills on unloaded bars are counted, not drawn.
+  - The full comment, price and trade P&L appear in the hover tooltip.
+  - `__tvChart.debugState().strategyAudit` reports `{fills, entries, exits, inside, outside, rendered}`.
+- `pine_add {source, another?, keep_editor?}`:
+  - An identical script (same compiled source, default inputs) already on the chart is not added again. The editor
+    result carries `duplicate_of` unless `another` is true.
+  - After a successful add, the dock opens the Strategy Tester for a strategy, or collapses for an indicator, unless
+    `keep_editor`.
+- Bottom panels: `indicators`, `strategy_tester`, `trades`, `logs`, `pine`. The separate `pine_strategy` panel is gone:
+  the Strategy Tester shows one source at a time, **Pine · TradingView Emulator** or **Python Audited Engine**, never
+  combined. The audited engine keeps the frozen, validated datasets.

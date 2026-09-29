@@ -120,6 +120,7 @@ export class ChartEngine {
 
     this.chart.subscribeCrosshairMove((param) => {
       this.hoverTime = param && param.time !== undefined && param.point ? param.time : null;
+      this.hoverPoint = param && param.point ? { x: param.point.x, y: param.point.y } : null;
       this.emitCrosshair();
     });
     this.chart.timeScale().subscribeVisibleTimeRangeChange((range) => this.rememberRange(range));
@@ -325,10 +326,17 @@ export class ChartEngine {
       price: this.chart.priceScale("right").getVisibleRange(), barSpacing: timeScale.options().barSpacing,
       count: this.bars.length, first: this.bars[0]?.time ?? null, last: this.bars[this.bars.length - 1] ?? null,
       follow: this.follow, viewKey: this.viewKey, stats: { ...this.stats },
+      strategyAudit: { ...this.pine.strategyAudit }, selectedPineTrade: this.pine.selectedTrade?.key ?? null,
     };
   }
 
   coordinateOf(time) { return this.chart.timeScale().timeToCoordinate(time); }
+
+  // Pine strategy trade selection (Strategy Tester rows): highlight it; returns false if its entry is not loaded.
+  selectPineTrade(trade) {
+    this.pine.selectTrade(trade);
+    return !trade || this.findIndex(trade.entry_time) >= 0;
+  }
 
   resetPriceScale() {
     this.chart.priceScale("right").applyOptions({ autoScale: true });
@@ -491,6 +499,9 @@ export class ChartEngine {
     const legend = {
       time,
       hovering,
+      point: hovering ? this.hoverPoint : null,
+      fills: hovering ? this.pine.fillsAt(time) : [],
+      trades: this.pine.strategyTrades,
       bar,
       change: bar && previous ? bar.close - previous.close : null,
       changePct: bar && previous && previous.close ? ((bar.close - previous.close) / previous.close) * 100 : null,

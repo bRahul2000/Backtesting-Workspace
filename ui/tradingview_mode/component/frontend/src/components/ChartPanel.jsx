@@ -5,7 +5,8 @@ import { ChartEngine } from "../chart/ChartEngine.js";
 import { LiveBar } from "./LiveBar.jsx";
 import { ReplayBar } from "./ReplayBar.jsx";
 import { SourceStrip } from "./SourceStrip.jsx";
-import { formatPrice, formatSigned, formatVolume, paramsLabel, providerShort, timeframeLabel } from "../format.js";
+import { describeFill } from "../chart/strategyMarkers.js";
+import { formatPrice, formatSigned, formatUtc, formatVolume, paramsLabel, providerShort, timeframeLabel } from "../format.js";
 
 function Values({ values, precision }) {
   return values.map((v) => (
@@ -61,6 +62,24 @@ function Legend({ engine, payload }) {
   );
 }
 
+// Pine strategy fills on the hovered bar (compact markers carry only a tag; the details are here).
+function FillTooltip({ engine, precision }) {
+  const [hover, setHover] = useState(null);
+  useEffect(() => engine?.onCrosshair((legend) => setHover(legend.fills?.length && legend.point
+    ? { fills: legend.fills, trades: legend.trades, point: legend.point, time: legend.time } : null)), [engine]);
+  if (!hover) return null;
+  return (
+    <div className="fill-tooltip" style={{ left: hover.point.x + 14, top: Math.max(4, hover.point.y - 10) }}>
+      <div className="fill-tooltip-time mono">{formatUtc(hover.time)} UTC · {hover.fills.length} fill{hover.fills.length > 1 ? "s" : ""}</div>
+      {hover.fills.map((fill) => (
+        <div key={fill.key} className={`fill-tooltip-row ${fill.side > 0 ? "is-buy" : "is-sell"}`}>
+          {describeFill(fill, hover.trades, precision)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, selectedKey, busy }) {
   const host = useRef(null);
   const [engine, setEngine] = useState(null);
@@ -92,6 +111,7 @@ export function ChartPanel({ payload, onEngine, onCrosshairTime, tradesByKey, se
       payload.live?.phase === "setup" && payload.live.message ? "live-message" : ""} ${payload.sources ? "has-sources" : ""}`}>
       <div className="chart-host" ref={host} />
       {engine && <Legend engine={engine} payload={payload} />}
+      {engine && <FillTooltip engine={engine} precision={payload.price_precision ?? 2} />}
       {payload.bars.length === 0 && <div className="chart-empty">No bars in the selected range.</div>}
       {!atLatest && payload.bars.length > 0 && !payload.replay?.enabled && (
         <button type="button" className="go-latest" title="Scroll to the newest candle and follow it"

@@ -137,11 +137,14 @@ async function main() {
   await evaluate(`__tv.setText(${JSON.stringify(SCRIPT)})`); await settle();
   await click("Add to chart", ".pine-add"); await settle();
   check("historical: strategy fills are chart markers", await waitFor(`__tv.strategyMarkers() > 10`, 20000), String(await evaluate("__tv.strategyMarkers()")));
-  await click("Pine Strategy tab", ".bottom-tab", "Pine Strategy"); await settle();
-  check("historical: report lists the trades", await waitFor(`__tv.reportRows() > 5`, 15000), String(await evaluate("__tv.reportRows()")));
+  // the dock opens the Strategy Tester after Add to chart; clicking the active tab would collapse it
+  if (!(await evaluate("!!__tv.find('.bottom-tab.is-active', 'Strategy Tester')"))) { await click("Strategy Tester tab", ".bottom-tab", "Strategy Tester"); await settle(); }
+  check("historical: the Strategy Tester shows the Pine source", (await evaluate("__tv.text('.source-badge')")) === "Pine · TradingView Emulator");
   const text = await evaluate("__tv.reportText()");
   check("historical: report is labelled simulation only", /simulated \(broker emulator\) · no broker orders/.test(text || ""), text);
   check("historical: report shows net profit and profit factor", /Net profit/.test(text) && /Profit factor/.test(text), text);
+  await click("Trades section", ".subtab", "Trades"); await settle();
+  check("historical: report lists the trades", await waitFor(`__tv.reportRows() > 5`, 15000), String(await evaluate("__tv.reportRows()")));
   if (process.env.PINE_SHOTS) {
     const { writeFileSync } = await import("node:fs");
     writeFileSync(`${process.env.PINE_SHOTS}/strategy_historical.png`, Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64"));

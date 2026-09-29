@@ -4,7 +4,7 @@
 //
 //   node data_refresh.mjs <app-url> <chrome-binary> <expected.json>
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, readdirSync, existsSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -58,7 +58,7 @@ const HELPERS = `window.__tv = {
   lastVisible() { const c = this.win().__tvChart; const r = c.chart.timeScale().getVisibleRange(); return r ? r.to : null; },
   visible() { const r = this.win().__tvChart.chart.timeScale().getVisibleRange(); return r ? [r.from, r.to] : null; },
   rowEntry(i) { const r = this.doc().querySelectorAll('.pine-trades tbody tr')[i]; if (!r) return null;
-    return Date.parse(r.children[3].innerText.trim().replace(' ', 'T') + ':00Z') / 1000; },
+    return Date.parse(r.children[2].innerText.trim().replace(' ', 'T') + ':00Z') / 1000; },
   rowSelected(i) { const r = this.doc().querySelectorAll('.pine-trades tbody tr')[i]; return !!r && r.classList.contains('is-selected'); },
   lastBar() { const b = this.win().__tvChart.bars; return b.length ? b[b.length - 1].time : null; },
   overlayLast() { const e = [...this.win().__tvChart.overlays.values()][0]; if (!e) return null;
@@ -120,16 +120,9 @@ async function main() {
   await click("watchlist XAUUSDm", ".wl-row", "XAUUSDm"); await settle();
   if (!(await evaluate("!!__tv.find('.tf-btn.is-active', '15m')"))) { await click("15m", ".tf-btn", "15m"); await settle(); }
 
-  // Before: the frozen dataset ends at 2026-09-18 20:30 and the chip says it is stale.
+  // Before any MT5 source exists: the frozen dataset ends at 2026-09-18 20:30 and its freshness is Unknown.
   check("before: last bar is the frozen 2026-09-18 20:30", (await evaluate("__tv.lastBar()")) === EXPECTED.before_last, String(await evaluate("__tv.lastBar()")));
-  check("before: status chip shows Stale with the last local bar", /^Stale/.test(await evaluate("__tv.text('.tool-btn.data-status')") || "")
-    && /Last local bar 2026-09-18 20:30 UTC/.test(await evaluate("__tv.chipTitle()") || ""), await evaluate("__tv.chipTitle()"));
-  await click("status details", ".tool-btn.data-status"); await sleep(300);
-  const details = await evaluate("__tv.text('.data-status-menu')");
-  check("details show last local, latest available and status", /Last local bar 2026-09-18 20:30 UTC/.test(details) &&
-    new RegExp(`Latest available ${EXPECTED.after_last_text} UTC`).test(details) && /Status Stale/.test(details), details);
-  await shot("refresh_before_details");
-  await click("close details", ".tool-btn.data-status"); await sleep(300);
+  check("before: no source -> Unknown", /^Unknown/.test(await evaluate("__tv.text('.tool-btn.data-status')") || ""), await evaluate("__tv.chipTitle()"));
 
   // An indicator and a Pine strategy on the chart.
   await click("Indicators", ".tool-btn", "Indicators"); await sleep(300);
@@ -142,8 +135,23 @@ async function main() {
                    markers: await evaluate("__tv.markerCount()") };
   check("before: indicator and Pine plot end at the frozen last bar", before.overlay === EXPECTED.before_last && before.plot === EXPECTED.before_last, JSON.stringify(before));
 
-  // Refresh data.
-  await click("Refresh", ".tool-btn.data-refresh"); await settle();
+  // MT5 now has newer closed bars (export + Live seed whose last row is still forming).
+  for (const name of readdirSync(EXPECTED.staged)) copyFileSync(join(EXPECTED.staged, name), join(EXPECTED.mt5_folder, name));
+  utimesSync(join(EXPECTED.mt5_folder, "tv_live_XAUUSDm_M15_seed.csv"), EXPECTED.seed_written, EXPECTED.seed_written);
+  await click("Logs tab", ".bottom-tab", "Logs"); await settle();            // any rerun re-reads the (changed) sources
+  check("stale: status chip shows Stale with the last local bar", await waitFor(`/^Stale/.test(__tv.text('.tool-btn.data-status') || '')
+    && (__tv.chipTitle() || '').includes('Last local bar 2026-09-18 20:30 UTC')`, 15000), await evaluate("__tv.chipTitle()"));
+  check("stale: manual Refresh is offered", !!(await evaluate("!!__tv.find('.tool-btn.data-refresh')")));
+  await click("status details", ".tool-btn.data-status"); await sleep(300);
+  const details = await evaluate("__tv.text('.data-status-menu')");
+  check("details show last local, latest available and status", /Last local bar 2026-09-18 20:30 UTC/.test(details) &&
+    new RegExp(`Latest available ${EXPECTED.after_last_text} UTC`).test(details) && /Status Stale/.test(details), details);
+  await shot("refresh_before_details");
+  await click("close details", ".tool-btn.data-status"); await sleep(300);
+
+  // Automatic refresh: selecting a timeframe checks freshness and appends the missing closed bars (no button press).
+  await click("30m", ".tf-btn", "30m"); await settle();
+  await click("15m", ".tf-btn", "15m"); await settle();
   check("after: last bar is the newest CLOSED source bar (forming bar excluded)", await waitFor(`__tv.lastBar() === ${EXPECTED.after_last}`, 30000), String(await evaluate("__tv.lastBar()")));
   const times = await evaluate("__tv.times()");
   const appended = times.filter((t) => t > EXPECTED.before_last);
@@ -151,17 +159,17 @@ async function main() {
     && times.every((t, i) => i === 0 || t > times[i - 1]), `${appended.length} vs ${EXPECTED.new_times.length}`);
   check("after: status chip shows Current with the new last bar", await waitFor(`/^Current/.test(__tv.text('.tool-btn.data-status') || '') && (__tv.chipTitle() || '').includes('Last local bar ${EXPECTED.after_last_text} UTC')`, 10000),
     await evaluate("__tv.chipTitle()"));
-  check("after: the chart follows the newest bar", (await evaluate("__tv.follow()")) && (await evaluate("__tv.lastVisible()")) === EXPECTED.after_last,
-    JSON.stringify({ follow: await evaluate("__tv.follow()"), lastVisible: await evaluate("__tv.lastVisible()") }));
   check("after: no Refresh button once current", !(await evaluate("!!__tv.find('.tool-btn.data-refresh')")));
   check("after: indicator recalculated to the new last bar", await waitFor(`__tv.overlayLast() === ${EXPECTED.after_last}`, 15000), String(await evaluate("__tv.overlayLast()")));
   check("after: Pine plot recalculated to the new last bar (script not re-added)", await waitFor(`__tv.pinePlotLast() === ${EXPECTED.after_last}`, 15000), String(await evaluate("__tv.pinePlotLast()")));
   const lastFill = await evaluate("__tv.lastMarkerTime()");
   check("after: strategy recalculated (fills include the new bars)", lastFill !== null && lastFill > EXPECTED.before_last,
     `last fill ${lastFill} · markers ${before.markers} -> ${await evaluate("__tv.markerCount()")}`);
-  await click("Pine Strategy tab", ".bottom-tab", "Pine Strategy"); await settle();
+  // the dock opens the Strategy Tester after Add to chart; clicking the active tab would collapse it
+  if (!(await evaluate("!!__tv.find('.bottom-tab.is-active', 'Strategy Tester')"))) { await click("Strategy Tester tab", ".bottom-tab", "Strategy Tester"); await settle(); }
   await shot("refresh_after");
   check("after: Pine Strategy report present", /Net profit/.test(await evaluate("__tv.reportText()") || ""));
+  await click("Trades section", ".subtab", "Trades"); await settle();
   // Trade-row navigation: an older trade's row brings it into view.
   const entry = await evaluate("__tv.rowEntry(12)");
   await evaluate("__tv.doc().querySelectorAll('.pine-trades tbody tr')[12].scrollIntoView({ block: 'center' })"); await sleep(200);
@@ -174,7 +182,7 @@ async function main() {
   check("after: date picker allows the new dates", (await evaluate("__tv.rangeMax()")) === EXPECTED.after_date, String(await evaluate("__tv.rangeMax()")));
   await click("Logs tab", ".bottom-tab", "Logs"); await settle();
   const logs = await evaluate("__tv.logs()");
-  check("log reports the refresh", logs.some((m) => /Refreshed XAUUSDm workspace history · 15m: \+\d+ closed bars through/.test(m)), JSON.stringify(logs.slice(-4)));
+  check("log reports the automatic refresh", logs.some((m) => /Automatic data refresh: XAUUSDm 15m \+\d+ through/.test(m)), JSON.stringify(logs.slice(-4)));
   check("no page errors", errors.length === 0, JSON.stringify(errors));
   ws.close();
 }

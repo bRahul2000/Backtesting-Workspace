@@ -4,13 +4,14 @@ import { Icon } from "./icons.jsx";
 import { StrategyTester } from "./tester/StrategyTester.jsx";
 import { TradesWorkspace } from "./tester/TradesTable.jsx";
 import { PineEditor } from "./PineEditor.jsx";
-import { PineStrategyReport } from "./PineStrategyReport.jsx";
+import { PineTester, PineTradesTable, pineStrategies } from "./tester/PineTester.jsx";
 
-const DEFAULT_HEIGHT = { strategy_tester: 330, trades: 260, pine: 340, pine_strategy: 330 };
+const DEFAULT_HEIGHT = { strategy_tester: 330, trades: 260, pine: 340 };
 const HEIGHT_STORAGE = "tvterm:bottom-height:";
 
+// Layout preferences persist in this browser (localStorage); storage may be unavailable (private windows).
 function storedHeight(tab) {
-  try { return Number(window.sessionStorage.getItem(HEIGHT_STORAGE + tab)) || DEFAULT_HEIGHT[tab] || 176; } catch { return DEFAULT_HEIGHT[tab] || 176; }
+  try { return Number(window.localStorage.getItem(HEIGHT_STORAGE + tab)) || DEFAULT_HEIGHT[tab] || 176; } catch { return DEFAULT_HEIGHT[tab] || 176; }
 }
 
 const TABS = [
@@ -18,7 +19,6 @@ const TABS = [
   ["strategy_tester", "Strategy Tester"],
   ["trades", "Trades"],
   ["pine", "Pine Editor"],
-  ["pine_strategy", "Pine Strategy"],
   ["logs", "Logs"],
 ];
 
@@ -113,17 +113,61 @@ function useResizableHeight(tab) {
   const onPointerUp = () => {
     if (!drag.current) return;
     drag.current = null;
-    try { window.sessionStorage.setItem(HEIGHT_STORAGE + tab, String(height)); } catch { /* ignore */ }
+    try { window.localStorage.setItem(HEIGHT_STORAGE + tab, String(height)); } catch { /* ignore */ }
   };
   return { height, handlers: { onPointerDown, onPointerMove, onPointerUp } };
 }
 
-export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelectTrade, focusNote, onFocusBars }) {
+// The Strategy Tester shows ONE engine's results at a time, never combined: "pine" (the Pine strategy on the chart,
+// TradingView emulator) or "python" (an explicitly run audited backtest). Pine is the default when the chart has a
+// Pine strategy; running an audited backtest switches to it; a newly added Pine strategy switches back.
+function useTesterSource(payload, pending) {
+  const strategies = pineStrategies(payload.pine);
+  const [source, setSource] = useState(() => (strategies.length ? "pine" : "python"));
+  const [strategyId, setStrategyId] = useState(null);
+  const lastIds = useRef(strategies.map((s) => s.id).join(","));
+  const lastRun = useRef(payload.tester.run?.run_id ?? null);
+  useEffect(() => {
+    const ids = strategies.map((s) => s.id);
+    const before = lastIds.current ? lastIds.current.split(",") : [];
+    const added = ids.filter((id) => !before.includes(id));
+    if (added.length) { setSource("pine"); setStrategyId(added[added.length - 1]); }
+    else if (!ids.length && source === "pine" && payload.tester.run) setSource("python");
+    lastIds.current = ids.join(",");
+  }, [strategies.map((s) => s.id).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const runId = payload.tester.run?.run_id ?? null;
+    if (runId && runId !== lastRun.current) setSource("python");
+    lastRun.current = runId;
+  }, [payload.tester.run?.run_id]);
+  useEffect(() => { if (pending?.type === "run_backtest") setSource("python"); }, [pending?.type]);
+  return { source, setSource, strategyId, setStrategyId, strategies };
+}
+
+function SourceSwitch({ source, setSource, hasPine, hasPython }) {
+  return (
+    <div className="tester-source">
+      <span className={`source-badge ${source}`}>{source === "pine" ? "Pine · TradingView Emulator" : "Python Audited Engine"}</span>
+      <div className="segmented small" role="group" aria-label="Strategy Tester source">
+        <button type="button" className={source === "pine" ? "is-active" : ""} onClick={() => setSource("pine")}
+          title={hasPine ? "The Pine strategy on the chart (simulated broker emulator)" : "No Pine strategy on the chart"}>Pine</button>
+        <button type="button" className={source === "python" ? "is-active" : ""} onClick={() => setSource("python")}
+          title={hasPython ? "The last audited backtest run" : "Run an audited backtest (frozen validated datasets)"}>Python</button>
+      </div>
+      <span className="muted small-text">One engine at a time · results are never combined</span>
+    </div>
+  );
+}
+
+export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelectTrade, focusNote, pineFocus }) {
   // Optimistic echo of the Python-owned panel state; Python's value wins on the next payload.
   const [tab, setTab] = useState(payload.ui.bottom_panel);
   const [open, setOpen] = useState(payload.ui.bottom_open);
   useEffect(() => { setTab(payload.ui.bottom_panel); setOpen(payload.ui.bottom_open); }, [payload.ui.bottom_panel, payload.ui.bottom_open]);
   const { height, handlers } = useResizableHeight(tab);
+  const tester = useTesterSource(payload, pending);
+  const hasPine = tester.strategies.length > 0;
+  const pineScript = tester.strategies.find((s) => s.id === tester.strategyId) || tester.strategies[0];
   const errorCount = payload.logs.filter((entry) => entry.level === "error").length + clientLogs.filter((e) => e.level === "error").length;
 
   const select = (next, nextOpen = true) => {
@@ -144,10 +188,10 @@ export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelec
             {key === "indicators" && payload.indicators.length > 0 && <span className="count">{payload.indicators.length}</span>}
             {key === "logs" && errorCount > 0 && <span className="count error">{errorCount}</span>}
             {key === "strategy_tester" && pending?.type === "run_backtest" && <span className="spinner" />}
-            {key === "trades" && payload.tester.run && <span className="count">{payload.tester.run.trades.length}</span>}
+            {key === "strategy_tester" && <span className={`source-dot ${tester.source}`} title={tester.source === "pine" ? "Pine · TradingView Emulator" : "Python Audited Engine"} />}
+            {key === "trades" && tester.source === "python" && payload.tester.run && <span className="count">{payload.tester.run.trades.length}</span>}
+            {key === "trades" && tester.source === "pine" && pineScript?.strategy && <span className="count">{pineScript.strategy.trades.length}</span>}
             {key === "pine" && payload.pine?.scripts.length > 0 && <span className="count">{payload.pine.scripts.length}</span>}
-            {key === "pine_strategy" && (payload.pine?.scripts || []).some((s) => s.strategy) && (
-              <span className="count">{(payload.pine.scripts.find((s) => s.strategy)?.strategy.metrics.total_closed_trades) ?? 0}</span>)}
           </button>
         ))}
         <div className="spacer" />
@@ -159,18 +203,37 @@ export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelec
         <div className="bottom-body">
           {tab === "indicators" && <IndicatorsTab indicators={payload.indicators} revision={payload.ack} />}
           {tab === "strategy_tester" && (
-            <StrategyTester payload={payload} pending={pending} selectedKey={selectedKey}
-              onSelectTrade={onSelectTrade} focusNote={focusNote} />
+            <div className="tester unified-tester">
+              <SourceSwitch source={tester.source} setSource={tester.setSource} hasPine={hasPine} hasPython={!!payload.tester.run} />
+              {tester.source === "pine"
+                ? <PineTester pine={payload.pine} precision={payload.price_precision ?? 2} strategyId={tester.strategyId}
+                    onStrategy={tester.setStrategyId} selectedKey={pineFocus.selectedKey} onSelectTrade={pineFocus.select}
+                    note={pineFocus.note} />
+                : <StrategyTester payload={payload} pending={pending} selectedKey={selectedKey}
+                    onSelectTrade={onSelectTrade} focusNote={focusNote} />}
+            </div>
           )}
           {tab === "trades" && (
             <div className="trades-tab">
-              {focusNote && <div className="tester-note">{focusNote}</div>}
-              <TradesWorkspace run={payload.tester.run} precision={payload.tester.run?.price_precision ?? payload.price_precision}
-                selectedKey={selectedKey} onSelect={onSelectTrade} />
+              <SourceSwitch source={tester.source} setSource={tester.setSource} hasPine={hasPine} hasPython={!!payload.tester.run} />
+              {tester.source === "pine" ? (
+                <>
+                  {pineFocus.note && <div className="tester-note">{pineFocus.note}</div>}
+                  {pineScript?.strategy
+                    ? <PineTradesTable report={pineScript.strategy} precision={payload.price_precision ?? 2}
+                        selectedKey={pineFocus.selectedKey} onSelect={pineFocus.select} />
+                    : <div className="empty">No Pine strategy trades.</div>}
+                </>
+              ) : (
+                <>
+                  {focusNote && <div className="tester-note">{focusNote}</div>}
+                  <TradesWorkspace run={payload.tester.run} precision={payload.tester.run?.price_precision ?? payload.price_precision}
+                    selectedKey={selectedKey} onSelect={onSelectTrade} />
+                </>
+              )}
             </div>
           )}
           {tab === "pine" && <PineEditor pine={payload.pine} pending={pending} />}
-          {tab === "pine_strategy" && <PineStrategyReport pine={payload.pine} precision={payload.price_precision ?? 2} onFocusBars={onFocusBars} />}
           {tab === "logs" && <LogsTab logs={payload.logs} clientLogs={clientLogs} />}
         </div>
       )}

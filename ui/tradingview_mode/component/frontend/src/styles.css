@@ -516,3 +516,55 @@ input { font: inherit; color: var(--text); }
 .pine-trades tbody tr { cursor: pointer; }
 .pine-trades tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
 .pine-trades tr.is-selected td { background: var(--accent-soft); }
+
+/* Pine strategy fill tooltip (compact markers carry only a tag) */
+.fill-tooltip { position: absolute; z-index: 30; pointer-events: none; max-width: 420px; background: rgba(16, 20, 27, 0.96);
+  border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px; font-size: 11px; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.fill-tooltip-time { color: var(--muted); margin-bottom: 2px; }
+.fill-tooltip-row { white-space: nowrap; }
+.fill-tooltip-row.is-buy { color: #6ea8ff; }
+.fill-tooltip-row.is-sell { color: #f57c9d; }
+
+/* Unified Strategy Tester: one engine at a time, clearly labelled */
+.tester-source { display: flex; align-items: center; gap: 8px; padding: 3px 8px; border-bottom: 1px solid var(--border); flex: none; }
+.source-badge { font-size: 10.5px; font-weight: 600; border-radius: 3px; padding: 1px 6px; letter-spacing: .2px; }
+.source-badge.pine { color: #8fb8ff; background: rgba(61,139,253,.14); border: 1px solid rgba(61,139,253,.35); }
+.source-badge.python { color: #e5c07b; background: rgba(229,192,123,.12); border: 1px solid rgba(229,192,123,.35); }
+.source-dot { width: 6px; height: 6px; border-radius: 50%; }
+.source-dot.pine { background: #3d8bfd; }
+.source-dot.python { background: #e5c07b; }
+.pine-strategy-select { height: 22px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; margin-left: 6px; }
+.pine-perf { max-width: 520px; margin-bottom: 6px; }
+.pine-props { display: flex; gap: 16px; flex-wrap: wrap; padding: 4px 8px; }
+.pine-props .grid-table { width: auto; min-width: 280px; }
+
+/* Pine editor: duplicates and pin */
+.pine-duplicate { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: rgba(226,162,59,.1); border-bottom: 1px solid rgba(226,162,59,.35); color: var(--warn); font-size: 11.5px; }
+.pine-badge.is-duplicate { color: var(--warn); border-color: rgba(226,162,59,.5); }
+.pine-script.is-focused { outline: 1px solid var(--accent); outline-offset: -1px; }
+.pine-pin { margin-left: 2px; }
+
+/* ---- layout: collapsible / resizable panels, focus modes ----------------------------------------------------- */
+.terminal { transition: grid-template-columns .12s ease; }
+.rail { background: var(--panel); border: 0; color: var(--muted); display: grid; place-items: center; padding: 0; cursor: pointer; }
+.rail:hover { color: var(--text); background: var(--hover); }
+.left-rail { grid-area: tools; border-right: 1px solid var(--border); }
+.right-rail { grid-area: watch; border-left: 1px solid var(--border); }
+.watch-wrap { grid-area: watch; position: relative; display: flex; min-height: 0; min-width: 0; }
+.watch-wrap .watchlist { flex: 1; min-width: 0; }
+.watch-resize { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 20; touch-action: none; }
+.watch-resize:hover { background: var(--accent-soft); }
+.watch-collapse { margin-left: auto; }
+.tools-collapse { margin-top: 2px; }
+.layout-btn.is-focus { color: var(--accent); background: var(--accent-soft); }
+.layout-exit { font-size: 11px; margin-left: 4px; }
+.layout-menu .check { padding: 3px 8px; }
+.terminal.layout-chart .lefttools, .terminal.layout-chart .watchlist { display: none; }
+/* denser chrome: thinner separators, tighter panel paddings */
+.terminal { border-width: 0; }
+.panel-head { padding: 0 8px; }
+.bottom-tabs { height: 28px; }
+.pine-trades th, .pine-trades td { white-space: nowrap; }
+.pine-strategy .subtab-body { overflow: auto; }
+.watchlist .panel-head { justify-content: flex-start; gap: 6px; }
+.tool-btn.data-status .ds-gap { color: var(--warn); border: 1px solid var(--warn); border-radius: 3px; font-size: 10px; padding: 0 3px; }

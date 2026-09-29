@@ -83,6 +83,16 @@ def marker(entry: MarketDataset) -> tuple[float, float]:
     return _mtime(entry.path), _mtime(extension_path(entry))
 
 
+def source_marker(entry: MarketDataset) -> tuple:
+    """Modification times of the entry's MT5 source files (a few stat calls; no file is read)."""
+    if not refreshable(entry):
+        return ()
+    name, symbol, period = MT5_SOURCES[entry.key]
+    folder = common_files_dir()
+    return tuple(_mtime(folder / f) for f in (name, f"{name}.metadata.json", f"tv_live_{symbol}_{period}_seed.csv",
+                                             f"tv_live_{symbol}_quote.json"))
+
+
 # ---- reading ------------------------------------------------------------------------------------------------------
 
 def _extension(entry: MarketDataset) -> pd.DataFrame | None:
@@ -189,6 +199,7 @@ class SourceBars:
     captured_utc: pd.Timestamp | None
     bars: pd.DataFrame            # closed bars (UTC), canonical columns
     problem: str | None = None
+    covers_from: pd.Timestamp | None = None   # the source's first bar: it holds every bar from here to last_closed
 
     def last_closed(self) -> pd.Timestamp | None:
         return self.bars["timestamp"].iloc[-1] if len(self.bars) else None
@@ -227,7 +238,15 @@ def _export_bars(entry: MarketDataset, after: pd.Timestamp | None) -> SourceBars
             raise RefreshError(f"{path.name}: unreadable row {line!r}") from None
     frame = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume"]) if rows else _empty()
     bars = _closed(frame, entry.step_seconds, captured)
-    return SourceBars("mt5_export", path, captured, bars)
+    first = None
+    with open(path, "rb") as handle:
+        handle.readline()
+        head = handle.readline().decode("utf-8", "replace").split(",")[0]
+    try:
+        first = pd.Timestamp(datetime.strptime(head, "%Y.%m.%d %H:%M:%S"), tz="UTC") - delta
+    except ValueError:
+        pass
+    return SourceBars("mt5_export", path, captured, bars, covers_from=first)
 
 
 def _seed_bars(entry: MarketDataset, after: pd.Timestamp | None) -> SourceBars | None:
@@ -249,11 +268,12 @@ def _seed_bars(entry: MarketDataset, after: pd.Timestamp | None) -> SourceBars |
     bars = pd.DataFrame({"timestamp": stamps, "open": frame["open"].astype(float), "high": frame["high"].astype(float),
                          "low": frame["low"].astype(float), "close": frame["close"].astype(float),
                          "volume": frame.get("tick_volume", pd.Series(0, index=frame.index)).astype(float)})
+    first = bars["timestamp"].iloc[0] if len(bars) else None
     bars = bars.iloc[:-1] if len(bars) else bars          # rewritten at a bar open: the last row is forming
     bars = _closed(bars, entry.step_seconds, written)
     if after is not None:
         bars = bars[bars["timestamp"] > after]
-    return SourceBars("mt5_live_seed", path, written, bars.reset_index(drop=True))
+    return SourceBars("mt5_live_seed", path, written, bars.reset_index(drop=True), covers_from=first)
 
 
 def _empty() -> pd.DataFrame:
@@ -266,6 +286,25 @@ def _closed(bars: pd.DataFrame, step: int, captured: pd.Timestamp) -> pd.DataFra
         return bars.reset_index(drop=True)
     keep = bars["timestamp"] + pd.Timedelta(seconds=step) <= captured
     return bars[keep].reset_index(drop=True)
+
+
+def coverage_gaps(local: pd.Timestamp | None, usable: list[SourceBars], step: int) -> list[tuple]:
+    """Spans after the last local bar that no source covers: (last covered bar, next source's first bar). Bars
+    strictly between them exist in no local MT5 file (the chart shows a hole; it may also be a market closure)."""
+    spans = sorted((s.covers_from, s.last_closed()) for s in usable if s.covers_from is not None and s.last_closed() is not None)
+    if local is None or not spans:
+        return []
+    gaps, cursor = [], local
+    for first, last in spans:
+        if first > cursor + pd.Timedelta(seconds=step):
+            gaps.append((cursor, first))
+        cursor = max(cursor, last)
+    return gaps
+
+
+def _recorded_gaps(entry: MarketDataset) -> list[tuple]:
+    meta = _read_meta(metadata_path(entry)) if extension_path(entry).exists() else None
+    return [(pd.Timestamp(g["after"]), pd.Timestamp(g["before"])) for g in (meta or {}).get("coverage_gaps", [])]
 
 
 def sources(entry: MarketDataset, after: pd.Timestamp | None) -> list[SourceBars]:
@@ -286,6 +325,7 @@ def freshness(entry: MarketDataset) -> dict:
     local = last_local(entry) if entry.exists else None
     info = {"dataset_key": entry.key, "last_local": _iso(local), "latest_available": None, "status": UNKNOWN,
             "refreshable": refreshable(entry), "source": None, "source_captured": None, "problems": [],
+            "coverage_gaps": [],
             "workspace_extended": extension_path(entry).exists()}
     try:
         found = sources(entry, local)
@@ -294,6 +334,9 @@ def freshness(entry: MarketDataset) -> dict:
         return info
     usable = [s for s in found if s.problem is None]
     info["problems"] = [f"{s.path.name}: {s.problem}" for s in found if s.problem]
+    info["coverage_gaps"] = [[_iso(a), _iso(b)] for a, b in _recorded_gaps(entry)]
+    info["problems"] += [f"no local MT5 source has the bars between {g[0]} and {g[1]} UTC (re-export the history in "
+                         "MT5, then Refresh)" for g in info["coverage_gaps"]]
     if not usable:
         return info
     # sources only return closed bars after the local last bar: none means nothing newer is known, and the capture
@@ -351,7 +394,9 @@ def refresh(entry: MarketDataset, *, now: datetime | None = None) -> dict:
     if not entry.exists:
         raise RefreshError(f"{entry.label}: the registered dataset file is missing.")
     local = last_local(entry)
-    found = sources(entry, local)
+    recorded = _recorded_gaps(entry)
+    earliest = min([local] + [a for a, _ in recorded]) if local is not None else None
+    found = sources(entry, earliest)
     problems = [f"{s.path.name}: {s.problem}" for s in found if s.problem]
     usable = [s for s in found if s.problem is None]
     if not usable:
@@ -359,19 +404,72 @@ def refresh(entry: MarketDataset, *, now: datetime | None = None) -> dict:
                                                         f" in {common_files_dir()}"))
     # union of the sources; the history export wins where both have a bar
     frames = [s.bars.assign(_rank=i) for i, s in enumerate(usable)]
-    new = pd.concat(frames, ignore_index=True).sort_values(["timestamp", "_rank"])
-    new = new.drop_duplicates("timestamp", keep="first").drop(columns="_rank").reset_index(drop=True)
-    if local is not None:
-        new = new[new["timestamp"] > local].reset_index(drop=True)
+    offered = pd.concat(frames, ignore_index=True).sort_values(["timestamp", "_rank"])
+    offered = offered.drop_duplicates("timestamp", keep="first").drop(columns="_rank").reset_index(drop=True)
+    after = offered[offered["timestamp"] > local].reset_index(drop=True) if local is not None else offered
+    # a recorded coverage gap is filled once ONE source covers it completely (e.g. after a new MT5 history export)
+    fills, remaining = [], []
+    for a, b in recorded:
+        if any(s.covers_from is not None and s.last_closed() is not None and s.covers_from <= a and s.last_closed() >= b
+               for s in usable):
+            fills.append(offered[(offered["timestamp"] > a) & (offered["timestamp"] < b)])
+        else:
+            remaining.append((a, b))
+    gaps = remaining + coverage_gaps(local, usable, entry.step_seconds)
+    filled = pd.concat(fills, ignore_index=True) if fills else offered.iloc[:0]
+    new = pd.concat([filled, after], ignore_index=True).sort_values("timestamp").reset_index(drop=True)
     base_last = _base_last(entry)
     phase = int(base_last.timestamp()) % entry.step_seconds if base_last is not None else 0
     _validate(new, entry.step_seconds, phase, entry.key)
     refreshed = pd.Timestamp(now or datetime.now(timezone.utc)).tz_convert("UTC")
-    summary = {"dataset_key": entry.key, "appended": int(len(new)), "previous_last": _iso(local),
-               "first_appended": _iso(new["timestamp"].iloc[0]) if len(new) else None,
-               "last_closed": _iso(new["timestamp"].iloc[-1]) if len(new) else _iso(local), "problems": problems}
-    if new.empty:
+    gap_text = [{"after": a.isoformat(), "before": b.isoformat()} for a, b in gaps]
+    summary = {"dataset_key": entry.key, "appended": int(len(after)), "filled": int(len(filled)),
+               "previous_last": _iso(local),
+               "first_appended": _iso(after["timestamp"].iloc[0]) if len(after) else None,
+               "last_closed": _iso(after["timestamp"].iloc[-1]) if len(after) else _iso(local), "problems": problems,
+               "coverage_gaps": [(_iso(a), _iso(b)) for a, b in gaps]}
+    if new.empty and gaps == recorded:
         return summary
+    path, meta_path = extension_path(entry), metadata_path(entry)
+    _guard(path)
+    _guard(meta_path)
+    existing = _extension(entry)
+    combined = pd.concat([existing, new], ignore_index=True) if existing is not None else new
+    combined = combined.sort_values("timestamp").reset_index(drop=True)
+    if combined["timestamp"].duplicated().any():
+        raise RefreshError("appending would create duplicate timestamps")
+    if combined.empty:
+        return summary
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".csv.tmp")
+    out = combined[["timestamp", "open", "high", "low", "close", "volume"]].copy()
+    out["timestamp"] = out["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    out.to_csv(temporary, index=False)
+    os.replace(temporary, path)
+    previous = _read_meta(meta_path) or {}
+    history = previous.get("refreshes", [])
+    history.append({"refreshed_at_utc": refreshed.isoformat(), "appended": int(len(after)), "filled": int(len(filled)),
+                    "first_appended_utc": after["timestamp"].iloc[0].isoformat() if len(after) else None,
+                    "last_closed_bar_utc": combined["timestamp"].iloc[-1].isoformat(),
+                    "sources": [{"kind": s.kind, "file": s.path.name, "captured_utc": s.captured_utc.isoformat(),
+                                 "covers_from_utc": s.covers_from.isoformat() if s.covers_from is not None else None,
+                                 "closed_bars_offered": int(len(s.bars)),
+                                 "last_closed_utc": s.last_closed().isoformat() if s.last_closed() is not None else None}
+                                for s in usable]})
+    meta = {"dataset_key": entry.key, "role": "WORKSPACE chart history (not research data)",
+            "frozen_dataset": str(entry.path.relative_to(ROOT)) if ROOT in entry.path.parents else str(entry.path),
+            "frozen_last_bar_utc": base_last.isoformat() if base_last is not None else None,
+            "step_seconds": entry.step_seconds, "rows": int(len(combined)),
+            "first_bar_utc": combined["timestamp"].iloc[0].isoformat(),
+            "last_closed_bar_utc": combined["timestamp"].iloc[-1].isoformat(),
+            "closed_bar_policy": "open + step <= source capture time; the forming bar is never stored",
+            # bars strictly between after/before exist in no local MT5 source (a hole on the chart)
+            "coverage_gaps": gap_text,
+            "extension_sha256": _sha256(path), "refreshes": history}
+    temporary_meta = meta_path.with_suffix(".json.tmp")
+    temporary_meta.write_text(json.dumps(meta, indent=1) + "\n")
+    os.replace(temporary_meta, meta_path)
+    return summary
     path, meta_path = extension_path(entry), metadata_path(entry)
     _guard(path)
     _guard(meta_path)

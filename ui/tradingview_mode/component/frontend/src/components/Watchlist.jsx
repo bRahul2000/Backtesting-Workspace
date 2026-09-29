@@ -1,5 +1,6 @@
 import React from "react";
 import { sendEvent } from "../events.js";
+import { Icon } from "./icons.jsx";
 import { formatPrice, formatSigned, providerShort, timeframeLabel } from "../format.js";
 
 // A live row: always names its source; no quote means no price (never another source's).
@@ -20,7 +21,7 @@ function LiveRow({ item, timeframe }) {
   );
 }
 
-export function Watchlist({ items, replay, live, timeframe }) {
+export function Watchlist({ items, replay, live, timeframe, onCollapse }) {
   const liveRows = items.filter((item) => item.kind === "live");
   const datasets = items.filter((item) => item.kind !== "live");
   return (
@@ -28,6 +29,7 @@ export function Watchlist({ items, replay, live, timeframe }) {
       <div className="panel-head">
         <span>Watchlist</span>
         <span className="muted">{items.length}</span>
+        {onCollapse && <button type="button" className="icon-btn watch-collapse" title="Hide watchlist" onClick={onCollapse}><Icon name="chevronRight" size={13} /></button>}
       </div>
       <div className="wl-cols"><span>Symbol</span><span>{liveRows.length ? "Bid / Last" : "Last"}</span><span>Chg%</span></div>
       <div className="wl-body">

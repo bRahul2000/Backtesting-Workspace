@@ -200,3 +200,23 @@ is that the orders of magnitude are consistent.
 - **Exchange time zone.** The exchange zone is UTC, so `syminfo.timezone` is `Etc/UTC`. TradingView's OANDA:XAUUSD
   uses America/New_York. That only matters for calls without a time-zone argument; the script passes "Asia/Kolkata"
   everywhere.
+
+## Custom strategy workspace acceptance (Historical, full calculation range)
+
+Test: `test_browser_gold_range_hunter.py`.
+
+- **Setup:** the date range is 2026-05-01 → 2026-06-02, so Pine calculates on 2025-12-23 → 2026-06-02 (10,355
+  bars, all before the Gold V2 sealed windows) while the chart renders May.
+- **Trades:** **155**, matching the headless run on the same bars. Net +242.71 (+2.43%), win rate 69.68%, profit
+  factor 2.605, max drawdown 27.00, max run-up 248.78, average bars in trade 5.2.
+- **Fill → marker reconciliation:**
+
+  | stage | fills | fills on loaded bars | markers rendered | fills outside loaded bars |
+  |---|---|---|---|---|
+  | May window | 310 (155 entries, 155 exits) | 46 | 46 | 264 |
+  | after lazy-loading the oldest trade (#1, 2025-12-26) | 310 | 310 | 310 | 0 |
+
+- **One instance by default:** an identical second Add to chart is refused, with Focus existing / Add another instance
+  offered.
+- **Layout:** the Strategy Tester opens by itself with the Pine source badge, and there is no separate Pine Strategy tab.
+  Dock resize and collapse and all four focus modes pass. The frozen datasets are byte-identical after the run.

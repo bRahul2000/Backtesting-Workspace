@@ -22,7 +22,7 @@ from .replay import SPEEDS as REPLAY_SPEEDS, is_utc_text
 
 CONTRACT_VERSION = 1
 MODES = ("historical", "replay", "live")
-BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs", "pine", "pine_strategy")
+BOTTOM_PANELS = ("indicators", "strategy_tester", "trades", "logs", "pine")
 _BAR_FIELDS = ("time", "open", "high", "low", "close", "volume")
 _REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
 
@@ -221,6 +221,9 @@ def _validate_pine(payload: dict[str, Any], bar_times: set[int]) -> None:
     for script in pine["scripts"]:
         _require(isinstance(script.get("id"), str) and script["id"] not in script_ids, "pine script ids must be unique.")
         script_ids.add(script["id"])
+        _require(script.get("display_from") is None or (type(script["display_from"]) is int
+                                                         and payload.get("mode") == "historical"),
+                 "pine display_from (calculation before the first rendered bar) is Historical-only.")
         outputs = script.get("outputs") or []
         kinds = {}
         for output in outputs:
@@ -254,10 +257,14 @@ def _finite(value) -> bool:
 
 def _validate_strategy(script: dict, bar_times: set[int]) -> None:
     """P3.1 strategy report: simulated trades and fills only, every event on a bar the chart has (Replay cannot show a
-    trade from after the cursor), finite numbers, unique keys."""
+    trade from after the cursor), finite numbers, unique keys. Historical calculation on earlier history
+    (``display_from``): events before the first rendered bar are allowed; never after the last one."""
     report = script.get("strategy")
     if report is None:
         return
+    display_from = script.get("display_from")
+    if type(display_from) is int:
+        bar_times = _EarlierOrOn(bar_times, display_from)
     _require(isinstance(report, dict), "pine strategy report must be an object.")
     keys: set = set()
     for trade in report.get("trades") or []:
@@ -292,6 +299,16 @@ MAX_DRAWINGS_PER_KIND = 1000          # declared limits <= 500; rooted objects m
 MAX_TABLE_CELLS = 10_000              # P2.3b oracle-support tables-core: columns x rows per table
 
 
+class _EarlierOrOn:
+    """Membership: a rendered bar time, or any integer time before the first rendered bar."""
+
+    def __init__(self, times: set[int], display_from: int):
+        self.times, self.display_from = times, display_from
+
+    def __contains__(self, value) -> bool:
+        return type(value) is int and (value in self.times or value < self.display_from)
+
+
 def _validate_drawings(script: dict, bar_count: int) -> None:
     """P2.3a drawings: raw Pine coordinates, stable unique keys, and every object created on a bar the chart has
     (so a Replay payload cannot carry a drawing from a bar after the cursor)."""
@@ -300,7 +317,10 @@ def _validate_drawings(script: dict, bar_count: int) -> None:
         return
     _require(isinstance(drawings, dict), "pine drawings must be an object.")
     first = drawings.get("first_bar_index")
-    _require(type(first) is int and first >= 0, "pine drawings need a non-negative first_bar_index.")
+    # Historical calculation may start before the first rendered bar (display_from): such drawings map to negative
+    # logical indices (left of the chart); nothing may come from after the last rendered bar.
+    earlier = type(script.get("display_from")) is int
+    _require(type(first) is int and (first >= 0 or earlier), "pine drawings need a non-negative first_bar_index.")
     keys: dict[str, str] = {}
     for name, kind in DRAWING_LISTS.items():
         items = drawings.get(name) or []
@@ -311,7 +331,7 @@ def _validate_drawings(script: dict, bar_count: int) -> None:
                      f"pine drawing keys must be unique and match their list ({key!r}).")
             keys[key] = kind
             bar = item.get("bar")
-            _require(type(bar) is int and 0 <= first + bar < bar_count,
+            _require(type(bar) is int and (0 <= first + bar or earlier) and first + bar < bar_count,
                      f"pine drawing {key} was created on bar {bar!r}, which the chart does not have.")
             if kind == "linefill":
                 continue
@@ -598,7 +618,9 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "refresh_data": {},
     # Pine editor. Compilation and semantics live in the Pine engine (ui/tradingview_mode/pine).
     "pine_compile": {"source": (True, _is_source)},
-    "pine_add": {"source": (True, _is_source)},
+    "pine_add": {"source": (True, _is_source),
+                 "another": (False, lambda v: isinstance(v, bool)),        # add even if an identical script is on
+                 "keep_editor": (False, lambda v: isinstance(v, bool))},   # editor pinned: do not auto-collapse
     "pine_update": {"id": (True, _is_str), "source": (True, _is_source)},
     "pine_remove": {"id": (True, _is_str)},
     "pine_toggle": {"id": (True, _is_str), "enabled": (True, lambda v: isinstance(v, bool))},

@@ -13,6 +13,8 @@ from collections import OrderedDict
 from dataclasses import replace
 from functools import lru_cache
 
+import pandas as pd
+
 from ..pine import PineExecution, compile_script, run_script
 from ..pine.compat import matrix
 from ..pine.engine import CompileResult, data_context, resolve_inputs, source_hash
@@ -21,7 +23,7 @@ from ..pine.security import LIMIT, MAX_CONTEXTS_PER_CHART as MAX_CHART_CONTEXTS,
 from .protocol import PINE_EVENTS  # noqa: F401  (re-exported for terminal.py)
 from .state import LogEntry, PineInstance, TerminalState
 MAX_SCRIPTS = 8
-MAX_PINE_BARS = 10_000
+MAX_PINE_BARS = 20_000       # TradingView Premium's chart bar limit; Pine calculates on at most this many bars
 EDITOR_KEY = "tv_terminal_pine_editor"
 EXEC_KEY = "tv_terminal_pine_exec"
 _COMPILED: "OrderedDict[str, CompileResult]" = OrderedDict()
@@ -72,6 +74,13 @@ def handle_pine_event(event, state: TerminalState, session) -> tuple[TerminalSta
         if kind == "pine_add":
             if len(state.pine) >= MAX_SCRIPTS:
                 return state, LogEntry("error", f"Rejected: at most {MAX_SCRIPTS} Pine scripts can be on the chart.")
+            twin = next((item for item in state.pine if source_hash(item.source) == result.source_hash
+                         and not item.inputs), None)
+            if twin is not None and not data.get("another"):
+                # an identical compiled script with identical (default) inputs is already on the chart
+                session[EDITOR_KEY]["duplicate_of"] = twin.id
+                return state, LogEntry("warning", f"`{twin.title}` is already on the chart ({twin.id}) with the same "
+                                                  "inputs. Not added again; use Add another instance for a second copy.")
             instance = PineInstance(f"pine-{state.next_pine}", data["source"], result.meta["title"])
             new = replace(state, pine=state.pine + (instance,), next_pine=state.next_pine + 1)
             return new, LogEntry("info", f"Added Pine script `{instance.title}` ({instance.id}).")
@@ -140,11 +149,24 @@ def _literal_problem(result: CompileResult, provider) -> dict | None:
     return None
 
 
+def _rendered(outputs: list[dict], display_from: int | None) -> list[dict]:
+    """Chart outputs restricted to the rendered bars (the calculation may start earlier)."""
+    if display_from is None:
+        return outputs
+    return [{**o, "data": [p for p in o["data"] if p.get("time") is None or p["time"] >= display_from]}
+            if isinstance(o.get("data"), list) else o for o in outputs]
+
+
 def pine_payload(state: TerminalState, frame, session, *, identity: tuple, timeframe_seconds: int, ticker: str,
                  tickerid: str, mintick: float, forming_last: bool = False, kind: str = "crypto",
                  currency: str = "USD", chart_family: str | None = None, mode: str = "historical",
-                 knowable_until: int | None = None, provider=None) -> dict:
+                 knowable_until: int | None = None, provider=None, display_from: int | None = None) -> dict:
     """Run every enabled script on ``frame`` and build the payload section.
+
+    Historical mode calculates on more history than the chart shows: ``frame`` is the calculation range (from the
+    first available bar to the end of the chart's date range) and ``display_from`` (epoch seconds) the first bar the
+    chart renders. Plots, shapes and colors are sent for the rendered bars only; drawings keep their Pine
+    coordinates (mapped with ``first_bar_index``); the strategy report covers the whole calculation range.
 
     request.security(): ``provider`` serves the chart's source family only; Replay and Live run in knowable
     mode (only information knowable per bar, cut at ``knowable_until``), Historical reproduces TradingView's
@@ -154,6 +176,10 @@ def pine_payload(state: TerminalState, frame, session, *, identity: tuple, timef
         executions.pop(stale)
     truncated = max(0, len(frame) - MAX_PINE_BARS)
     view = frame.iloc[truncated:].reset_index(drop=True) if truncated else frame
+    hidden = 0                                     # calculated bars before the first rendered bar
+    if display_from is not None and len(frame):
+        stamps = (frame["timestamp"] - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(seconds=1)
+        hidden = int((stamps < display_from).sum())
     knowable = mode in ("replay", "live")
     data = data_context(view, timeframe_seconds=timeframe_seconds, ticker=ticker, tickerid=tickerid, mintick=mintick,
                         forming_last=forming_last, kind=kind, currency=currency, knowable=knowable,
@@ -166,7 +192,8 @@ def pine_payload(state: TerminalState, frame, session, *, identity: tuple, timef
                  "shorttitle": result.meta.get("shorttitle") or instance.title, "inputs": _input_rows(result, instance),
                  "outputs": [], "error": None, "runtime_ms": 0.0, "bars": 0, "executed": 0, "incremental": False,
                  "truncated_bars": truncated, "contexts": [], "drawings": None,
-                 "kind": result.meta.get("kind") or "indicator", "strategy": None}
+                 "kind": result.meta.get("kind") or "indicator", "strategy": None, "calc_bars": 0,
+                 "display_from": display_from}
         if not result.ok:
             entry["error"] = {"message": _first_problem(result), "line": result.errors[0].line, "bar_index": None}
         elif result.program.security and provider is not None and (problem := _literal_problem(result, provider)):
@@ -178,10 +205,12 @@ def pine_payload(state: TerminalState, frame, session, *, identity: tuple, timef
             if cached is None or cached[0] != key:
                 cached = executions[instance.id] = (key, PineExecution(result.program, values))
             run = run_script(cached[1], data, identity + (chart_family, mode), instance.id, provider)
-            entry.update(outputs=run.outputs, error=run.error, runtime_ms=round(run.runtime_ms, 1), bars=run.bars,
+            entry.update(outputs=_rendered(run.outputs, display_from), error=run.error,
+                         runtime_ms=round(run.runtime_ms, 1), bars=run.bars,
                          executed=run.executed, incremental=run.incremental, contexts=_contexts(run.contexts),
-                         drawings=None if run.drawings is None else {**run.drawings, "first_bar_index": truncated},
-                         strategy=run.strategy)
+                         drawings=None if run.drawings is None else {**run.drawings,
+                                                                     "first_bar_index": truncated - hidden},
+                         strategy=run.strategy, calc_bars=len(view), display_from=display_from)
             total_contexts += len(entry["contexts"])
             if total_contexts > MAX_CHART_CONTEXTS:
                 total_contexts -= len(entry["contexts"])

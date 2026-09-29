@@ -14,7 +14,7 @@ import dataclasses
 from dataclasses import asdict, replace
 import time
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 
@@ -84,6 +84,9 @@ LIVE_SESSION_KEY = "tv_terminal_live_session"
 AUTHORITY_KEY = "tv_terminal_signal_authority"
 SOURCE_LOG_KEY = "tv_terminal_source_log"
 CHART_ROLE_KEY = "tv_terminal_chart_role"
+AUTO_REFRESH_KEY = "tv_terminal_auto_refresh"     # symbol family -> last automatic freshness check / error
+FRESHNESS_KEY = "tv_terminal_freshness"           # dataset key -> cached data status (throttled)
+AUTO_REFRESH_SECONDS = 180                        # at most one automatic check per symbol every 3 minutes
 MAX_LOGS = 200
 _RSI_LEVELS = (70.0, 50.0, 30.0)
 _SECONDARY_COLORS = {"signal": "#f5a623", "histogram": "#7d8799"}
@@ -536,6 +539,53 @@ def _load(state: TerminalState) -> tuple[MarketDataset, TimeframeResolution, pd.
     return selected, resolution, frame
 
 
+def _family(selected: MarketDataset) -> list[MarketDataset]:
+    return [entry for entry in all_datasets() if entry.symbol == selected.symbol and entry.broker == selected.broker
+            and workspace_data.refreshable(entry)]
+
+
+def auto_refresh_workspace(state: TerminalState, session, now: float) -> LogEntry | None:
+    """Historical mode keeps locally backed charts current: a lightweight freshness check when the terminal opens,
+    when a symbol or timeframe is selected, and otherwise at most every AUTO_REFRESH_SECONDS. Missing CLOSED bars are
+    appended to the workspace history (never to a frozen dataset). A failure never breaks the chart: the status stays
+    STALE with the error, and the manual Refresh remains."""
+    if state.replay is not None or state.live is not None:
+        return None
+    try:
+        selected = dataset(state.dataset_key)
+    except KeyError:
+        return None
+    family = _family(selected)
+    if not family:
+        return None
+    checks = session.setdefault(AUTO_REFRESH_KEY, {})
+    key = f"{selected.broker}|{selected.symbol}"
+    last = checks.get(key)
+    if last is not None and last["view"] == (state.dataset_key, state.timeframe) and now - last["at"] < AUTO_REFRESH_SECONDS:
+        return None
+    appended, errors = [], []
+    for entry in family:
+        try:
+            result = workspace_data.refresh(entry)
+        except workspace_data.RefreshError as exc:
+            if not str(exc).startswith("no readable MT5 source"):
+                errors.append(f"{entry.timeframe}: {exc}")
+            continue
+        except OSError as exc:
+            errors.append(f"{entry.timeframe}: {exc}")
+            continue
+        if result["appended"]:
+            appended.append(f"{entry.timeframe} +{result['appended']} through {result['last_closed']} UTC")
+    checks[key] = {"at": now, "view": (state.dataset_key, state.timeframe), "errors": errors}
+    session.pop(FRESHNESS_KEY, None)
+    if errors:
+        return LogEntry("warning", f"Automatic data refresh failed for {selected.symbol}: {'; '.join(errors)}. "
+                                   "The chart keeps the last local bars; use Refresh to retry.")
+    if appended:
+        return LogEntry("info", f"Automatic data refresh: {selected.symbol} " + " · ".join(appended))
+    return None
+
+
 def refresh_workspace_data(state: TerminalState) -> LogEntry:
     """Refresh data: append the closed bars the local MT5 sources have to the WORKSPACE copies of every refreshable
     dataset of the chart's symbol (M15 and H1 together, so request.security() stays aligned). Frozen research datasets
@@ -543,8 +593,7 @@ def refresh_workspace_data(state: TerminalState) -> LogEntry:
     if state.replay is not None or state.live is not None:
         return LogEntry("error", "Rejected: Refresh data is available in Historical mode.")
     selected = dataset(state.dataset_key)
-    family = [entry for entry in all_datasets() if entry.symbol == selected.symbol and entry.broker == selected.broker
-              and workspace_data.refreshable(entry)]
+    family = _family(selected)
     if not family:
         return LogEntry("error", f"Rejected: {selected.label} has no local MT5 source to refresh from.")
     parts, failed = [], []
@@ -562,9 +611,25 @@ def refresh_workspace_data(state: TerminalState) -> LogEntry:
                     f"Refreshed {selected.symbol} workspace history · " + " · ".join(parts + failed))
 
 
-def data_status(entry: MarketDataset) -> dict:
-    status = workspace_data.freshness(entry)
-    status["label"] = entry.label
+def data_status(entry: MarketDataset, session=None, now: float | None = None) -> dict:
+    """Freshness of the chart's source dataset, cached per dataset until its files change or AUTO_REFRESH_SECONDS pass
+    (normal reruns do not touch the MT5 folder). The last automatic refresh error, if any, is attached."""
+    cache = session.setdefault(FRESHNESS_KEY, {}) if session is not None else {}
+    now = time.time() if now is None else now
+    marker = (workspace_data.marker(entry), workspace_data.source_marker(entry))
+    cached = cache.get(entry.key)
+    if cached is not None and cached["marker"] == marker and now - cached["at"] < AUTO_REFRESH_SECONDS:
+        status = dict(cached["status"])
+    else:
+        status = workspace_data.freshness(entry)
+        status["label"] = entry.label
+        cache[entry.key] = {"at": now, "marker": marker, "status": dict(status)}
+    auto = (session or {}).get(AUTO_REFRESH_KEY, {}).get(f"{entry.broker}|{entry.symbol}")
+    status["auto_refresh"] = None if auto is None else {
+        "checked": datetime.fromtimestamp(auto["at"], timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "errors": auto["errors"]}
+    if auto and auto["errors"]:
+        status["problems"] = list(status.get("problems") or []) + [f"automatic refresh: {e}" for e in auto["errors"]]
     return status
 
 
@@ -683,8 +748,15 @@ def _live_frame(state: TerminalState, notices: list[dict[str, str]], selected: M
 
 
 def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketDataset, live_status: dict | None,
-                 replay_status: dict | None, seconds: int, notices: list[dict[str, str]]) -> dict:
-    """Run the chart's Pine scripts on exactly the bars this payload shows."""
+                 replay_status: dict | None, seconds: int, notices: list[dict[str, str]],
+                 calc_frame: pd.DataFrame | None = None) -> dict:
+    """Run the chart's Pine scripts. Replay and Live: exactly the bars this payload shows. Historical: on
+    ``calc_frame`` (all available history up to the chart's last bar), with outputs for the rendered bars only - a
+    strategy backtest is not limited to the visible window."""
+    display_from = None
+    if calc_frame is not None and len(frame) and len(calc_frame) > len(frame):
+        display_from = int(frame["timestamp"].iloc[0].timestamp())
+        frame = calc_frame
     streaming = live_status is not None and live_status.get("phase") == "streaming"
     last_open_ms = int(frame["timestamp"].iloc[-1].timestamp() * 1000) if len(frame) else None
     if streaming:
@@ -714,7 +786,7 @@ def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketData
         tickerid=f"{provider.split(' ')[0].upper()}:{symbol}", mintick=10.0 ** -digits, forming_last=streaming,
         kind="cfd" if provider.startswith("Exness") else "crypto",
         currency="USDT" if symbol.upper().endswith("USDT") else "USD", chart_family=family, mode=mode,
-        knowable_until=knowable_until,
+        knowable_until=knowable_until, display_from=display_from,
         provider=security_data.provider_for(family, binance_provider=binance_provider, received=received))
     for script in section["scripts"]:
         if script["error"] and script["enabled"]:
@@ -741,9 +813,22 @@ def render_custom_terminal() -> None:
     registry = discover_builtin_strategies()
     if tester_event is not None and tester_event.type in DATA_EVENTS:
         entry = refresh_workspace_data(state)
+        st.session_state.pop(FRESHNESS_KEY, None)
+        if entry.level != "error":           # a successful manual refresh replaces the last automatic check
+            chart = dataset(state.dataset_key)
+            st.session_state.setdefault(AUTO_REFRESH_KEY, {})[f"{chart.broker}|{chart.symbol}"] = {
+                "at": time.time(), "view": (state.dataset_key, state.timeframe), "errors": []}
     elif tester_event is not None and tester_event.type in PINE_EVENTS:
+        before = len(state.pine)
         state, entry = pine_bridge.handle_pine_event(tester_event, state, st.session_state)
-        state = replace(state, bottom_panel="pine", bottom_open=True)
+        added = tester_event.type == "pine_add" and len(state.pine) > before
+        if added and not tester_event.data.get("keep_editor"):
+            # after a successful Add to chart the editor makes room: a strategy opens the Strategy Tester, an
+            # indicator collapses the dock (unless the editor is pinned open)
+            strategy = pine_bridge.compiled(state.pine[-1].source).meta.get("kind") == "strategy"
+            state = replace(state, bottom_panel="strategy_tester" if strategy else "pine", bottom_open=strategy)
+        else:
+            state = replace(state, bottom_panel="pine", bottom_open=True)
     elif tester_event is not None:
         # Runs synchronously inside this rerun. The event id is persisted only
         # afterwards, so an interrupted run is retried, never silently dropped.
@@ -766,6 +851,11 @@ def render_custom_terminal() -> None:
             notices.append({"level": "error", "message": entry.message})
         if isinstance(raw_event, dict) and raw_event.get("type") == "chart_ready":
             st.session_state[READY_KEY] = True
+
+    # 2b. Historical: keep locally backed datasets current (throttled; never a frozen dataset).
+    auto = auto_refresh_workspace(state, st.session_state, time.time())
+    if auto is not None:
+        _log(auto)
 
     # 3. Resolve and load exactly what the state names. No fallback substitution.
     try:
@@ -801,6 +891,7 @@ def render_custom_terminal() -> None:
     live_status = None
     rows = None
     sources = None
+    calc_frame = None
     streaming = state.live is not None and state.live.streaming
     if state.live is not None and not streaming:
         live_status = live_setup_status(state.live, selected)
@@ -812,7 +903,10 @@ def render_custom_terminal() -> None:
     elif replay_status is None and bounds is not None:
         start, end, range_notices = effective_range(state, bounds, resolution.target_seconds)
         notices.extend(range_notices)
+        full = frame
         frame = filter_range(frame, start, end)
+        if len(frame) and state.live is None:           # Historical only (Live setup still shows these bars)
+            calc_frame = full[full["timestamp"] <= frame["timestamp"].iloc[-1]].reset_index(drop=True)
         shown = (start, end)
         if len(frame) > MAX_BARS:
             notices.append({"level": "warning", "message": f"Showing the latest {MAX_BARS:,} of {len(frame):,} bars."})
@@ -820,7 +914,8 @@ def render_custom_terminal() -> None:
     elif replay_status is None:
         notices.append({"level": "warning", "message": "The selected dataset contains no bars."})
 
-    pine = pine_section(state, frame, selected, live_status, replay_status, resolution.target_seconds, notices)
+    pine = pine_section(state, frame, selected, live_status, replay_status, resolution.target_seconds, notices,
+                        calc_frame=calc_frame)
 
     # 4. Build, validate, render.
     try:
@@ -828,7 +923,7 @@ def render_custom_terminal() -> None:
             state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
             logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, rows),
             replay_status=replay_status, live_status=live_status, sources=sources, pine=pine, ack=last_id,
-            data_status=None if streaming else data_status(resolution.source),
+            data_status=None if streaming else data_status(resolution.source, st.session_state),
             tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
     except ValueError as exc:
         st.error(f"TradingView Mode payload rejected: {exc}")

@@ -212,3 +212,114 @@ def test_refresh_is_rejected_outside_historical_mode():
     assert entry.level == "error" and "Historical mode" in entry.message
     bitstamp = refresh_workspace_data(TerminalState(dataset_key="BITSTAMP_BTCUSD_15M", timeframe="15m"))
     assert bitstamp.level == "error" and "no local MT5 source" in bitstamp.message
+
+
+# ---- automatic Historical refresh (terminal.auto_refresh_workspace / data_status) ----------------------------------
+
+def _terminal_env(env, monkeypatch):
+    """terminal.py with the fixture's frozen file standing in for the registered XAUUSDm M15 dataset."""
+    from ui.tradingview_mode.component import terminal as T
+
+    entry, common, workspace, frozen = env
+    real = T.dataset
+    monkeypatch.setattr(T, "dataset", lambda key: entry if key == EXNESS_XAUUSDM_M15 else real(key))
+    monkeypatch.setattr(T, "all_datasets", lambda: (entry,))
+    return T
+
+
+def test_auto_refresh_appends_missing_closed_bars_and_is_throttled(env, monkeypatch):
+    from ui.tradingview_mode.component.state import TerminalState
+
+    T = _terminal_env(env, monkeypatch)
+    entry, common, workspace, frozen = env
+    before = sha(frozen)
+    write_export(common, "xauusd_XAUUSDm_M15.csv", bars(T0, 10), captured=pd.Timestamp("2026-09-18 22:00", tz="UTC"))
+    state = TerminalState(dataset_key=EXNESS_XAUUSDM_M15, timeframe="15m")
+    session: dict = {}
+    first = T.auto_refresh_workspace(state, session, now=1000.0)
+    assert first.level == "info" and "+3 through 2026-09-18 21:15" in first.message
+    assert W.last_local(entry) == pd.Timestamp("2026-09-18 21:15", tz="UTC") and sha(frozen) == before
+    # throttled: new source bars are not looked at again within AUTO_REFRESH_SECONDS for the same view
+    write_export(common, "xauusd_XAUUSDm_M15.csv", bars(T0, 12), captured=pd.Timestamp("2026-09-18 22:30", tz="UTC"))
+    assert T.auto_refresh_workspace(state, session, now=1000.0 + T.AUTO_REFRESH_SECONDS - 1) is None
+    assert W.last_local(entry) == pd.Timestamp("2026-09-18 21:15", tz="UTC")
+    # ... but a timeframe change (a new view) or the interval passing checks again
+    later = T.auto_refresh_workspace(TerminalState(dataset_key=EXNESS_XAUUSDM_M15, timeframe="30m"), session, now=1001.0)
+    assert later is not None and "+2 through 2026-09-18 21:45" in later.message
+    assert T.auto_refresh_workspace(state, session, now=1001.0 + T.AUTO_REFRESH_SECONDS) is None   # nothing new
+    merged = W.load(entry)
+    assert merged["timestamp"].is_unique and merged["timestamp"].is_monotonic_increasing and len(merged) == 12
+
+
+def test_auto_refresh_is_historical_only(env, monkeypatch):
+    from ui.tradingview_mode.component.replay import ReplayState
+    from ui.tradingview_mode.component.state import TerminalState
+
+    T = _terminal_env(env, monkeypatch)
+    entry, common, *_ = env
+    write_export(common, "xauusd_XAUUSDm_M15.csv", bars(T0, 10), captured=pd.Timestamp("2026-09-18 22:00", tz="UTC"))
+    replay = TerminalState(dataset_key=EXNESS_XAUUSDM_M15, timeframe="15m",
+                           replay=ReplayState(EXNESS_XAUUSDM_M15, "15m", 0, 0, 0))
+    assert T.auto_refresh_workspace(replay, {}, now=1.0) is None
+    assert not W.extension_path(entry).exists()
+
+
+def test_failed_auto_refresh_keeps_the_chart_and_reports_stale(env, monkeypatch):
+    from ui.tradingview_mode.component.state import TerminalState
+
+    T = _terminal_env(env, monkeypatch)
+    entry, common, workspace, _ = env
+    rows = bars(T0, 10)
+    rows[8] = (rows[8][0], rows[8][1], rows[8][4] - 1, rows[8][3], rows[8][4], rows[8][5])      # high below close
+    write_export(common, "xauusd_XAUUSDm_M15.csv", rows, captured=pd.Timestamp("2026-09-18 22:00", tz="UTC"))
+    session: dict = {}
+    entry_log = T.auto_refresh_workspace(TerminalState(dataset_key=EXNESS_XAUUSDM_M15, timeframe="15m"), session, now=5.0)
+    assert entry_log.level == "warning" and "use Refresh to retry" in entry_log.message
+    assert list(workspace.iterdir()) == []                                           # nothing written
+    status = T.data_status(entry, session, now=5.0)
+    assert status["status"] == "STALE" and status["refreshable"] is True
+    assert status["auto_refresh"]["errors"] and any("automatic refresh" in p for p in status["problems"])
+    assert len(W.load(entry)) == 7                                                   # the frozen bars still load
+
+
+def test_data_status_is_cached_until_files_change(env, monkeypatch):
+    T = _terminal_env(env, monkeypatch)
+    entry, common, *_ = env
+    calls = []
+    real = W.freshness
+    monkeypatch.setattr(W, "freshness", lambda e: calls.append(e.key) or real(e))
+    session: dict = {}
+    T.data_status(entry, session, now=10.0)
+    T.data_status(entry, session, now=11.0)
+    assert len(calls) == 1                                                           # normal reruns: no filesystem
+    T.data_status(entry, session, now=10.0 + T.AUTO_REFRESH_SECONDS)
+    assert len(calls) == 2
+    write_export(common, "xauusd_XAUUSDm_M15.csv", bars(T0, 9), captured=pd.Timestamp("2026-09-18 21:15", tz="UTC"))
+    W.refresh(entry)                                                                 # the extension changed
+    T.data_status(entry, session, now=10.0 + T.AUTO_REFRESH_SECONDS + 1)
+    assert len(calls) == 3
+
+
+def test_uncovered_span_between_sources_is_recorded_reported_and_later_filled(env):
+    entry, common, workspace, frozen = env
+    # export ends 21:00; the Live seed starts 22:30: nothing local has 21:15 ... 22:15
+    write_export(common, "xauusd_XAUUSDm_M15.csv", bars(T0, 9), captured=pd.Timestamp("2026-09-18 21:15", tz="UTC"))
+    write_seed(common, "XAUUSDm", "M15", bars(T0 + pd.Timedelta(minutes=210), 4),
+               written=pd.Timestamp("2026-09-18 23:15", tz="UTC"))                   # 22:30 ... 23:15 (forming)
+    result = W.refresh(entry)
+    assert result["coverage_gaps"] == [("2026-09-18 21:00", "2026-09-18 22:30")]
+    assert result["appended"] == 5                                                   # 20:45, 21:00, 22:30, 22:45, 23:00
+    meta = json.loads(W.metadata_path(entry).read_text())
+    assert meta["coverage_gaps"] == [{"after": "2026-09-18T21:00:00+00:00", "before": "2026-09-18T22:30:00+00:00"}]
+    status = W.freshness(entry)
+    assert status["status"] == "CURRENT" and status["coverage_gaps"] == [["2026-09-18 21:00", "2026-09-18 22:30"]]
+    assert any("no local MT5 source has the bars between" in p for p in status["problems"])
+    # a new MT5 history export covering the hole: the next refresh inserts exactly the missing bars
+    write_export(common, "xauusd_XAUUSDm_M15.csv", bars(T0, 17), captured=pd.Timestamp("2026-09-18 23:15", tz="UTC"))
+    filled = W.refresh(entry)
+    assert filled["filled"] == 5 and filled["appended"] == 0 and filled["coverage_gaps"] == []
+    merged = W.load(entry)
+    assert merged["timestamp"].is_unique and merged["timestamp"].is_monotonic_increasing
+    assert len(merged) == 17                                                         # 19:00 ... 23:00 every 15 min: no hole
+    assert json.loads(W.metadata_path(entry).read_text())["coverage_gaps"] == []
+    assert W.freshness(entry)["problems"] == []

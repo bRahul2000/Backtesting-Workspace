@@ -4,6 +4,7 @@ import { sendEvent } from "../events.js";
 // Pine Editor. Python compiles and runs every script (language-driven engine);
 // this panel only edits text, sends it, and shows what Python reports.
 const DRAFT_KEY = "tvterm:pine:draft";
+const PIN_KEY = "tvterm:pine:pinned";      // keep the editor open after Add to chart
 
 function loadDraft(fallback) {
   try { return window.localStorage.getItem(DRAFT_KEY) ?? fallback; } catch { return fallback; }
@@ -88,16 +89,21 @@ function contextsTitle(contexts) {
     + (c.forming ? " · forming bar" : "") + ` · ${c.data_identity}`).join("\n");
 }
 
-function ScriptRow({ script, editing, onEdit }) {
+function ScriptRow({ script, editing, onEdit, identical, focused }) {
   const [open, setOpen] = useState(false);
+  const row = useRef(null);
+  useEffect(() => { if (focused) row.current?.scrollIntoView({ block: "nearest" }); }, [focused]);
   const outputs = script.outputs.length;
   return (
-    <div className={`pine-script ${script.enabled ? "" : "is-hidden"} ${editing ? "is-editing" : ""}`} data-script={script.id}>
+    <div ref={row} className={`pine-script ${script.enabled ? "" : "is-hidden"} ${editing ? "is-editing" : ""} ${focused ? "is-focused" : ""}`}
+      data-script={script.id}>
       <div className="pine-script-head">
         <input type="checkbox" checked={script.enabled} title={script.enabled ? "Hide" : "Show"}
           onChange={(e) => sendEvent("pine_toggle", { id: script.id, enabled: e.target.checked })} />
         <b className="pine-script-title" title={script.title}>{script.title}</b>
-        <span className="pine-badge">{script.overlay ? "overlay" : "pane"}</span>
+        <span className="pine-badge">{script.kind === "strategy" ? "strategy" : script.overlay ? "overlay" : "pane"}</span>
+        <span className="pine-badge muted mono">{script.id}</span>
+        {identical > 1 && <span className="pine-badge is-duplicate" title="Identical script and inputs are on the chart more than once">identical ×{identical}</span>}
         {script.inputs.length > 0 && <button type="button" className="rp-btn" onClick={() => setOpen((v) => !v)}>Inputs {open ? "▴" : "▾"}</button>}
         <button type="button" className="rp-btn" onClick={() => onEdit(script)}>Edit</button>
         <button type="button" className="rp-btn exit" title="Remove from chart" onClick={() => sendEvent("pine_remove", { id: script.id })}>✕</button>
@@ -142,6 +148,9 @@ export function PineEditor({ pine, pending }) {
   const [lastSent, setLastSent] = useState(null);            // {id, text}
   const [editingId, setEditingId] = useState(null);
   const [view, setView] = useState("problems");
+  const [focusId, setFocusId] = useState(null);
+  const [pinned, setPinned] = useState(() => { try { return window.localStorage.getItem(PIN_KEY) === "1"; } catch { return false; } });
+  useEffect(() => { try { window.localStorage.setItem(PIN_KEY, pinned ? "1" : "0"); } catch { /* storage unavailable */ } }, [pinned]);
   const area = useRef(null);
   const gutter = useRef(null);
   useEffect(() => saveDraft(text), [text]);
@@ -159,6 +168,8 @@ export function PineEditor({ pine, pending }) {
   const busy = !!pending && pending.type?.startsWith("pine_");
   const editing = pine.scripts.find((s) => s.id === editingId) || null;
   const lines = text.split("\n").length;
+  const duplicateOf = editor && editor.action === "pine_add" && !stale ? editor.duplicate_of : null;
+  const duplicate = duplicateOf ? pine.scripts.find((s) => s.id === duplicateOf) : null;
 
   const send = (type, extra = {}) => {
     const id = sendEvent(type, { source: text, ...extra });
@@ -198,8 +209,10 @@ export function PineEditor({ pine, pending }) {
           </select>
           <button type="button" className="btn small pine-compile" disabled={busy || !text.trim()} onClick={() => send("pine_compile")}
             title="Compile (Ctrl/⌘+Enter)">Compile</button>
-          <button type="button" className="btn primary small pine-add" disabled={busy || !text.trim()} onClick={() => send("pine_add")}>
-            Add to chart</button>
+          <button type="button" className="btn primary small pine-add" disabled={busy || !text.trim()}
+            onClick={() => send("pine_add", { keep_editor: pinned })}>Add to chart</button>
+          <label className="check small pine-pin" title="Keep the Pine Editor open after Add to chart">
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /><span>Keep open</span></label>
           {editing && (
             <button type="button" className="btn small pine-update" disabled={busy} onClick={() => send("pine_update", { id: editing.id })}>
               Update “{editing.title}”</button>
@@ -208,6 +221,14 @@ export function PineEditor({ pine, pending }) {
           <div className="spacer" />
           <span className="muted mono">{lines} lines{busy ? " · compiling…" : ""}</span>
         </div>
+        {duplicate && (
+          <div className="pine-duplicate">
+            <span>Already on the chart as <b>{duplicate.title}</b> ({duplicate.id}) with the same inputs — not added again.</span>
+            <button type="button" className="rp-btn" onClick={() => { setView("scripts"); setFocusId(duplicate.id); }}>Focus existing</button>
+            <button type="button" className="rp-btn pine-add-another" onClick={() => send("pine_add", { another: true, keep_editor: pinned })}>
+              Add another instance</button>
+          </div>
+        )}
         <div className="pine-code">
           <pre className="pine-gutter mono" ref={gutter} aria-hidden="true">
             {Array.from({ length: lines }, (_, i) => `${i + 1}\n`).join("")}
@@ -227,6 +248,9 @@ export function PineEditor({ pine, pending }) {
           {view === "problems" && <Diagnostics result={result} stale={stale} onJump={jump} />}
           {view === "scripts" && (pine.scripts.length
             ? pine.scripts.map((script) => <ScriptRow key={script.id} script={script} editing={editingId === script.id}
+              identical={pine.scripts.filter((other) => other.source_hash === script.source_hash
+                && JSON.stringify(other.inputs.map((i) => i.value)) === JSON.stringify(script.inputs.map((i) => i.value))).length}
+              focused={focusId === script.id}
               onEdit={(s) => { setText(s.source); setEditingId(s.id); }} />)
             : <div className="pine-empty">No Pine scripts on the chart. Write or load one, then “Add to chart”.</div>)}
           {view === "compat" && <Compatibility compat={pine.compat} />}

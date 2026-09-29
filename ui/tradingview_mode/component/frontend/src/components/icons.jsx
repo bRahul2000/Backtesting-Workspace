@@ -22,6 +22,9 @@ const paths = {
   close: <path d="M4.5 4.5l9 9M13.5 4.5l-9 9" />,
   fx: <><path d="M6.5 15c1.5 0 2-1 2.3-3l1-6c.3-1.7.9-2.5 2.2-2.5" /><path d="M5.5 8h6" /></>,
   collapse: <path d="M5 11l4-4 4 4" />,
+  layout: <><rect x="2.5" y="3" width="13" height="12" rx="1" /><path d="M2.5 11.5h13M6 3v8.5" /></>,
+  chevronLeft: <path d="M11 4 6 9l5 5" />,
+  chevronRight: <path d="M7 4l5 5-5 5" />,
   expand: <path d="M5 7l4 4 4-4" />,
 };
 

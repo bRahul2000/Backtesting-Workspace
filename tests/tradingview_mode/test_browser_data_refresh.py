@@ -1,4 +1,4 @@
-"""Browser acceptance: Historical data freshness + Refresh data on XAUUSDm (production build, real clicks).
+"""Browser acceptance: Historical data freshness + automatic / manual Refresh on XAUUSDm (production build, real clicks).
 
 The app reads a SYNTHETIC MT5 Common/Files folder (a CopyRates export and a Live feed seed extending XAUUSDm past the
 frozen 2026-09-18 20:30 bar, the seed's last row still forming) and writes only to the test's temporary workspace
@@ -62,12 +62,15 @@ def test_historical_refresh_extends_chart_indicators_and_strategy(app, tmp_path)
     frozen = dataset(EXNESS_XAUUSDM_M15).path
     before_hash = hashlib.sha256(frozen.read_bytes()).hexdigest()
     frame = synthetic_bars()
-    write_sources(mt5_folder, frame)
+    staged = tmp_path / "staged"                     # copied into the MT5 folder by the browser script, mid-test
+    staged.mkdir()
+    write_sources(staged, frame)
     closed = frame[frame["timestamp"] <= pd.Timestamp("2026-09-21 06:00", tz="UTC")]
     expected = {"before_last": int(FROZEN_LAST.timestamp()),
                 "new_times": [int(t.timestamp()) for t in closed["timestamp"]],
                 "after_last": int(closed["timestamp"].iloc[-1].timestamp()), "after_last_text": "2026-09-21 06:00",
-                "after_date": "2026-09-21"}
+                "after_date": "2026-09-21", "staged": str(staged), "mt5_folder": str(mt5_folder),
+                "seed_written": pd.Timestamp("2026-09-21 06:15:02", tz="UTC").timestamp()}
     expected_path = tmp_path / "expected.json"
     expected_path.write_text(json.dumps(expected))
     completed = subprocess.run(["node", str(SCRIPT), url, CHROME, str(expected_path)], capture_output=True, text=True,
@@ -76,7 +79,8 @@ def test_historical_refresh_extends_chart_indicators_and_strategy(app, tmp_path)
     failures = [r for r in results if not r["ok"]]
     assert results and not failures, json.dumps(failures, indent=1) + completed.stderr[-2000:]
     names = {r["name"] for r in results}
-    assert {"before: status chip shows Stale with the last local bar", "after: last bar is the newest CLOSED source bar "
+    assert {"stale: status chip shows Stale with the last local bar", "log reports the automatic refresh",
+            "after: last bar is the newest CLOSED source bar "
             "(forming bar excluded)", "after: every appended bar present once, strictly increasing, nothing extra",
             "after: indicator recalculated to the new last bar",
             "after: Pine plot recalculated to the new last bar (script not re-added)",
