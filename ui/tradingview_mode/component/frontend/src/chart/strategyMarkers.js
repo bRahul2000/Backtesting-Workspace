@@ -11,7 +11,10 @@ export function strategyMarkers(fills, colors = { buy: "#2962ff", sell: "#e91e63
     const qty = Number.isInteger(fill.qty) || Math.abs(fill.qty - Math.round(fill.qty)) < 1e-9
       ? String(Math.round(fill.qty)) : String(Number(fill.qty.toFixed(6)));
     const label = fill.kind === "exit" || fill.kind === "close" ? LABELS[fill.exit_kind] : null;
-    const tag = label && label.toLowerCase() !== String(fill.id).toLowerCase() ? `${fill.id} ${label}` : fill.id;
+    // A non-empty order comment (comment / comment_profit / comment_loss / comment_trailing) is shown instead of the
+    // order ID, as TradingView's chart does (Pine reference, strategy.entry/exit/order `comment`).
+    const tag = fill.comment ? fill.comment
+      : label && label.toLowerCase() !== String(fill.id).toLowerCase() ? `${fill.id} ${label}` : fill.id;
     markers.push({
       time: fill.time, position: buy ? "belowBar" : "aboveBar", shape: buy ? "arrowUp" : "arrowDown",
       color: buy ? colors.buy : colors.sell, text: `${tag} ${buy ? "+" : "-"}${qty}`, id: fill.key,

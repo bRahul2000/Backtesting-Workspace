@@ -5,7 +5,7 @@ built-in registries; a test fails if this file is out of date. Compatibility is 
 feature. **No claim of full Pine compatibility is made**: a script runs only if every feature it
 uses is supported, and otherwise fails with the exact feature and line.
 
-Features: 23 supported, 25 partial, 10 not yet implemented. Built-ins: 282 functions, 91 variables, 162 constants.
+Features: 23 supported, 25 partial, 10 not yet implemented. Built-ins: 283 functions, 91 variables, 162 constants.
 
 ## parser
 
@@ -58,8 +58,8 @@ Features: 23 supported, 25 partial, 10 not yet implemented. Built-ins: 282 funct
 | math built-ins (`math.*`) | partial | See the built-in coverage list. |
 | string built-ins (`str.*`) | partial | See the built-in coverage list. |
 | colors (`color.*`, `#RRGGBBAA` literals) | supported |  |
-| inputs (`input.*`) | partial | Defaults, editable values; session/symbol/time inputs are gaps. |
-| time variables and functions (UTC) | partial | time() with a session argument is a gap. |
+| inputs (`input.*`) | partial | Defaults, editable values; input.time() edits a UTC date and time; session/symbol inputs are gaps. |
+| time variables and functions (UTC) | partial | Calendar functions accept a time zone (IANA or UTC/GMT offset); time() takes a session on the chart's timeframe only; timestamp() with a time zone is a gap. |
 | barstate.*, syminfo.*, timeframe.* | partial | Fundamental syminfo fields are gaps. |
 | Pine logs (`log.info()`, `log.warning()`, `log.error()`) | partial | Messages are collected on the run (parity tooling); the terminal does not display them yet. |
 | alert() / alertcondition() | partial | Accepted; no alerts are delivered. |
@@ -116,7 +116,7 @@ Features: 23 supported, 25 partial, 10 not yet implemented. Built-ins: 282 funct
 | `chart` | 0 / 11 | `chart.bg_color`, `chart.fg_color`, `chart.is_heikinashi`, `chart.is_kagi`, `chart.is_linebreak`, `chart.is_pnf`, `chart.is_range`, `chart.is_renko`, `chart.is_standard`, `chart.left_visible_bar_time`, `chart.right_visible_bar_time` |
 | `chart.point` | 5 / 5 |  |
 | `color` | 7 / 7 |  |
-| `input` | 9 / 13 | `input.enum`, `input.session`, `input.symbol`, `input.time` |
+| `input` | 10 / 13 | `input.enum`, `input.session`, `input.symbol` |
 | `label` | 20 / 22 | `label.set_text_font_family`, `label.set_text_formatting` |
 | `line` | 22 / 22 |  |
 | `linefill` | 6 / 6 |  |

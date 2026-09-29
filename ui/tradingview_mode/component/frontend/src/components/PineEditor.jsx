@@ -57,6 +57,16 @@ function InputField({ script, input }) {
         send(match ?? raw);
       }}>{options.map((o) => <option key={String(o)} value={String(o)}>{String(o)}</option>)}</select></label>;
   }
+  if (input.kind === "time") {
+    // input.time(): UNIX milliseconds, edited as a UTC date and time (this terminal's exchange time zone)
+    const ms = Number(input.value);
+    const shown = Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 16) : "";
+    return <label className="pine-input"><span>{input.title} <small>(UTC)</small></span>
+      <input className="mono" type="datetime-local" step="60" value={shown} onChange={(e) => {
+        const next = Date.parse(`${e.target.value}:00Z`);
+        if (Number.isFinite(next) && next !== ms) send(next);
+      }} /></label>;
+  }
   const numeric = ["int", "float", "price"].includes(input.kind);
   const commit = () => {
     if (numeric) {

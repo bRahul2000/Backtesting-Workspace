@@ -66,10 +66,16 @@ test("P3.1 strategy fills become chart markers (presentation only)", async () =>
     { key: "s:fill:1", time: 200, side: -1, qty: 2, kind: "reversal", exit_kind: "reversal", id: "Short" },
     { key: "s:fill:0", time: 100, side: 1, qty: 1, kind: "entry", exit_kind: null, id: "Long" },
     { key: "s:fill:2", time: 300, side: 1, qty: 1, kind: "exit", exit_kind: "trail", id: "Trail" },
+    { key: "s:fill:3", time: 400, side: 1, qty: 1, kind: "entry", exit_kind: null, id: "BUY", comment: "SETUP_A_BUY" },
+    { key: "s:fill:4", time: 500, side: -1, qty: 1, kind: "exit", exit_kind: "stop", id: "BUY EXIT", comment: "TRAIL_SL" },
+    { key: "s:fill:5", time: 600, side: -1, qty: 1, kind: "exit", exit_kind: "stop", id: "BUY EXIT", comment: null },
   ]);
   assert.deepEqual(markers.map((m) => [m.time, m.position, m.shape, m.text]), [
     [100, "belowBar", "arrowUp", "Long +1"],
     [200, "aboveBar", "arrowDown", "Short -2"],
     [300, "belowBar", "arrowUp", "Trail +1"],
+    [400, "belowBar", "arrowUp", "SETUP_A_BUY +1"],          // a comment replaces the order ID
+    [500, "aboveBar", "arrowDown", "TRAIL_SL -1"],
+    [600, "aboveBar", "arrowDown", "BUY EXIT SL -1"],
   ]);
 });

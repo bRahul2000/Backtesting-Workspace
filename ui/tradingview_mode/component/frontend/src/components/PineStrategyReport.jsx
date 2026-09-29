@@ -59,10 +59,11 @@ function Trades({ trades, precision }) {
           <tr key={t.key} className={t.open ? "is-open" : ""}>
             <td className="mono">{t.number}</td>
             <td>{t.direction > 0 ? "Long" : "Short"}</td>
-            <td>{t.entry_id}</td>
+            <td title={t.entry_comment ? `ID ${t.entry_id}` : undefined}>{t.entry_comment || t.entry_id}</td>
             <td className="mono">{utc(t.entry_time)}</td>
             <td className="mono">{fmt(t.entry_price, precision)}</td>
-            <td title={KIND[t.exit_kind] || ""}>{t.open ? "Open" : t.exit_id}</td>
+            <td title={[KIND[t.exit_kind], t.exit_comment ? `ID ${t.exit_id}` : ""].filter(Boolean).join(" · ")}>
+              {t.open ? "Open" : t.exit_comment || t.exit_id}</td>
             <td className="mono">{utc(t.exit_time)}</td>
             <td className="mono">{fmt(t.exit_price, precision)}</td>
             <td className="mono">{fmt(t.qty, 4)}</td>

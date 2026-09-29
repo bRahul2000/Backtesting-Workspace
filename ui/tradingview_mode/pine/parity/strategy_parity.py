@@ -63,17 +63,58 @@ def load_bars(path: Path) -> pd.DataFrame:
     return frame
 
 
+class FrozenProvider:
+    """request.security() data for parity runs: frozen bars of the chart's own symbol per requested timeframe (e.g.
+    TradingView's exported 60-minute bars), so both engines see identical data. Other symbols and timeframes are
+    refused, never synthesised."""
+
+    family = "frozen"
+
+    def __init__(self, tickerid: str, frames: dict[str, pd.DataFrame], mintick: float):
+        self.tickerid, self.frames, self.mintick = tickerid, frames, mintick
+
+    def check_symbol(self, symbol: str) -> str:
+        ticker = self.tickerid.split(":")[-1]
+        if symbol not in (self.tickerid, ticker):
+            from ..security import SecurityDataError
+            raise SecurityDataError(f"symbol `{symbol}` has no frozen bars (only `{self.tickerid}`).", "unknown_symbol")
+        return ticker
+
+    def request(self, symbol, timeframe, *, parent_tickerid, parent_seconds, knowable, until_ms, chart_end_ms,
+                lower: bool = False):
+        from ..security import BarGrid, Bars, Requested, SecurityDataError
+
+        ticker = self.check_symbol(symbol)
+        frame = self.frames.get(timeframe.text)
+        if frame is None:
+            raise SecurityDataError(f"no frozen `{timeframe.text}` bars for `{self.tickerid}`.", "missing_source")
+        stamps = frame["timestamp"].dt.tz_convert("UTC").dt.tz_localize(None).to_numpy(dtype="datetime64[ms]").astype(np.int64)
+        bars = Bars(stamps, stamps + timeframe.seconds * 1000, *(frame[c].to_numpy(dtype=float) for c in
+                                                                 ("open", "high", "low", "close")),
+                    frame["volume"].to_numpy(dtype=float) if "volume" in frame else np.zeros(len(frame)))
+        if knowable:
+            bars = bars.upto_close(until_ms)
+        elif chart_end_ms is not None:                 # historical: nothing opening after the chart's last bar
+            bars = bars.head(int(np.searchsorted(bars.time, chart_end_ms, side="right")))
+        return Requested(bars, BarGrid(timeframe), ticker, self.tickerid,
+                         {"provider_family": "frozen", "provider": "parity bars", "native": True,
+                          "aggregation_base": None, "data_identity": f"frozen:{self.tickerid}:{timeframe.text}",
+                          "fingerprint": None}, mintick=self.mintick, same_as_parent=True)
+
+
 def run_strategy(source: str, frame: pd.DataFrame, *, mintick: float, timeframe_seconds: int,
-                 tickerid: str = "BINANCE:BTCUSDT.P", inputs: dict | None = None):
+                 tickerid: str = "BINANCE:BTCUSDT.P", inputs: dict | None = None,
+                 security_frames: dict[str, pd.DataFrame] | None = None, currency: str = "USDT"):
     from ..engine import PineExecution, compile_script, data_context, resolve_inputs, run_script
 
     result = compile_script(source)
     if not result.ok:
         raise ValueError("; ".join(d.text() for d in result.diagnostics))
     values = resolve_inputs(result.program, inputs or {})[0]
-    execution = PineExecution(result.program, values)
+    provider = FrozenProvider(tickerid, security_frames, mintick) if security_frames else None
+    execution = PineExecution(result.program, values, provider)
     data = data_context(frame, timeframe_seconds=timeframe_seconds, ticker=tickerid.split(":")[-1], tickerid=tickerid,
-                        mintick=mintick, currency="USDT")
+                        mintick=mintick, currency=currency)
     out = run_script(execution, data, ("parity",), "p")
     if out.error:
         raise RuntimeError(out.error)
@@ -353,11 +394,17 @@ def main(argv=None) -> int:
     parser.add_argument("--bars", default=str(DATA / "BINANCE_BTCUSDT.P_1D.csv"))
     parser.add_argument("--mintick", type=float, default=0.1)
     parser.add_argument("--timeframe-seconds", type=int, default=86_400)
+    parser.add_argument("--tickerid", default="BINANCE:BTCUSDT.P")
+    parser.add_argument("--currency", default="USDT")
+    parser.add_argument("--security-bars", action="append", default=[], metavar="TF=BARS.csv",
+                        help="frozen bars for request.security() on the chart's symbol, e.g. 60=OANDA_XAUUSD_60.csv")
     parser.add_argument("--json", help="write the machine-readable report here")
     args = parser.parse_args(argv)
     frame = load_bars(Path(args.bars))
+    security = {tf: load_bars(Path(path)) for tf, _, path in (item.partition("=") for item in args.security_bars)}
     broker = run_strategy(Path(args.script).read_text(), frame, mintick=args.mintick,
-                          timeframe_seconds=args.timeframe_seconds)
+                          timeframe_seconds=args.timeframe_seconds, tickerid=args.tickerid,
+                          security_frames=security or None, currency=args.currency)
     report = compare(parse_trades(Path(args.trades)), broker, frame, mintick=args.mintick,
                      until=frame["timestamp"].iloc[-1].to_pydatetime())
     print(report.text())

@@ -36,7 +36,7 @@ ALL_VARIABLES = {f"{kind}.all" for kind in ARRAY_DRAWING_KINDS}
 class InputDef:
     index: int
     node_id: int
-    kind: str                     # int | float | bool | string | color | source | timeframe | price | text_area
+    kind: str                     # int | float | bool | string | color | source | timeframe | price | text_area | time
     title: str
     defval: Any
     options: list | None = None
@@ -101,6 +101,7 @@ class Analyzer:
         self.uses_arrays = False
         self.top_index: int | None = None
         self.meta: dict = {}
+        self.rejected_args: set[int] = set()     # argument nodes that already have a type/qualifier error
 
     # -- diagnostics --------------------------------------------------------------------------------
     def error(self, message: str, node: A.Node) -> None:
@@ -863,6 +864,10 @@ class Analyzer:
         if builtin_.name.startswith("array."):
             self.uses_arrays = True
             return self.array_result(builtin_, binding, arg_types)
+        if builtin_.polymorphic:
+            # strongest participating qualifier; omitted arguments take const defaults, unknown types stay series
+            args = [arg_types.get(id(n)) for n in (*binding.nodes.values(), *binding.extra)]
+            return TypeSpec(self.max_qualifier(*args), TypeSpec.parse(builtin_.returns).base)
         return TypeSpec.parse(builtin_.returns) if builtin_.returns not in ("void", "tuple") else None
 
     def overload_call(self, node: A.Call, builtin_: Builtin, positional: list, named: dict) -> None:
@@ -1012,6 +1017,7 @@ class Analyzer:
         mismatch = not self.fits(param, actual)
         too_variable = QUALIFIER_RANK.get(actual.qualifier, 3) > QUALIFIER_RANK.get(expected.qualifier, 3)
         if mismatch or too_variable:
+            self.rejected_args.add(arg.id)
             self.error(f"Cannot call `{builtin_.name}` with argument `{param.name}`: a `{actual.qualifier} {actual.base}` "
                        f"was used but a `{expected}` is expected.", arg)
 
@@ -1023,7 +1029,8 @@ class Analyzer:
         if kind == "source":
             defval = self.source_name(defval_node) if defval_node is not None else "close"
         else:
-            defval = self.const_value(defval_node, "defval") if defval_node is not None else None
+            defval = (self.const_value(defval_node, "defval")
+                      if defval_node is not None and defval_node.id not in self.rejected_args else None)
         if kind is None:  # plain input(): type from the default value
             if isinstance(defval_node, (A.Name, A.Attribute)) and self.source_name(defval_node, quiet=True):
                 kind, defval = "source", self.source_name(defval_node)
@@ -1086,7 +1093,14 @@ class Analyzer:
             for argument in node.args:
                 if argument.name is not None:
                     args[argument.name] = self.const_value(argument.value, what)
+            if any(value is None for value in args.values()):
+                return None                              # a non-constant argument (already reported)
             return builtin_.impl(None, None, args)
+        if isinstance(node, A.Ternary):
+            condition = self.const_value(node.condition, what)
+            if isinstance(condition, bool):
+                return self.const_value(node.then if condition else node.otherwise, what)
+            return None if condition is None else self.const_value(node.otherwise, what)   # na condition: false
         self.error(f"`{what}` must be a constant value here.", node)
         return None
 

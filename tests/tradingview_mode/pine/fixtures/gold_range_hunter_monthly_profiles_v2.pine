@@ -1,0 +1,571 @@
+//@version=6
+// Packaged v49 trading core. Diagnostic-only closed-trade rescans omitted.
+// All twelve month profiles frozen for demo; not a live-performance guarantee.
+strategy("Gold Range Hunter - Monthly Profiles V2", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, pyramiding=0, commission_type=strategy.commission.percent, commission_value=0.0, process_orders_on_close=true, calc_on_order_fills=false, use_bar_magnifier=false, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+const string DEFAULT_TZ = "Asia/Kolkata"
+startDate = input.time(1756665000000, "Backtest Start Date Combined AB")
+endDate = input.time(1924972140000, "Backtest End Date")
+inBacktest = time >= startDate and time <= endDate
+timeZone = DEFAULT_TZ
+morningRangeSession = "0330-0545"
+nyRangeSession = "1700-1830"
+useBodyFilter = true
+minBodyPercent = 60.0
+useOutsideFilter = true
+minOutsidePercent = 15.0
+useCloseStrengthFilter = true
+closeZonePercent = 15.0
+useFirstSignalLock = true
+enableBuyTrades = true
+useBuyTrendFilter = true
+buyTrendTimeframe = "60"
+buyTrendEmaLength = 30
+showBuyTrendEMA = input.bool(false, "Show BUY HTF EMA")
+useSellTrendFilter = false
+sellTrendTimeframe = "60"
+sellTrendEmaLength = 30
+showSellTrendEMA = input.bool(false, "Show SELL HTF EMA")
+useSellEMASlopeFilter = false
+useSellDMIFilter = false
+useSellATRFilter = true
+sellATRTimeframe = "60"
+sellATRLength = 14
+sellATRAverageLength = 50
+useSellMaxBoxATRRatio = true
+sellMaxBoxATRRatio = 2.0
+useSellMaxEntryTime = true
+sellMaxEntryHour = 13
+sellMaxEntryMinute = 30
+useBuyMaxEntryTime = true
+buyMaxEntryHour = 13
+buyMaxEntryMinute = 30
+useBuyMaxBoxRange = true
+buyMaxBoxRange = 35.0
+useADXRegimeFilter = true
+adxRegimeTimeframe = "60"
+adxLength = 14
+minADX = 15.0
+setupASellMinBodyPercent = 65.0
+setupASellMinADX = 15.0
+setupASellMinCloseBeyondPercent = 5.0
+showADXDiagnostics = input.bool(true, "Show ADX Diagnostics In Data Window")
+useCloseBeyondBoxFilter = false
+minCloseBeyondBoxPercent = 10.0
+useMaxBreakoutSizeFilter = false
+maxBreakoutCandlePercent = 70.0
+riskReward = 3.0
+useTrailingSL = true
+trailActivationR = 1.5
+useAdaptiveTrailActivation = true
+useAdaptiveExitProfiles = true
+string monthlyProfileGroup = "Monthly Exit Profiles"
+januaryExitProfile = "Adaptive"
+februaryExitProfile = "Adaptive"
+marchExitProfile = "Baseline"
+aprilExitProfile = "Baseline"
+mayExitProfile = "Baseline"
+juneExitProfile = "Adaptive"
+julyExitProfile = "Adaptive"
+augustExitProfile = "Baseline"
+septemberExitProfile = "Baseline"
+octoberExitProfile = "Baseline"
+novemberExitProfile = "Baseline"
+decemberExitProfile = "Baseline"
+string octoberResearchGroup = "October Locked Research Profile"
+octoberUseSweepRiskCap = true
+octoberSweepRiskCapATR = 1.75
+octoberProfitLockR = 0.20
+string aprilEntryProfileGroup = "April Entry Profile"
+useAprilEntryProfile = true
+aprilMinADX = 15.0
+aprilUseMaxBreakoutSizeFilter = true
+aprilMaxBreakoutCandlePercent = 70.0
+aprilSweepBuyMinADX = 20.0
+aprilSweepMinBodyPercent = 35.0
+aprilMaxTradesPerDay = 3
+aprilAllowRepeatedBreakouts = true
+aprilRetestMinBody = 20.0
+aprilRetestEmaTouchATR = 0.50
+aprilRetestEmaDepthATR = 0.75
+aprilEnableRetestSells = false
+aprilRiskReward = 0.75
+aprilEnableSetupABuys = false
+aprilEnableSetupBSells = false
+aprilMaxSweepTradesPerDay = 3
+aprilMaxRetestTradesPerRange = 5
+lowVolATRRatio = 0.85
+lowVolTrailActivationR = 1.75
+highVolTrailActivationR = 2.0
+trailATRExpansionRatio = 1.25
+trailLookback = 1
+baseProtectTriggerR = 0.50
+baseProtectProfitR = 0.20
+lowVolProtectTriggerR = 0.50
+lowVolProtectProfitR = 0.15
+highVolProtectTriggerR = 0.75
+highVolProtectProfitR = 0.20
+maxTradesPerDay = 1
+enableSweepSetup = true
+enableSweepBuyTrades = true
+sweepBuyMinReclaimBodyPercent = 45.0
+sweepBuyMinConfirmBodyPercent = 20.0
+sweepBuyMinADX = 20.0
+sweepBuyPenetrationATR = 0.05
+maxSweepTradesPerDay = 1
+sweepMinBodyPercent = 35.0
+sweepConfirmationBars = 2
+sweepPenetrationATR = 0.05
+enableRetestSetup = true
+enableRetestLongs = true
+enableRetestShorts = true
+enableRetestSellBoundary = true
+enableRetestSellEMA = false
+maxRetestTradesPerRange = 2
+retestEMALength = 20
+retestTouchATR = 0.25
+retestDepthATR = 0.50
+retestMinBodyPercent = 40.0
+retestRiskReward = 2.0
+setupCProtectTriggerR = 0.90
+setupCProtectProfitR = 0.40
+retestMinADX = 15.0
+retestSellMinBodyPercent = 50.0
+retestSellMinADX = 15.0
+retestSellDepthATR = 0.50
+showTradeLevels = input.bool(true, "Show Entry / SL / TP")
+showTradeLabels = input.bool(false, "Show Trade Labels")
+boxFillColor = input.color(color.new(color.blue, 85), "Box Fill")
+boxBorderColor = input.color(color.blue, "Box Border")
+f_confirmedDMI(_length) =>
+    [plusDI, minusDI, adxValue] = ta.dmi(_length, _length)
+    [plusDI[1], minusDI[1], adxValue[1]]
+buyHTFEMA = request.security(syminfo.tickerid, buyTrendTimeframe, ta.ema(close, buyTrendEmaLength)[1], lookahead=barmerge.lookahead_on)
+bool buyTrendPass = true
+if useBuyTrendFilter
+    buyTrendPass := not na(buyHTFEMA) and close > buyHTFEMA
+float buyEMAPlot = na
+if showBuyTrendEMA
+    buyEMAPlot := buyHTFEMA
+plot(buyEMAPlot, title="BUY HTF EMA", color=color.orange, linewidth=2)
+sellHTFEMA = request.security(syminfo.tickerid, sellTrendTimeframe, ta.ema(close, sellTrendEmaLength)[1], lookahead=barmerge.lookahead_on)
+sellHTFEMAPrevious = request.security(syminfo.tickerid, sellTrendTimeframe, ta.ema(close, sellTrendEmaLength)[2], lookahead=barmerge.lookahead_on)
+bool sellTrendPass = true
+if useSellTrendFilter
+    sellTrendPass := not na(sellHTFEMA) and close < sellHTFEMA
+bool sellEMASlopePass = true
+if useSellEMASlopeFilter
+    sellEMASlopePass := not na(sellHTFEMA) and not na(sellHTFEMAPrevious) and sellHTFEMA < sellHTFEMAPrevious
+float sellEMAPlot = na
+if showSellTrendEMA
+    sellEMAPlot := sellHTFEMA
+plot(sellEMAPlot, title="SELL HTF EMA", color=color.aqua, linewidth=2)
+[htfPlusDI, htfMinusDI, htfADX] = request.security(syminfo.tickerid, adxRegimeTimeframe, f_confirmedDMI(adxLength), lookahead=barmerge.lookahead_on)
+int strategyMonth = month(time, timeZone)
+bool qualityEntryProfileActive = useAprilEntryProfile and (strategyMonth == 4 or strategyMonth == 9 or strategyMonth == 12 or strategyMonth == 8)
+float effectiveMinADX = qualityEntryProfileActive ? aprilMinADX : minADX
+float effectiveSweepBuyMinADX = qualityEntryProfileActive ? aprilSweepBuyMinADX : sweepBuyMinADX
+float effectiveSweepMinBodyPercent = qualityEntryProfileActive ? aprilSweepMinBodyPercent : sweepMinBodyPercent
+bool effectiveUseMaxBreakoutSizeFilter = useMaxBreakoutSizeFilter or (qualityEntryProfileActive and aprilUseMaxBreakoutSizeFilter)
+float effectiveMaxBreakoutCandlePercent = qualityEntryProfileActive and aprilUseMaxBreakoutSizeFilter ? aprilMaxBreakoutCandlePercent : maxBreakoutCandlePercent
+bool lockedFrequencyProfile = strategyMonth == 2 or strategyMonth == 3
+int effectiveMaxTradesPerDay = strategyMonth == 3 ? 3 : lockedFrequencyProfile ? 2 : qualityEntryProfileActive ? aprilMaxTradesPerDay : maxTradesPerDay
+bool effectiveFirstSignalLock = not lockedFrequencyProfile and useFirstSignalLock and not (qualityEntryProfileActive and aprilAllowRepeatedBreakouts)
+float effectiveBaseRiskReward = qualityEntryProfileActive ? aprilRiskReward : riskReward
+float effectiveSweepRiskReward = qualityEntryProfileActive ? aprilRiskReward : 2.0
+float effectiveRetestRiskReward = qualityEntryProfileActive ? aprilRiskReward : retestRiskReward
+int effectiveMaxSweepTradesPerDay = qualityEntryProfileActive ? aprilMaxSweepTradesPerDay : maxSweepTradesPerDay
+int effectiveMaxRetestTradesPerRange = qualityEntryProfileActive ? aprilMaxRetestTradesPerRange : maxRetestTradesPerRange
+bool adxRegimePass = not useADXRegimeFilter or (not na(htfADX) and htfADX >= effectiveMinADX)
+sellHTFATR = request.security(syminfo.tickerid, sellATRTimeframe, ta.atr(sellATRLength)[1], lookahead=barmerge.lookahead_on)
+sellHTFATRAverage = request.security(syminfo.tickerid, sellATRTimeframe, ta.sma(ta.atr(sellATRLength), sellATRAverageLength)[1], lookahead=barmerge.lookahead_on)
+bool sellATRPass = not useSellATRFilter or (not na(sellHTFATR) and not na(sellHTFATRAverage) and sellHTFATR > sellHTFATRAverage)
+int exitProfileMonth = strategyMonth
+bool monthUsesAdaptiveExit = switch exitProfileMonth
+    1 => januaryExitProfile == "Adaptive"
+    2 => februaryExitProfile == "Adaptive"
+    3 => marchExitProfile == "Adaptive"
+    4 => aprilExitProfile == "Adaptive"
+    5 => mayExitProfile == "Adaptive"
+    6 => juneExitProfile == "Adaptive"
+    7 => julyExitProfile == "Adaptive"
+    8 => augustExitProfile == "Adaptive"
+    9 => septemberExitProfile == "Adaptive"
+    10 => octoberExitProfile == "Adaptive"
+    11 => novemberExitProfile == "Adaptive"
+    12 => decemberExitProfile == "Adaptive"
+    => false
+bool adaptiveExitEnabledForMonth = useAdaptiveExitProfiles and monthUsesAdaptiveExit
+float exitATRRatio = not na(sellHTFATR) and not na(sellHTFATRAverage) and sellHTFATRAverage > 0.0 ? sellHTFATR / sellHTFATRAverage : 1.0
+bool lowVolExitRegime = adaptiveExitEnabledForMonth and exitATRRatio <= lowVolATRRatio
+bool highVolExitRegime = adaptiveExitEnabledForMonth and exitATRRatio >= trailATRExpansionRatio
+float activeBaseProtectTriggerR = lowVolExitRegime ? lowVolProtectTriggerR : highVolExitRegime ? highVolProtectTriggerR : baseProtectTriggerR
+float activeBaseProtectProfitR = strategyMonth == 10 ? octoberProfitLockR : lowVolExitRegime ? lowVolProtectProfitR : highVolExitRegime ? highVolProtectProfitR : baseProtectProfitR
+float activeTrailActivationR = lowVolExitRegime ? lowVolTrailActivationR : highVolExitRegime ? highVolTrailActivationR : trailActivationR
+bool sellDMIPass = not useSellDMIFilter or (not na(htfMinusDI) and not na(htfPlusDI) and htfMinusDI > htfPlusDI)
+bool sellRegimePass = sellTrendPass and sellEMASlopePass and sellDMIPass and sellATRPass
+var int activeEntryCutoffMinutes = 13 * 60 + 30
+var int activeEntryStartMinutes = 5 * 60 + 45
+int candleCloseHour = hour(time_close, timeZone)
+int candleCloseMinute = minute(time_close, timeZone)
+int candleCloseMinutes = candleCloseHour * 60 + candleCloseMinute
+int maxBuyEntryMinutes = activeEntryCutoffMinutes
+bool buyTimePass = not useBuyMaxEntryTime or candleCloseMinutes <= maxBuyEntryMinutes
+int maxSellEntryMinutes = activeEntryCutoffMinutes
+bool sellTimePass = not useSellMaxEntryTime or candleCloseMinutes <= maxSellEntryMinutes
+inMorningRange = not na(time(timeframe.period, morningRangeSession, timeZone))
+inNYRange = not na(time(timeframe.period, nyRangeSession, timeZone))
+inRange = inMorningRange or inNYRange
+rangeStart = inRange and not inRange[1]
+rangeEnd = not inRange and inRange[1]
+var box currentBox = na
+var float rangeHigh = na
+var float rangeLow = na
+var bool rangeReady = false
+var int rangeEndTime = na
+var int tradesToday = 0
+var int sweepTradesToday = 0
+var int sweepPendingDirection = 0
+var int sweepPendingBar = na
+var float sweepPendingExtreme = na
+var float sweepPendingConfirmLevel = na
+var bool retestLongArmed = false
+var bool retestShortArmed = false
+var int retestArmedBar = na
+var int retestTradesToday = 0
+var bool dayClaimed = false
+var int claimedDirection = 0
+var int buyFirstSignals = 0
+var int sellFirstSignals = 0
+var int rejectedBuyFirstSignals = 0
+var int rejectedBuyTrendSignals = 0
+var int rejectedBuyTimeSignals = 0
+var int rejectedBuyBoxRangeSignals = 0
+var int rejectedADXSignals = 0
+var int rejectedADXBuySignals = 0
+var int rejectedADXSellSignals = 0
+var int tradeEntryBar = na
+var float entryPrice = na
+var float initialSL = na
+var float currentSL = na
+var float targetPrice = na
+var float riskAmount = na
+var float tradeTrailActivationR = na
+var float tradeProtectTriggerR = na
+var float tradeProtectProfitR = na
+var float tradeEntryATRRatio = na
+var bool activeSetupCTrade = false
+var bool trailingActive = false
+var bool trailingStopMoved = false
+var line entryLine = na
+var line slLine = na
+var line tpLine = na
+var array<int> buyMetricBars = array.new_int()
+var array<float> buyMetricBody = array.new_float()
+var array<float> buyMetricOutside = array.new_float()
+var array<float> buyMetricCloseZone = array.new_float()
+var array<float> buyMetricEmaDistance = array.new_float()
+var array<float> buyMetricBoxRange = array.new_float()
+var array<float> buyMetricMinutesAfterBox = array.new_float()
+if rangeStart
+    activeEntryStartMinutes := inNYRange ? 18 * 60 + 30 : 5 * 60 + 45
+    activeEntryCutoffMinutes := inNYRange ? 23 * 60 : 13 * 60 + 30
+    rangeHigh := high
+    rangeLow := low
+    rangeReady := false
+    rangeEndTime := na
+    tradesToday := 0
+    sweepTradesToday := 0
+    sweepPendingDirection := 0
+    sweepPendingBar := na
+    sweepPendingExtreme := na
+    sweepPendingConfirmLevel := na
+    retestLongArmed := false
+    retestShortArmed := false
+    retestArmedBar := na
+    retestTradesToday := 0
+    dayClaimed := false
+    claimedDirection := 0
+    currentBox := box.new(left=bar_index, top=rangeHigh, right=bar_index, bottom=rangeLow, xloc=xloc.bar_index, bgcolor=boxFillColor, border_color=boxBorderColor, border_width=1)
+if inRange and not na(currentBox)
+    rangeHigh := math.max(rangeHigh, high)
+    rangeLow := math.min(rangeLow, low)
+    box.set_right(currentBox, bar_index)
+    box.set_top(currentBox, rangeHigh)
+    box.set_bottom(currentBox, rangeLow)
+if rangeEnd
+    rangeReady := true
+    rangeEndTime := time
+float boxRange = na
+if not na(rangeHigh) and not na(rangeLow)
+    boxRange := rangeHigh - rangeLow
+bool buyBoxRangePass = true
+if useBuyMaxBoxRange
+    buyBoxRangePass := not na(boxRange) and boxRange <= buyMaxBoxRange
+bool sellBoxATRPass = not useSellMaxBoxATRRatio or (not na(boxRange) and not na(sellHTFATR) and sellHTFATR > syminfo.mintick and boxRange / sellHTFATR <= sellMaxBoxATRRatio)
+float minutesAfterBox = na
+if not na(rangeEndTime)
+    minutesAfterBox := (time - rangeEndTime) / 60000.0
+float candleRange = high - low
+float candleBody = math.abs(close - open)
+float bodyPercent = 0.0
+if candleRange > 0.0
+    bodyPercent := candleBody / candleRange * 100.0
+bool bullishCandle = close > open
+bool bearishCandle = close < open
+bool strongBody = not useBodyFilter or bodyPercent >= minBodyPercent
+float buyCloseDistancePercent = 100.0
+float sellCloseDistancePercent = 100.0
+if candleRange > 0.0
+    buyCloseDistancePercent := (high - close) / candleRange * 100.0
+    sellCloseDistancePercent := (close - low) / candleRange * 100.0
+bool strongBuyClose = not useCloseStrengthFilter or buyCloseDistancePercent <= closeZonePercent
+bool strongSellClose = not useCloseStrengthFilter or sellCloseDistancePercent <= closeZonePercent
+float buyOutsideAmount = 0.0
+float sellOutsideAmount = 0.0
+if not na(rangeHigh)
+    buyOutsideAmount := math.max(0.0, high - math.max(low, rangeHigh))
+if not na(rangeLow)
+    sellOutsideAmount := math.max(0.0, math.min(high, rangeLow) - low)
+float buyOutsidePercent = 0.0
+float sellOutsidePercent = 0.0
+if candleRange > 0.0
+    buyOutsidePercent := buyOutsideAmount / candleRange * 100.0
+    sellOutsidePercent := sellOutsideAmount / candleRange * 100.0
+bool validBuyOutside = not useOutsideFilter or buyOutsidePercent >= minOutsidePercent
+bool validSellOutside = not useOutsideFilter or sellOutsidePercent >= minOutsidePercent
+float buyCloseBeyondBoxPercent = 0.0
+float sellCloseBeyondBoxPercent = 0.0
+if not na(boxRange) and boxRange > syminfo.mintick
+    if close > rangeHigh
+        buyCloseBeyondBoxPercent := (close - rangeHigh) / boxRange * 100.0
+    if close < rangeLow
+        sellCloseBeyondBoxPercent := (rangeLow - close) / boxRange * 100.0
+bool validBuyCloseBeyond = true
+bool validSellCloseBeyond = true
+if useCloseBeyondBoxFilter
+    validBuyCloseBeyond := buyCloseBeyondBoxPercent >= minCloseBeyondBoxPercent
+    validSellCloseBeyond := sellCloseBeyondBoxPercent >= minCloseBeyondBoxPercent
+float breakoutCandleVsBoxPercent = 0.0
+if not na(boxRange) and boxRange > syminfo.mintick
+    breakoutCandleVsBoxPercent := candleRange / boxRange * 100.0
+bool validBreakoutCandleSize = true
+if effectiveUseMaxBreakoutSizeFilter
+    validBreakoutCandleSize := breakoutCandleVsBoxPercent <= effectiveMaxBreakoutCandlePercent
+float buyEmaDistanceBoxPercent = na
+if not na(buyHTFEMA) and not na(boxRange) and boxRange > syminfo.mintick
+    buyEmaDistanceBoxPercent := (close - buyHTFEMA) / boxRange * 100.0
+bool julyCooldownPass = strategyMonth != 7 or strategy.closedtrades == 0 or bar_index > strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1)
+bool noPosition = strategy.position_size == 0 and julyCooldownPass
+bool longPosition = strategy.position_size > 0
+bool shortPosition = strategy.position_size < 0
+bool tradeAvailable = tradesToday < effectiveMaxTradesPerDay
+float buyRisk = close - low
+float sellRisk = high - close
+bool validBuyRisk = buyRisk > syminfo.mintick
+bool validSellRisk = sellRisk > syminfo.mintick
+bool rawBuyBreakout = (inBacktest and rangeReady and not inRange and noPosition and tradeAvailable and barstate.isconfirmed and close > rangeHigh and bullishCandle and strongBody and validBuyOutside and strongBuyClose and validBuyCloseBeyond and validBreakoutCandleSize and validBuyRisk)
+bool rawSellBreakout = (inBacktest and rangeReady and not inRange and noPosition and tradeAvailable and barstate.isconfirmed and close < rangeLow and bearishCandle and strongBody and validSellOutside and strongSellClose and validSellCloseBeyond and validBreakoutCandleSize and validSellRisk)
+if rawBuyBreakout and not adxRegimePass
+    rejectedADXSignals += 1
+    rejectedADXBuySignals += 1
+if rawSellBreakout and not adxRegimePass
+    rejectedADXSignals += 1
+    rejectedADXSellSignals += 1
+bool baseBuyBreakout = rawBuyBreakout and adxRegimePass
+bool baseSellBreakout = rawSellBreakout and adxRegimePass
+bool setupASellQualityPass = not na(htfADX) and htfADX >= setupASellMinADX and bodyPercent >= setupASellMinBodyPercent and sellCloseBeyondBoxPercent >= setupASellMinCloseBeyondPercent
+bool lateFridaySellRisk = dayofweek(time_close, timeZone) == dayofweek.friday and candleCloseMinutes > 20 * 60 + 45
+bool earlySaturdaySellRisk = dayofweek(time_close, timeZone) == dayofweek.saturday and candleCloseMinutes < 5 * 60 + 45
+bool sellWeekendRiskPass = not lateFridaySellRisk and not earlySaturdaySellRisk
+bool buySignal = false
+bool sellSignal = false
+if effectiveFirstSignalLock
+    if not dayClaimed
+        if enableBuyTrades and baseBuyBreakout
+            dayClaimed := true
+            claimedDirection := 1
+            buyFirstSignals += 1
+            if buyTrendPass and buyTimePass and buyBoxRangePass
+                buySignal := true
+            else
+                rejectedBuyFirstSignals += 1
+                if not buyTrendPass
+                    rejectedBuyTrendSignals += 1
+                if not buyTimePass
+                    rejectedBuyTimeSignals += 1
+                if not buyBoxRangePass
+                    rejectedBuyBoxRangeSignals += 1
+        else if baseSellBreakout
+            dayClaimed := sellRegimePass and sellBoxATRPass and sellTimePass and setupASellQualityPass
+            claimedDirection := -1
+            sellFirstSignals += 1
+            if sellRegimePass and sellBoxATRPass and sellTimePass and sellWeekendRiskPass and setupASellQualityPass
+                sellSignal := true
+else
+    buySignal := enableBuyTrades and baseBuyBreakout and buyTrendPass and buyTimePass and buyBoxRangePass
+    sellSignal := baseSellBreakout and sellRegimePass and sellBoxATRPass and sellTimePass and sellWeekendRiskPass and setupASellQualityPass
+if qualityEntryProfileActive and not aprilEnableSetupABuys
+    buySignal := false
+float sweepATR = ta.atr(14)
+bool sweepSessionTimePass = candleCloseMinutes >= activeEntryStartMinutes and candleCloseMinutes <= activeEntryCutoffMinutes
+bool sweepCanSeek = enableSweepSetup and inBacktest and rangeReady and not inRange and noPosition and sweepTradesToday < effectiveMaxSweepTradesPerDay and sweepSessionTimePass and barstate.isconfirmed and not buySignal and not sellSignal
+bool sweepLongTrend = not na(buyHTFEMA) and close > buyHTFEMA and adxRegimePass
+bool sweepShortTrend = not na(sellHTFEMA) and close < sellHTFEMA and adxRegimePass
+bool downsideSweepReclaim = enableSweepBuyTrades and sweepCanSeek and sweepLongTrend and not na(htfADX) and htfADX >= effectiveSweepBuyMinADX and low < rangeLow - sweepATR * sweepBuyPenetrationATR and close > rangeLow and bullishCandle and bodyPercent >= sweepBuyMinReclaimBodyPercent
+bool upsideSweepReclaim = sweepCanSeek and sweepShortTrend and high > rangeHigh + sweepATR * sweepPenetrationATR and close < rangeHigh and bearishCandle and bodyPercent >= effectiveSweepMinBodyPercent
+if sweepPendingDirection == 0
+    if downsideSweepReclaim
+        sweepPendingDirection := 1
+        sweepPendingBar := bar_index
+        sweepPendingExtreme := low
+        sweepPendingConfirmLevel := high
+    else if upsideSweepReclaim
+        sweepPendingDirection := -1
+        sweepPendingBar := bar_index
+        sweepPendingExtreme := high
+        sweepPendingConfirmLevel := low
+bool sweepBuySignal = enableSweepBuyTrades and sweepCanSeek and sweepPendingDirection == 1 and bar_index > sweepPendingBar and bar_index <= sweepPendingBar + sweepConfirmationBars and close > sweepPendingConfirmLevel and bullishCandle and bodyPercent >= sweepBuyMinConfirmBodyPercent
+bool sweepSellSignal = (not qualityEntryProfileActive or aprilEnableSetupBSells) and sellWeekendRiskPass and sweepCanSeek and sweepPendingDirection == -1 and bar_index > sweepPendingBar and bar_index <= sweepPendingBar + sweepConfirmationBars and close < sweepPendingConfirmLevel and bearishCandle
+if strategyMonth == 10 and octoberUseSweepRiskCap and sweepSellSignal
+    sweepSellSignal := sweepPendingExtreme + sweepATR * 0.10 - close <= sweepATR * octoberSweepRiskCapATR
+if strategyMonth == 10 and octoberUseSweepRiskCap and sellSignal
+    sellSignal := high - close <= sweepATR * octoberSweepRiskCapATR
+if sweepPendingDirection != 0 and bar_index > sweepPendingBar + sweepConfirmationBars
+    sweepPendingDirection := 0
+    sweepPendingBar := na
+    sweepPendingExtreme := na
+    sweepPendingConfirmLevel := na
+bool retestSessionTimePass = candleCloseMinutes >= activeEntryStartMinutes and candleCloseMinutes <= activeEntryCutoffMinutes
+bool retestCanSeek = enableRetestSetup and inBacktest and rangeReady and not inRange and barstate.isconfirmed and retestSessionTimePass
+if retestCanSeek
+    if close > rangeHigh + sweepATR * 0.10 and sweepLongTrend and (not qualityEntryProfileActive or not retestLongArmed)
+        retestLongArmed := true
+        retestShortArmed := false
+        retestArmedBar := bar_index
+    else if close < rangeLow - sweepATR * 0.10 and sweepShortTrend and (not qualityEntryProfileActive or not retestShortArmed)
+        retestShortArmed := true
+        retestLongArmed := false
+        retestArmedBar := bar_index
+float setupCRetestEMA = ta.ema(close, retestEMALength)
+bool boundaryRetestBuy = low <= rangeHigh + sweepATR * retestTouchATR and low >= rangeHigh - sweepATR * retestDepthATR and close > rangeHigh
+bool boundaryRetestSell = enableRetestSellBoundary and high >= rangeLow - sweepATR * retestTouchATR and high <= rangeLow + sweepATR * retestSellDepthATR and close < rangeLow
+bool emaRetestBuy = low <= setupCRetestEMA + sweepATR * (qualityEntryProfileActive ? aprilRetestEmaTouchATR : 0.10) and low >= setupCRetestEMA - sweepATR * (qualityEntryProfileActive ? aprilRetestEmaDepthATR : 0.25) and close > setupCRetestEMA
+bool emaRetestSell = enableRetestSellEMA and high >= setupCRetestEMA - sweepATR * 0.10 and high <= setupCRetestEMA + sweepATR * 0.25 and close < setupCRetestEMA
+bool retestBuySignal = (not qualityEntryProfileActive or sweepLongTrend) and enableRetestLongs and retestCanSeek and noPosition and retestTradesToday < effectiveMaxRetestTradesPerRange and retestLongArmed and bar_index > retestArmedBar and not buySignal and not sellSignal and not sweepBuySignal and not sweepSellSignal and (boundaryRetestBuy or emaRetestBuy) and bullishCandle and bodyPercent >= (qualityEntryProfileActive ? aprilRetestMinBody : retestMinBodyPercent) and adxRegimePass and not na(htfADX) and htfADX >= retestMinADX
+bool retestSellSignal = (not qualityEntryProfileActive or (aprilEnableRetestSells and sweepShortTrend)) and sellWeekendRiskPass and enableRetestShorts and retestCanSeek and noPosition and retestTradesToday < effectiveMaxRetestTradesPerRange and retestShortArmed and bar_index > retestArmedBar and not buySignal and not sellSignal and not sweepBuySignal and not sweepSellSignal and (boundaryRetestSell or emaRetestSell) and bearishCandle and bodyPercent >= retestSellMinBodyPercent and adxRegimePass and not na(htfADX) and htfADX >= retestSellMinADX
+if (buySignal or sweepBuySignal or retestBuySignal) and (strategyMonth != 7 or sellWeekendRiskPass)
+    if buySignal
+        tradesToday += 1
+    else if sweepBuySignal
+        sweepTradesToday += 1
+        sweepPendingDirection := 0
+    else
+        retestTradesToday += 1
+        retestLongArmed := false
+        retestShortArmed := false
+    activeSetupCTrade := retestBuySignal
+    tradeEntryBar := bar_index
+    entryPrice := close
+    initialSL := sweepBuySignal ? sweepPendingExtreme - sweepATR * 0.10 : retestBuySignal ? low - sweepATR * 0.10 : low
+    currentSL := initialSL
+    riskAmount := entryPrice - initialSL
+    float activeRR = sweepBuySignal ? effectiveSweepRiskReward : retestBuySignal ? effectiveRetestRiskReward : effectiveBaseRiskReward
+    targetPrice := entryPrice + riskAmount * activeRR
+    tradeTrailActivationR := useAdaptiveTrailActivation ? activeTrailActivationR : trailActivationR
+    tradeProtectTriggerR := activeSetupCTrade ? setupCProtectTriggerR : activeBaseProtectTriggerR
+    tradeProtectProfitR := activeSetupCTrade ? setupCProtectProfitR : activeBaseProtectProfitR
+    tradeEntryATRRatio := exitATRRatio
+    trailingActive := false
+    trailingStopMoved := false
+    array.push(buyMetricBars, bar_index)
+    array.push(buyMetricBody, bodyPercent)
+    array.push(buyMetricOutside, buyOutsidePercent)
+    array.push(buyMetricCloseZone, buyCloseDistancePercent)
+    array.push(buyMetricEmaDistance, buyEmaDistanceBoxPercent)
+    array.push(buyMetricBoxRange, boxRange)
+    array.push(buyMetricMinutesAfterBox, minutesAfterBox)
+    strategy.entry("BUY", strategy.long, comment=buySignal ? "SETUP_A_BUY" : sweepBuySignal ? "SETUP_B_BUY" : "SETUP_C_BUY")
+    strategy.exit("BUY EXIT", from_entry="BUY", stop=currentSL, limit=targetPrice, comment_profit="TP", comment_loss="FULL_SL")
+    if showTradeLevels
+        entryLine := line.new(bar_index, entryPrice, bar_index, entryPrice, xloc=xloc.bar_index, color=color.yellow, width=2)
+        slLine := line.new(bar_index, currentSL, bar_index, currentSL, xloc=xloc.bar_index, color=color.red, width=2)
+        tpLine := line.new(bar_index, targetPrice, bar_index, targetPrice, xloc=xloc.bar_index, color=color.green, width=2)
+    if showTradeLabels
+        label.new(bar_index, low, "BUY", style=label.style_label_up, color=color.green, textcolor=color.white)
+if sellSignal or sweepSellSignal or retestSellSignal
+    if sellSignal
+        tradesToday += 1
+    else if sweepSellSignal
+        sweepTradesToday += 1
+        sweepPendingDirection := 0
+    else
+        retestTradesToday += 1
+        retestLongArmed := false
+        retestShortArmed := false
+    activeSetupCTrade := retestSellSignal
+    tradeEntryBar := bar_index
+    entryPrice := close
+    initialSL := sweepSellSignal ? sweepPendingExtreme + sweepATR * 0.10 : retestSellSignal ? high + sweepATR * 0.10 : high
+    currentSL := initialSL
+    riskAmount := initialSL - entryPrice
+    float activeRR = sweepSellSignal ? effectiveSweepRiskReward : retestSellSignal ? effectiveRetestRiskReward : effectiveBaseRiskReward
+    targetPrice := entryPrice - riskAmount * activeRR
+    tradeTrailActivationR := useAdaptiveTrailActivation ? activeTrailActivationR : trailActivationR
+    tradeProtectTriggerR := activeSetupCTrade ? setupCProtectTriggerR : activeBaseProtectTriggerR
+    tradeProtectProfitR := activeSetupCTrade ? setupCProtectProfitR : activeBaseProtectProfitR
+    tradeEntryATRRatio := exitATRRatio
+    trailingActive := false
+    trailingStopMoved := false
+    strategy.entry("SELL", strategy.short, comment=sellSignal ? "SETUP_A_SELL" : sweepSellSignal ? "SETUP_B_SELL" : "SETUP_C_SELL")
+    strategy.exit("SELL EXIT", from_entry="SELL", stop=currentSL, limit=targetPrice, comment_profit="TP", comment_loss="FULL_SL")
+    if showTradeLevels
+        entryLine := line.new(bar_index, entryPrice, bar_index, entryPrice, xloc=xloc.bar_index, color=color.yellow, width=2)
+        slLine := line.new(bar_index, currentSL, bar_index, currentSL, xloc=xloc.bar_index, color=color.red, width=2)
+        tpLine := line.new(bar_index, targetPrice, bar_index, targetPrice, xloc=xloc.bar_index, color=color.green, width=2)
+    if showTradeLabels
+        label.new(bar_index, high, "SELL", style=label.style_label_down, color=color.red, textcolor=color.white)
+float longStructureSL = ta.lowest(low[1], trailLookback)
+float shortStructureSL = ta.highest(high[1], trailLookback)
+if longPosition and bar_index > tradeEntryBar
+    float protectPrice = entryPrice + riskAmount * tradeProtectProfitR
+    if high >= entryPrice + riskAmount * tradeProtectTriggerR and protectPrice > currentSL and protectPrice < close
+        currentSL := protectPrice
+        trailingStopMoved := true
+    float activationPrice = entryPrice + riskAmount * tradeTrailActivationR
+    if useTrailingSL and high >= activationPrice
+        trailingActive := true
+    if trailingActive and not na(longStructureSL)
+        float candidateSL = longStructureSL
+        if candidateSL > currentSL and candidateSL < close
+            currentSL := candidateSL
+            trailingStopMoved := true
+    string buyLossComment = "FULL_SL"
+    if trailingStopMoved
+        buyLossComment := "TRAIL_SL"
+    strategy.exit("BUY EXIT", from_entry="BUY", stop=currentSL, limit=targetPrice, comment_profit="TP", comment_loss=buyLossComment)
+if shortPosition and bar_index > tradeEntryBar
+    float protectPrice = entryPrice - riskAmount * tradeProtectProfitR
+    if low <= entryPrice - riskAmount * tradeProtectTriggerR and protectPrice < currentSL and protectPrice > close
+        currentSL := protectPrice
+        trailingStopMoved := true
+    float activationPrice = entryPrice - riskAmount * tradeTrailActivationR
+    if useTrailingSL and low <= activationPrice
+        trailingActive := true
+    if trailingActive and not na(shortStructureSL)
+        float candidateSL = shortStructureSL
+        if candidateSL < currentSL and candidateSL > close
+            currentSL := candidateSL
+            trailingStopMoved := true
+    string sellLossComment = "FULL_SL"
+    if trailingStopMoved
+        sellLossComment := "TRAIL_SL"
+    strategy.exit("SELL EXIT", from_entry="SELL", stop=currentSL, limit=targetPrice, comment_profit="TP", comment_loss=sellLossComment)
+if strategy.position_size != 0 and showTradeLevels
+    if not na(entryLine)
+        line.set_x2(entryLine, bar_index)
+    if not na(slLine)
+        line.set_x2(slLine, bar_index)
+        line.set_y1(slLine, currentSL)
+        line.set_y2(slLine, currentSL)
+    if not na(tpLine)
+        line.set_x2(tpLine, bar_index)

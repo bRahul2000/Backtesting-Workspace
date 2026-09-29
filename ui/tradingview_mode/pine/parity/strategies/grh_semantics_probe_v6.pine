@@ -1,0 +1,27 @@
+//@version=6
+// Zoneflow parity probe for the semantics "Gold Range Hunter - Monthly Profiles V2" needed (input.time date filter,
+// input.color defaults, calendar functions in Asia/Kolkata, time(timeframe.period, session, tz)). Every value logged
+// depends only on bar times, so TradingView (any XAUUSD feed, 15 minutes) and Zoneflow (Exness) can be compared bar by
+// bar without a price feed difference. Paste into TradingView on a 15-minute chart, open Pine Logs, copy the ZF| lines.
+indicator("ZF GRH semantics probe", overlay=true)
+startDate = input.time(1756665000000, "Backtest Start Date Combined AB")
+endDate = input.time(1924972140000, "Backtest End Date")
+boxFillColor = input.color(color.new(color.blue, 85), "Box Fill")
+boxBorderColor = input.color(color.blue, "Box Border")
+windowStart = input.time(1778187600000, "Probe window start (2026-05-07 21:00 UTC)")
+windowEnd = input.time(1778274000000, "Probe window end (2026-05-08 21:00 UTC)")
+const string TZ = "Asia/Kolkata"
+inBacktest = time >= startDate and time <= endDate
+morning = time(timeframe.period, "0330-0545", TZ)
+ny = time(timeframe.period, "1700-1830", TZ)
+f_t(_t) => na(_t) ? "na" : str.tostring(_t, "#")
+if time >= windowStart and time < windowEnd
+    string line = "ZF|GRH|" + str.tostring(time, "#") + "|" + str.tostring(time_close, "#") + "|" + (inBacktest ? "1" : "0")
+    line += "|" + f_t(morning) + "|" + f_t(ny) + "|" + str.tostring(month(time, TZ)) + "|" + str.tostring(dayofweek(time_close, TZ))
+    line += "|" + str.tostring(hour(time_close, TZ)) + "|" + str.tostring(minute(time_close, TZ))
+    line += "|" + str.tostring(color.r(boxFillColor)) + "," + str.tostring(color.g(boxFillColor)) + "," + str.tostring(color.b(boxFillColor))
+    line += "," + str.tostring(color.t(boxFillColor)) + "|" + str.tostring(color.t(boxBorderColor))
+    log.info(line)
+plot(inBacktest ? 1 : 0, "inBacktest", display=display.data_window)
+plot(na(morning) ? 0 : 1, "morning range", display=display.data_window)
+plot(na(ny) ? 0 : 1, "NY range", display=display.data_window)
