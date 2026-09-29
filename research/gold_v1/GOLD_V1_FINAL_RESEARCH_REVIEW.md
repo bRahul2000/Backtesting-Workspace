@@ -221,7 +221,7 @@ None of these may be tested on any Gold V1 data or sealed sample:
 
 | artifact | hash / location |
 |---|---|
-| research design | `GOLD_V1_RESEARCH_DESIGN.md` `acb8c424…` |
+| research design | `GOLD_V1_RESEARCH_DESIGN.md` `acb8c421…` |
 | H1–H5 frozen folders | `h1/`–`h5/`, 67 files; hashes in `history_expansion/gold_v1_state_hashes.txt` |
 | H2 / H3 / H4 / H5 preregistrations | `89e22514…` / **`c481f8a1…`** / `92f25167…` / `cfeda52f…` |
 | consolidated H1–H5 review | `H1_H5_CONSOLIDATED_REVIEW.md` `ec031000…` |
