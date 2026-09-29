@@ -54,7 +54,12 @@ const MEASURE = `(() => {
   const sidebar = document.querySelector('[data-testid="stSidebar"]');
   const sidebarShown = sidebar && getComputedStyle(sidebar).display !== 'none' && sidebar.getBoundingClientRect().width > 0
     && sidebar.getAttribute('aria-expanded') !== 'false';
-  const block = document.querySelector('[data-testid="stMainBlockContainer"]');
+  // Streamlit renames its hooks between releases (1.64 stMainBlockContainer, 1.37 stAppViewBlockContainer)
+  const block = document.querySelector('[data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], .block-container');
+  // Deploy (by its text, whatever the release calls it) must not be visible
+  const deploy = [...document.querySelectorAll('button, a')].filter((e) => e.innerText && e.innerText.trim() === 'Deploy')
+    .some((e) => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return b.width > 0 && b.height > 0 && cs.visibility !== 'hidden'
+      && b.bottom > 0 && b.right > 0 && b.top < innerHeight && b.left < innerWidth; });
   const cs = block && getComputedStyle(block);
   const part = (sel) => { const e = doc && doc.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect();
     return { left: Math.round(f.left + b.left), right: Math.round(f.left + b.right), width: Math.round(b.width), height: Math.round(b.height) }; };
@@ -65,7 +70,7 @@ const MEASURE = `(() => {
     sidebar: sidebarShown ? r(sidebar) : null,
     header: r(document.querySelector('[data-testid="stHeader"]')),
     block: block && { ...r(block), maxWidth: cs.maxWidth, padding: [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].join(' ') },
-    iframe: r(frame), terminal,
+    iframe: r(frame), terminal, deployVisible: deploy, streamlit: window.__streamlitVersion || null,
     chart: part('.chart-panel'), watch: part('.watchlist'), dock: part('.bottom'), rail: part('.right-rail'),
     margins: terminal && { top: terminal.top, right: vw - terminal.right, bottom: vh - terminal.bottom, left: terminal.left - leftEdge },
     usable: { width: vw - leftEdge, height: vh },
@@ -97,6 +102,17 @@ async function main() {
   };
   const shot = async (name) => { if (!process.env.PINE_SHOTS) return; const { writeFileSync } = await import("node:fs");
     writeFileSync(`${process.env.PINE_SHOTS}/${name}.png`, Buffer.from((await send("Page.captureScreenshot", { format: "png" })).data, "base64")); };
+  // Open TradingView Mode the way a user does: the app's root, then the sidebar link. (Direct page URLs differ between
+  // Streamlit releases: 1.64 derives /render_tradingview_mode from the function name, 1.37 does not.)
+  const origin = new URL(url).origin;
+  const openTerminal = async () => {
+    await send("Page.navigate", { url: origin + "/" });
+    await waitFor(`[...document.querySelectorAll('[data-testid="stSidebarNav"] a')].some((a) => a.innerText.trim() === 'TradingView Mode')`, 90000);
+    const link = await evaluate(`(() => { const a = [...document.querySelectorAll('[data-testid="stSidebarNav"] a')].find((x) => x.innerText.trim() === 'TradingView Mode');
+      const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: link.x, y: link.y, button: "left", clickCount: 1 });
+    return waitFor(inFrame("!!(d && d.querySelector('.terminal'))"), 90000);
+  };
   const settle = async () => { await sleep(300); await waitFor(inFrame("d && d.querySelector('.sync') && d.querySelector('.sync').innerText.trim() === 'Synced'"), 60000); await sleep(700); };
   const errors = [];
   await send("Runtime.enable");
@@ -105,17 +121,20 @@ async function main() {
 
   for (const [width, height] of SIZES) {
     await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
-    await send("Page.navigate", { url });
-    check(`${width}x${height}: terminal loaded`, await waitFor(inFrame("!!(d && d.querySelector('.terminal'))"), 90000));
+    check(`${width}x${height}: terminal loaded from the sidebar`, await openTerminal());
     await settle();
     const m = await evaluate(MEASURE);
     note(`${width}x${height}: measured`, JSON.stringify(m));
+    const dialog = await evaluate(`(() => [...document.querySelectorAll('[role="dialog"]')].some((d) => d.getBoundingClientRect().width > 0))()`);
+    check(`${width}x${height}: no Streamlit dialog over the terminal`, !dialog, String(dialog));
     const mg = m.margins;
     check(`${width}x${height}: outer margins <= 10 px on all four sides`, mg && [mg.top, mg.right, mg.bottom, mg.left].every((v) => v >= 0 && v <= 10), JSON.stringify(mg));
-    check(`${width}x${height}: workspace fills >= 95% of the usable area`, m.areaRatio >= 0.95, String(m.areaRatio));
+    check(`${width}x${height}: workspace fills >= 96% of the usable area`, m.areaRatio >= 0.96, String(m.areaRatio));
     check(`${width}x${height}: no horizontal or vertical page overflow`, !m.overflowX && !m.overflowY, JSON.stringify([m.overflowX, m.overflowY]));
+    check(`${width}x${height}: main block container found (release-specific hook)`, !!m.block, JSON.stringify(m.block));
     check(`${width}x${height}: no max-width cap on the main container`, m.block && (m.block.maxWidth === "none" || parseInt(m.block.maxWidth, 10) >= width), m.block && m.block.maxWidth);
-    const menu = await evaluate(`(() => { const b = document.querySelector('[data-testid="stMainMenuButton"]'); if (!b) return null; const r = b.getBoundingClientRect();
+    check(`${width}x${height}: Deploy is not visible`, !m.deployVisible, String(m.deployVisible));
+    const menu = await evaluate(`(() => { const b = document.querySelector('[data-testid="stMainMenuButton"], [data-testid="stMainMenu"] button'); if (!b) return null; const r = b.getBoundingClientRect();
       const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { left: Math.round(r.left), bottom: Math.round(r.bottom), reachable: !!top && b.contains(top) }; })()`);
     check(`${width}x${height}: Streamlit's main menu stays reachable (bottom-left, over the sidebar)`, menu && menu.reachable && menu.left <= 20 && menu.bottom >= height - 20, JSON.stringify(menu));
     check(`${width}x${height}: sidebar expanded 220-240 px`, m.sidebar && m.sidebar.width >= 220 && m.sidebar.width <= 240, JSON.stringify(m.sidebar));
@@ -126,7 +145,7 @@ async function main() {
 
   // At 1440x900: collapsing panels hands their space to the chart immediately.
   await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-  await send("Page.navigate", { url }); await waitFor(inFrame("!!(d && d.querySelector('.terminal'))"), 90000); await settle();
+  await openTerminal(); await settle();
   const base = await evaluate(MEASURE);
   check("watchlist default width 230-260 px", base.watch && base.watch.width >= 230 && base.watch.width <= 260, JSON.stringify(base.watch));
   await clickIn(".watch-collapse"); await settle();
@@ -141,20 +160,25 @@ async function main() {
     && Math.abs(noDock.terminal.height - dockBefore.terminal.height) <= 1, JSON.stringify({ before: dockBefore.chart.height, after: noDock.chart.height }));
   await clickIn(".bottom-tabs .icon-btn:last-child"); await settle();
   // Streamlit sidebar collapsed: 48-56 px icon rail (or hidden); the workspace grows.
-  const collapse = await evaluate(`(() => { const b = document.querySelector('[data-testid="stSidebarCollapseButton"] button, [data-testid="stSidebarCollapseButton"]');
+  const collapse = await evaluate(`(() => { const b = document.querySelector('[data-testid="stSidebarCollapseButton"] button, [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarHeader"] button');
     if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   if (collapse) {
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 120, y: 300 });           // hover the sidebar
-    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: collapse.x, y: collapse.y });
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 120, y: 20 });            // ... and its header
     await sleep(400);                                   // Streamlit reveals the collapse button on hover
+    const shown = await evaluate(`(() => { const b = document.querySelector('[data-testid="stSidebarCollapseButton"] button, [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarHeader"] button');
+      const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    Object.assign(collapse, shown);
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: collapse.x, y: collapse.y });
+    await sleep(300);
     for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: collapse.x, y: collapse.y, button: "left", clickCount: 1 });
     await sleep(900); await settle();
     const narrow = await evaluate(MEASURE);
     // the collapsed rail is the main area's left padding (page.py draws it behind Streamlit's expand button)
-    const rail = await evaluate(`(() => { const s = document.querySelector('[data-testid="stSidebar"]'); const m = document.querySelector('[data-testid="stMain"]');
+    const rail = await evaluate(`(() => { const s = document.querySelector('[data-testid="stSidebar"]'); const m = document.querySelector('[data-testid="stMain"], section.main');
       const side = s && getComputedStyle(s).display !== 'none' ? Math.max(0, s.getBoundingClientRect().right) : 0;
       return Math.round(side + parseFloat(getComputedStyle(m).paddingLeft)); })()`);
-    const expand = await evaluate(`(() => { const b = document.querySelector('[data-testid="stExpandSidebarButton"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), visible: r.width > 0 }; })()`);
+    const expand = await evaluate(`(() => { const b = document.querySelector('[data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), visible: r.width > 0 }; })()`);
     note("sidebar collapsed", JSON.stringify({ rail, terminal: narrow.terminal, margins: narrow.margins }));
     check("collapsed sidebar is a 48-56 px rail with the expand button, and the workspace grows", rail >= 48 && rail <= 56
       && expand && expand.visible && expand.right <= rail && narrow.terminal.width > dockBefore.terminal.width + 150
@@ -175,7 +199,7 @@ async function main() {
   await shot("viewport_chart_only");
   await clickIn(".layout-btn"); await sleep(300);
   await clickIn('.layout-mode[data-mode="normal"]'); await settle();
-  const reopen = await evaluate(`(() => { const b = document.querySelector('[data-testid="stExpandSidebarButton"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const reopen = await evaluate(`(() => { const b = document.querySelector('[data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   if (reopen) {
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: reopen.x, y: reopen.y, button: "left", clickCount: 1 });
     await sleep(900); await settle();
