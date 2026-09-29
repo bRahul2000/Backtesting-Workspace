@@ -41,8 +41,13 @@ HEARTBEAT_DISCONNECTED_S = 60.0
 TICK_STALE_S = 60.0            # no tick for a minute: not LIVE (market closed or feed stalled)
 MAX_FUTURE_SKEW_S = 5.0
 STATUSES = ("DISCONNECTED", "CONNECTING", "LIVE", "STALE", "ERROR")
-DEFAULT_COMMON_FILES = (Path.home() / "Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/users/user"
-                        "/AppData/Roaming/MetaQuotes/Terminal/Common/Files")
+# MetaTrader 5's Common\Files folder: native on Windows (%APPDATA%), the Wine prefix on macOS. TV_MT5_COMMON_FILES
+# overrides both (the Windows service sets it to the MT5 user's folder, see deployment/windows).
+if os.name == "nt":
+    DEFAULT_COMMON_FILES = Path(os.environ.get("APPDATA") or (Path.home() / "AppData/Roaming")) / "MetaQuotes/Terminal/Common/Files"
+else:
+    DEFAULT_COMMON_FILES = (Path.home() / "Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/users/user"
+                            "/AppData/Roaming/MetaQuotes/Terminal/Common/Files")
 _BAR_COLUMNS = ("time", "open", "high", "low", "close", "tick_volume", "spread")
 
 

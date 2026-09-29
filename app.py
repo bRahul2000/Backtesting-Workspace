@@ -69,6 +69,11 @@ st.set_page_config(
     layout="wide",
 )
 
+# Private login: an unauthenticated request stops here and renders only the sign-in notice (services/auth/gate.py)
+from services.auth.gate import require_login  # noqa: E402
+
+require_login()
+
 st.markdown(
     """
     <style>

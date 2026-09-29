@@ -1,0 +1,50 @@
+# Zoneflow reverse proxy (Caddy 2). Public HTTPS -> login check -> Streamlit on 127.0.0.1 only.
+#
+# Values come from the environment (the Windows launcher loads C:\ZoneflowData\zoneflow.env):
+#   ZONEFLOW_SITE_ADDRESS  the public hostname, e.g. zoneflow.example.com (set by run-proxy.ps1 from ZONEFLOW_DOMAIN;
+#                          Caddy obtains and renews its HTTPS certificate)
+#   ZONEFLOW_PROXY_TOKEN   secret header value Streamlit requires on every request (services/auth/gate.py)
+#   ZONEFLOW_LOG_DIR       log folder
+# Ports 8501 (Streamlit) and 8601 (login service) listen on 127.0.0.1 only and are never exposed.
+{
+	admin {$ZONEFLOW_CADDY_ADMIN:localhost:2019}
+}
+
+{$ZONEFLOW_SITE_ADDRESS} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
+
+	# A client can never supply these itself: they are set only by the login check / this proxy.
+	request_header -X-Zoneflow-User
+	request_header -X-Zoneflow-Proxy
+
+	# The login pages (the only thing reachable without a session).
+	handle /zoneflow-auth/* {
+		reverse_proxy 127.0.0.1:{$ZONEFLOW_AUTH_PORT:8601}
+	}
+
+	# Everything else - pages, static files, WebSockets - needs a valid session first.
+	handle {
+		forward_auth 127.0.0.1:{$ZONEFLOW_AUTH_PORT:8601} {
+			uri /zoneflow-auth/verify
+			copy_headers X-Zoneflow-User
+		}
+		reverse_proxy 127.0.0.1:{$ZONEFLOW_APP_PORT:8501} {
+			header_up X-Zoneflow-Proxy {$ZONEFLOW_PROXY_TOKEN}
+		}
+	}
+
+	log {
+		output file {$ZONEFLOW_LOG_DIR:.}/caddy-access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

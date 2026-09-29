@@ -13,6 +13,10 @@ htmlcov/
 .env
 .env.*
 !.env.example
+# real Zoneflow production settings (deployment/.env.example is the template)
+*.env
+zoneflow.env*
+!deployment/.env.example
 .streamlit/secrets.toml
 .streamlit/secrets.*
 secrets.*

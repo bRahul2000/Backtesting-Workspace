@@ -579,6 +579,8 @@ def auto_refresh_workspace(state: TerminalState, session, now: float) -> LogEntr
     checks[key] = {"at": now, "view": (state.dataset_key, state.timeframe), "errors": errors}
     session.pop(FRESHNESS_KEY, None)
     if errors:
+        from services.auth.logs import setup as _logs
+        _logs("app").warning("automatic data refresh failed for %s: %s", selected.symbol, "; ".join(errors))
         return LogEntry("warning", f"Automatic data refresh failed for {selected.symbol}: {'; '.join(errors)}. "
                                    "The chart keeps the last local bars; use Refresh to retry.")
     if appended:
@@ -605,6 +607,9 @@ def refresh_workspace_data(state: TerminalState) -> LogEntry:
             continue
         parts.append(f"{entry.timeframe}: +{result['appended']} closed bars through {result['last_closed']} UTC"
                      if result["appended"] else f"{entry.timeframe}: already current ({result['last_closed']} UTC)")
+    if failed:
+        from services.auth.logs import setup as _logs
+        _logs("app").warning("manual data refresh failed for %s: %s", selected.symbol, " · ".join(failed))
     if not parts:
         return LogEntry("error", f"Refresh failed for {selected.symbol} · " + " · ".join(failed))
     return LogEntry("warning" if failed else "info",

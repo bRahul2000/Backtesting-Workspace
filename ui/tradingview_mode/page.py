@@ -39,7 +39,9 @@ _TERMINAL_CSS = f"""<style>
 {_BLOCK} {{ max-width: none !important; width: 100%; padding: var(--tv-edge) var(--tv-edge) 0 var(--tv-edge) !important; }}
 {_each('[data-testid="stAppViewBlockContainer"]', '[data-testid="stVerticalBlock"]')},
 {_each('[data-testid="stMainBlockContainer"]', '[data-testid="stVerticalBlock"]')} {{ gap: 0; }}
-[data-testid="stElementContainer"]:has(style), [data-testid="element-container"]:has(style) {{ display: none; }}
+[data-testid="stElementContainer"]:has(style):not(:has(.zf-account)),
+[data-testid="element-container"]:has(style):not(:has(.zf-account)) {{ display: none; }}
+[data-testid="stElementContainer"]:has(.zf-account), [data-testid="element-container"]:has(.zf-account) {{ height: 0; margin: 0; }}
 /* an inline iframe adds a baseline gap under it (page overflow -> a scrollbar eating the right edge) */
 iframe[title*="tradingview_terminal"] {{ display: block !important; vertical-align: top; }}
 [data-testid="stElementContainer"]:has(> iframe), [data-testid="element-container"]:has(> iframe) {{ line-height: 0; }}
@@ -68,4 +70,6 @@ def render_tradingview_mode():
     try:
         render_custom_terminal()
     except Exception as exc:  # Streamlit's rerun/stop signals are BaseException and pass through
+        from services.auth.logs import setup as _logs
+        _logs("app").exception("TradingView Mode failed to load")
         st.error(f"TradingView Mode failed to load: {type(exc).__name__}: {exc}")
