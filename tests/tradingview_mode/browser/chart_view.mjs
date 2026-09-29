@@ -178,7 +178,7 @@ async function main() {
   const expected = [`O${fmt(target.open, precision)}`, `H${fmt(target.high, precision)}`, `L${fmt(target.low, precision)}`, `C${fmt(target.close, precision)}`];
   check("crosshair shows exact UTC time", legend.time === utc(target.time) && legend.hover, JSON.stringify(legend));
   check("crosshair shows the candle's exact OHLC", expected.every((v, i) => legend.spans[i + 1] === v), JSON.stringify({ expected, got: legend.spans }));
-  check("volume shown", legend.spans.some((v) => v.startsWith("Vol")), JSON.stringify(legend.spans));
+  check("no volume by default (candles only)", !legend.spans.some((v) => v.startsWith("Vol")), JSON.stringify(legend.spans));
   await waitUpdates(2);
   legend = await evaluate("__tv.legend()");
   check("hovered candle stays in the legend across live updates", legend.time === utc(target.time), legend.time);

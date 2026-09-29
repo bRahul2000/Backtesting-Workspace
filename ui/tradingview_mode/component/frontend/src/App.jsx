@@ -196,6 +196,8 @@ function usePineTradeFocus(payload, engine) {
   }, [show, payload.replay?.enabled, payload.live?.enabled, payload.range.end, payload.range.min]);
   // The chart may be rebuilt (new view): re-apply the highlight.
   useEffect(() => { if (!selectedKey && engine) engine.selectPineTrade(null); }, [selectedKey, engine]);
+  // A new symbol / timeframe: no trade of the previous one stays selected
+  useEffect(() => { setSelectedKey(null); setPendingTrade(null); setNote(null); }, [payload.view_key]);
   return { selectedKey, select, note };
 }
 

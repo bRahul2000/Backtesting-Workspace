@@ -6,12 +6,19 @@ import { TradesWorkspace } from "./tester/TradesTable.jsx";
 import { PineEditor } from "./PineEditor.jsx";
 import { PineTester, PineTradesTable, pineStrategies } from "./tester/PineTester.jsx";
 
-const DEFAULT_HEIGHT = { strategy_tester: 330, trades: 260, pine: 340 };
-const HEIGHT_STORAGE = "tvterm:bottom-height:";
+// ONE dock height for every tab: changing tabs only swaps the content inside the same rectangle (the chart never
+// moves). The height changes only when the user drags the dock's top edge; it and the collapsed state persist in this
+// browser (localStorage; storage may be unavailable in private windows).
+const DEFAULT_HEIGHT = 280;
+const HEIGHT_STORAGE = "tvterm:dock-height";
+const OPEN_STORAGE = "tvterm:dock-open";
 
-// Layout preferences persist in this browser (localStorage); storage may be unavailable (private windows).
-function storedHeight(tab) {
-  try { return Number(window.localStorage.getItem(HEIGHT_STORAGE + tab)) || DEFAULT_HEIGHT[tab] || 176; } catch { return DEFAULT_HEIGHT[tab] || 176; }
+function storedHeight() {
+  try { return Number(window.localStorage.getItem(HEIGHT_STORAGE)) || DEFAULT_HEIGHT; } catch { return DEFAULT_HEIGHT; }
+}
+
+function storedOpen() {
+  try { const v = window.localStorage.getItem(OPEN_STORAGE); return v === null ? null : v === "1"; } catch { return null; }
 }
 
 const TABS = [
@@ -96,10 +103,9 @@ function LogsTab({ logs, clientLogs }) {
   );
 }
 
-// Drag the top edge to resize; the height is remembered per tab for this browser tab.
-function useResizableHeight(tab) {
-  const [height, setHeight] = useState(() => storedHeight(tab));
-  useEffect(() => setHeight(storedHeight(tab)), [tab]);
+// Drag the top edge to resize; one height, remembered in this browser.
+function useResizableHeight() {
+  const [height, setHeight] = useState(storedHeight);
   const drag = useRef(null);
   const onPointerDown = (event) => {
     drag.current = { y: event.clientY, height };
@@ -113,7 +119,7 @@ function useResizableHeight(tab) {
   const onPointerUp = () => {
     if (!drag.current) return;
     drag.current = null;
-    try { window.localStorage.setItem(HEIGHT_STORAGE + tab, String(height)); } catch { /* ignore */ }
+    try { window.localStorage.setItem(HEIGHT_STORAGE, String(height)); } catch { /* ignore */ }
   };
   return { height, handlers: { onPointerDown, onPointerMove, onPointerUp } };
 }
@@ -164,7 +170,21 @@ export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelec
   const [tab, setTab] = useState(payload.ui.bottom_panel);
   const [open, setOpen] = useState(payload.ui.bottom_open);
   useEffect(() => { setTab(payload.ui.bottom_panel); setOpen(payload.ui.bottom_open); }, [payload.ui.bottom_panel, payload.ui.bottom_open]);
-  const { height, handlers } = useResizableHeight(tab);
+  const { height, handlers } = useResizableHeight();
+  // collapsed / open persists across reloads: restore the stored state once, then remember every change
+  const restored = useRef(false);
+  useEffect(() => {
+    if (!restored.current) {
+      restored.current = true;
+      const stored = storedOpen();
+      if (stored !== null && stored !== payload.ui.bottom_open) {
+        setOpen(stored);
+        sendEvent("set_bottom_panel", { panel: payload.ui.bottom_panel, open: stored });
+        return;
+      }
+    }
+    try { window.localStorage.setItem(OPEN_STORAGE, payload.ui.bottom_open ? "1" : "0"); } catch { /* ignore */ }
+  }, [payload.ui.bottom_open]); // eslint-disable-line react-hooks/exhaustive-deps
   const tester = useTesterSource(payload, pending);
   const hasPine = tester.strategies.length > 0;
   const pineScript = tester.strategies.find((s) => s.id === tester.strategyId) || tester.strategies[0];

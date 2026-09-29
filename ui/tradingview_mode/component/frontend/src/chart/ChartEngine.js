@@ -94,7 +94,8 @@ export class ChartEngine {
         vertLine: { color: COLORS.crosshair, labelBackgroundColor: "#2a3140" },
         horzLine: { color: COLORS.crosshair, labelBackgroundColor: "#2a3140" },
       },
-      rightPriceScale: { borderColor: COLORS.border, scaleMargins: { top: 0.08, bottom: 0.2 } },
+      // bottom margin 0.2 only while the volume histogram is shown (see update); candles use the whole pane otherwise
+      rightPriceScale: { borderColor: COLORS.border, scaleMargins: { top: 0.08, bottom: 0.08 } },
       // All times are UTC epoch seconds; labels never use the browser time zone.
       timeScale: {
         borderColor: COLORS.border, timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7,
@@ -140,8 +141,11 @@ export class ChartEngine {
     const streaming = !!payload.replay?.enabled || payload.live?.phase === "streaming";
     const before = newView ? null : timeScale.getVisibleLogicalRange();
     const beforeTime = newView ? null : timeScale.getVisibleRange();
+    const previousView = this.viewKey;
+    const previousTime = this.bars.length ? timeScale.getVisibleRange() : null;
     const wasFollowing = this.follow;
     const previousLast = this.bars.length ? this.bars[this.bars.length - 1].time : null;
+    const hadBars = this.bars.length > 0;
     this.stats.updates += 1;
 
     if (precision !== this.precision) {
@@ -179,6 +183,8 @@ export class ChartEngine {
     if (this.volumeVisible !== !!payload.ui.show_volume) {
       this.volumeVisible = !!payload.ui.show_volume;
       this.volume.applyOptions({ visible: this.volumeVisible });
+      // no volume: no vertical space reserved for it
+      this.candles.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: this.volumeVisible ? 0.2 : 0.08 } });
     }
     this.syncOverlays(payload.overlays, precision);
     if (this.panesSignature(payload.panes) !== this.paneSig) this.pine.clear();  // pane indices are about to move
@@ -190,6 +196,23 @@ export class ChartEngine {
     this.moreHistory = payload.live?.phase === "streaming" && !!payload.live.more_history;
     if (newView) {
       this.historyRequestedFor = null;
+      // A new symbol / timeframe: nothing symbol-specific survives, and the vertical scale starts from the new data
+      // (a price-axis drag on the previous symbol turned autoScale off; it must not keep BTC's range for Gold).
+      this.pine.selectTrade(null);
+      this.chart.priceScale("right").applyOptions({ autoScale: true });
+      this.volume.priceScale().applyOptions({ autoScale: true });
+      // The horizontal time window is kept when the new view covers it (Historical -> Historical); otherwise the new
+      // view's remembered range, or the latest bars.
+      const modeOf = (key) => (key ? (key.endsWith("|replay") ? "replay" : key.endsWith("|live") ? "live" : "historical") : null);
+      const keepTime = !streaming && previousTime && modeOf(previousView) === "historical" && modeOf(payload.view_key) === "historical"
+        && this.bars.length && previousTime.to >= this.bars[0].time && previousTime.from <= this.bars[this.bars.length - 1].time;
+      if (streaming) this.showLatest();
+      else if (keepTime) this.applyRange(previousTime);
+      else this.restoreOrDefaultRange();
+      this.setFollow(true);
+    } else if (replaced && !hadBars && this.bars.length) {
+      // The view's first bars arrived after it opened empty (e.g. Live: the seed comes in the next payload): place
+      // them as a new view would, immediately (not via an animated scroll from a stale range).
       if (streaming) this.showLatest();
       else this.restoreOrDefaultRange();
       this.setFollow(true);

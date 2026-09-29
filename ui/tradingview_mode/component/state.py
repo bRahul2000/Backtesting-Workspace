@@ -62,7 +62,7 @@ class TerminalState:
     # None means "Python default window"; otherwise an explicit inclusive UTC date range.
     date_range: tuple[date, date] | None = None
     indicators: tuple[IndicatorInstance, ...] = ()
-    show_volume: bool = True
+    show_volume: bool = False       # candles only by default; Settings -> "Show volume" adds the histogram
     bottom_panel: str = "indicators"
     bottom_open: bool = True
     next_indicator: int = 1

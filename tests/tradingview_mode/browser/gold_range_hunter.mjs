@@ -194,7 +194,7 @@ async function main() {
   await mouse("mouseMoved", edge.x, edge.y - 60); await mouse("mouseReleased", edge.x, edge.y - 60); await sleep(300);
   const h1 = await evaluate("__tv.height('.bottom')");
   check("dock resizes by dragging its top edge", h1 >= h0 + 50, `${h0} -> ${h1}`);
-  check("dock height is remembered in this browser", (await evaluate("Object.keys(__tv.win().localStorage).some((k) => k.startsWith('tvterm:bottom-height:'))")));
+  check("dock height is remembered in this browser", (await evaluate("Object.keys(__tv.win().localStorage).some((k) => k === 'tvterm:dock-height')")));
   await click("collapse dock", ".bottom-tabs .icon-btn"); await settle();
   check("dock collapses", await waitFor("__tv.has('.bottom.is-collapsed')", 10000));
   await click("expand dock", ".bottom-tabs .icon-btn"); await settle();
