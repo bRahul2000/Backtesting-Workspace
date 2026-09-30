@@ -27,6 +27,7 @@ from utils.data_validation import (
 from ui.backtest_dashboard import render_backtest_panel
 from ui.long_history_research import render_long_history_research
 from ui.setup_b_diagnostics import render_setup_b_diagnostics
+from ui.telemetry_diagnostics import render_telemetry_diagnostics
 from ui.setup_b_exit_research import render_exit_research
 from ui.setup_b_entry_research import render_entry_research
 from ui.exness_cost_calibration import render_exness_cost_calibration
@@ -407,6 +408,7 @@ def _backtest_page() -> None:
 
 
 def _diagnostics_page() -> None:
+    render_telemetry_diagnostics()
     render_setup_b_diagnostics()
     render_exit_research()
     render_entry_research()

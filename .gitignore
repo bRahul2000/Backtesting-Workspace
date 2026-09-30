@@ -37,6 +37,9 @@ data/exness/btc/r4/
 data/exness/btc/provenance/raw/
 data/exness/btc/provenance/processed/
 
+# Zoneflow telemetry store, reconciliation results and watchdog state (production: C:\ZoneflowData\telemetry)
+data/telemetry/
+
 # Stage 3 live-forward evidence collected from the terminal
 data/exness/btc/stage3/
 data/exness/btc/stage4/

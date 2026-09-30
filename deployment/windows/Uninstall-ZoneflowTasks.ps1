@@ -2,7 +2,7 @@
 . (Join-Path $PSScriptRoot 'common.ps1')
 Assert-Administrator
 Stop-Zoneflow
-foreach ($name in $script:TaskNames) { Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue }
+foreach ($name in $script:TaskNames + @('Zoneflow-Telemetry-Daily', 'Zoneflow-Telemetry-Watchdog')) { Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue }
 foreach ($rule in @('Zoneflow HTTPS', 'Zoneflow internal ports blocked')) {
     Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 }

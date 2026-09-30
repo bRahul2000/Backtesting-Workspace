@@ -12,7 +12,8 @@
     6. writes the non-secret settings to C:\ZoneflowData\zoneflow.env (finds MetaTrader 5's Common\Files folder)
     7. asks for the admin login if none exists yet (typed here, stored only as a hash - never in chat or Git)
     8. opens ports 80 + 443 in Windows Firewall and blocks 8501/8601 from outside. RDP (3389) is NOT touched.
-    9. registers three start-at-boot tasks (Zoneflow-Auth, Zoneflow-App, Zoneflow-Proxy) and starts them
+    9. registers three start-at-boot tasks (Zoneflow-Auth, Zoneflow-App, Zoneflow-Proxy) and starts them,
+       plus the Telemetry V1 daily reconciliation and 5-minute watchdog tasks (observe only)
 
   Nothing here enables trading: Zoneflow only reads MT5 data files; execution stays disabled.
 #>
@@ -51,7 +52,7 @@ Write-Host "Python: $PythonExe"
 
 # 2. folders -------------------------------------------------------------------------------------------------------
 Step 'Creating folders'
-foreach ($sub in @('workspace', 'logs', 'backups', 'auth', 'caddy', 'bin')) {
+foreach ($sub in @('workspace', 'logs', 'backups', 'auth', 'caddy', 'bin', 'telemetry')) {
     New-Item -ItemType Directory -Force -Path (Join-Path $script:DataRoot $sub) | Out-Null
 }
 & icacls $script:DataRoot /inheritance:r /grant:r 'SYSTEM:(OI)(CI)(F)' 'Administrators:(OI)(CI)(F)' | Out-Null
@@ -105,6 +106,7 @@ $settings = [ordered]@{
     ZONEFLOW_AUTH_MODE = 'proxy'; ZONEFLOW_AUTH_PORT = '8601'; ZONEFLOW_APP_PORT = '8501'
     ZONEFLOW_AUTH_STATE_DIR = (Join-Path $script:DataRoot 'auth'); ZONEFLOW_LOG_DIR = $script:LogDir
     TV_WORKSPACE_DATA = (Join-Path $script:DataRoot 'workspace')
+    ZONEFLOW_TELEMETRY_ROOT = (Join-Path $script:DataRoot 'telemetry')
 }
 if ($Domain) { $settings['ZONEFLOW_DOMAIN'] = $Domain; $settings['ZONEFLOW_PUBLIC_BASE_URL'] = "https://$Domain" }
 $mt5 = Find-Mt5CommonFiles
@@ -144,6 +146,7 @@ foreach ($name in $script:TaskNames) {
         -Settings $taskSettings -Principal $principal -Force | Out-Null
     Write-Host "  $name"
 }
+& (Join-Path $PSScriptRoot 'Register-ZoneflowTelemetry.ps1')
 
 if ($SkipStart) { Write-Host 'Installed. Start with Start-Zoneflow.ps1.'; exit 0 }
 if (-not (Read-ZoneflowEnv)['ZONEFLOW_DOMAIN']) {
