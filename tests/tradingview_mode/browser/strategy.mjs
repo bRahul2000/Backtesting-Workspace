@@ -141,9 +141,9 @@ async function main() {
   if (!(await evaluate("!!__tv.find('.bottom-tab.is-active', 'Strategy Tester')"))) { await click("Strategy Tester tab", ".bottom-tab", "Strategy Tester"); await settle(); }
   check("historical: the Strategy Tester shows the Pine source", (await evaluate("__tv.text('.source-badge')")) === "Pine · TradingView Emulator");
   const text = await evaluate("__tv.reportText()");
-  check("historical: report is labelled simulation only", /simulated \(broker emulator\) · no broker orders/.test(text || ""), text);
-  check("historical: report shows net profit and profit factor", /Net profit/.test(text) && /Profit factor/.test(text), text);
-  await click("Trades section", ".subtab", "Trades"); await settle();
+  check("historical: report is labelled simulation only", /Simulated · no broker orders/.test(text || ""), text);
+  check("historical: report shows net profit and profit factor", /Net P&L/i.test(text) && /Profit factor/i.test(text), text);
+  await click("Trades section", ".subtab", "List of Trades"); await settle();
   check("historical: report lists the trades", await waitFor(`__tv.reportRows() > 5`, 15000), String(await evaluate("__tv.reportRows()")));
   if (process.env.PINE_SHOTS) {
     const { writeFileSync } = await import("node:fs");

@@ -8,6 +8,16 @@ targets or metrics, and never falls back to another provider or timeframe.
   validation, `apply_event`), `terminal.py` (Streamlit glue).
 - Frontend side: `frontend/src/events.js`, `frontend/src/chart/ChartEngine.js`.
 
+## Transport: data files and fragment reruns
+
+- The terminal runs in an `st.fragment` (ui/tradingview_mode/page.py): a terminal event reruns the terminal only,
+  never the whole app. The fragment re-validates the login session on every run (`gate.recheck_session`).
+- Large payload values are sent once as content-addressed data files (component/blobs.py): a list of 64+ items
+  becomes `{"$blob": "/media/<hash>.json", "tail": [last 2 items]}`, any other value over 16 KB becomes
+  `{"$json": "/media/<hash>.json"}`. The frontend (src/blobs.js) rebuilds the identical payload before rendering and
+  keeps each file by URL. While files load, no event is sent; a file that cannot be loaded keeps the previous view
+  and sends `resync`.
+
 ## Time
 
 Every chart time is an **integer Unix epoch in seconds, UTC**. Python converts
@@ -33,10 +43,10 @@ as UTC and applies no local-timezone conversion. Date ranges in events are ISO
 | `bars` | `[{time, open, high, low, close, volume}]`. Strictly increasing int `time`, finite floats. |
 | `bars_rev` | Fingerprint of `bars`. The frontend calls `setData` only when it changes. |
 | `price_precision` | Display decimals derived from the data. |
-| `overlays` | Price-pane indicators: `[{id, key, name, params, series:[{name, type, color, data:[{time, value}]}]}]`. |
-| `panes` | Lower-pane indicators with the same shape plus `levels` (e.g. RSI 70/50/30). |
+| `overlays` | Price-pane indicators, as generic plot definitions (ui/tradingview_mode/indicators.py): `[{id, key, name, label, params, visible, status: ok\|limited\|unavailable, note, scale, series:[{name, title, type: line\|histogram, color, width, style: solid\|dashed\|dotted, data:[{time, value, color?}]}], fills:[{upper, lower, color}], levels:[{value, title, color, style}], markers:[{time, position, shape, color, text}]}]`. Hidden instances are included (`visible: false`) so showing one is instant; an `unavailable` one carries no data and says why in `note`. |
+| `panes` | Lower-pane indicators, same shape; each gets its own pane (unless unavailable). |
 | `indicators` | All active instances, including hidden ones: `{id, key, name, enabled, params, pane, color}`. |
-| `indicator_catalog` | Addable indicators with their defaults. |
+| `indicator_catalog` | The Indicators menu: `{key, name, category, pane, defaults, params:[{name, label, kind, default, min, max, step, choices}], status, note, description}`. `unavailable` items are listed disabled with their reason (never clickable, never silently empty). |
 | `datasets`, `watchlist` | Registry entries; watchlist rows carry `last_close`, `change_pct`, `price_precision`, `selected`. |
 | `ui` | `{bottom_panel, bottom_open, show_volume}`. |
 | `logs`, `notices` | Python log entries and current warnings or errors (clipping, truncation, rejected events). |
@@ -67,6 +77,7 @@ and unknown or missing fields are rejected (`protocol.parse_event`).
 | `remove_indicator` | `id` | Ids are never reused. |
 | `set_bottom_panel` | `panel`, `open?` | `panel` is one of `indicators, strategy_tester, trades, logs`. |
 | `set_chart_setting` | `show_volume` | – |
+| `resync` | – | No state change: the next payload is sent fresh (the frontend could not load a data file). |
 
 A rejected event leaves the state untouched, adds an `error` log entry, and
 shows up as a notice on the next payload. Nothing is silently substituted.
@@ -586,3 +597,18 @@ the frontend only renders them.
 - Bottom panels: `indicators`, `strategy_tester`, `trades`, `logs`, `pine`. The separate `pine_strategy` panel is gone:
   the Strategy Tester shows one source at a time, **Pine · TradingView Emulator** or **Python Audited Engine**, never
   combined. The audited engine keeps the frozen, validated datasets.
+
+## Strategy test range and trade-list export (Pine strategies, Historical)
+
+- `pine_set_range {id, start, end}`: UTC `YYYY-MM-DDTHH:MM`, both inclusive on bar OPEN time; both `null` = full
+  available history. The strategy is evaluated on exactly those bars - it starts fresh at `start` (indicators warm up
+  inside the range) and a trade still open at `end` stays open. This changes the evaluation; it is not a filter of a
+  longer run. The chart's visible window is independent: zooming or changing the chart range never changes the test.
+- A strategy added while the chart has an explicit date range starts with the custom range dataset start → chart
+  range end (shown in the tester header, editable). A range with no bars on a new symbol/timeframe is reset to the
+  full history with a notice; otherwise it is kept.
+- Each strategy script carries `test_range {mode: full|custom, start, end, first_time, last_time, bars}`.
+- `pine_export {id}`: Python builds the CURRENT result's trade list as CSV (component/tester_export.py) and sends it
+  once as `pine.export {id, filename, mime, content}`; filename
+  `<Strategy>_<SYMBOL>_<TF>_<first day>_<last day>_trades.csv`, raw values (full-precision numbers, UTC ISO time and
+  epoch seconds), UTF-8.

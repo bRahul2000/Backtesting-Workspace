@@ -21,6 +21,7 @@ import {
   diffSeries, indexOfTime, isAtLatest, samePoint, shiftedRange, tickLabel, utcLabel, wantsOlderHistory,
 } from "./chartView.js";
 import { PineLayer } from "./PineLayer.js";
+import { BandFill, LINE_STYLES } from "./indicatorPrimitives.js";
 
 export const COLORS = {
   bg: "#0b0e14",
@@ -47,16 +48,16 @@ function storageSet(key, value) {
 }
 
 // What an indicator *is* (not its values): only a change here rebuilds its series.
+// What forces a rebuild of an indicator's series (not its values, not its visibility).
 function structureSignature(item, precision) {
-  return `${precision}|${JSON.stringify(item.params)}|${item.series.map((s) => `${s.name}:${s.type}:${s.color}`).join(",")}`;
+  return `${precision}|${item.status}|${item.scale}|${JSON.stringify(item.params)}|`
+    + `${item.series.map((s) => `${s.name}:${s.type}:${s.color}:${s.width}:${s.style}`).join(",")}|`
+    + `${JSON.stringify(item.fills || [])}|${JSON.stringify(item.levels || [])}|${(item.markers || []).length > 0}`;
 }
 
 const plainCandle = (b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close });
 const volumeBar = (b) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? `${COLORS.up}55` : `${COLORS.down}55` });
 
-function histogramData(points) {
-  return points.map((p) => ({ time: p.time, value: p.value, color: p.value >= 0 ? `${COLORS.up}99` : `${COLORS.down}99` }));
-}
 
 export class ChartEngine {
   constructor(container) {
@@ -189,7 +190,7 @@ export class ChartEngine {
     this.syncOverlays(payload.overlays, precision);
     if (this.panesSignature(payload.panes) !== this.paneSig) this.pine.clear();  // pane indices are about to move
     this.syncPanes(payload.panes);
-    this.pine.sync(payload.pine?.scripts || [], 1 + this.panes.length);
+    this.pine.sync(payload.pine?.scripts || [], 1 + this.panes.filter((p) => p.series.length).length);
 
     this.viewKey = payload.view_key;
     this.barsRev = payload.bars_rev;
@@ -414,45 +415,111 @@ export class ChartEngine {
   }
 
   // ---- indicators -------------------------------------------------------
+  // Generic plot definitions from Python (ui/tradingview_mode/indicators.py): lines / histograms with their own
+  // colour, width and style, per-point colours, fills, levels and markers. Visibility is applied in place (no rebuild),
+  // so hide/show is instant and never recalculates anything.
 
   // Indicator values change every tick; the series only change when the indicator does.
   applyPoints(target, data) {
-    const toSeries = target.histogram ? histogramData : (points) => points;
     const diff = diffSeries(target.data, data, samePoint);
-    if (diff.kind === "tail") toSeries(diff.updates).forEach((point) => target.api.update(point));
-    else if (diff.kind === "replace") target.api.setData(toSeries(data));
+    if (diff.kind === "tail") diff.updates.forEach((point) => target.api.update(point));
+    else if (diff.kind === "replace") target.api.setData(data);
     target.data = data;
+  }
+
+  buildIndicator(item, paneIndex, precision) {
+    const own = item.scale === "own" && paneIndex === 0;
+    const series = item.series.map((s) => {
+      const isHistogram = s.type === "histogram";
+      const common = { priceLineVisible: false, lastValueVisible: paneIndex > 0 && !isHistogram, crosshairMarkerVisible: false,
+        visible: item.visible !== false, ...(own ? { priceScaleId: `ind-${item.id}` } : {}),
+        ...(paneIndex === 0 ? { priceFormat: { type: "price", precision, minMove: 10 ** -precision } } : {}) };
+      const api = this.chart.addSeries(isHistogram ? HistogramSeries : LineSeries, isHistogram
+        ? { ...common, color: s.color }
+        : { ...common, color: s.color, lineWidth: s.width || 1, lineStyle: LINE_STYLES[s.style] ?? LineStyle.Solid },
+      paneIndex);
+      api.setData(s.data);
+      return { name: s.name, title: s.title || s.name, api, color: s.color, data: s.data, histogram: isHistogram };
+    });
+    const host = series[0]?.api || (paneIndex === 0 ? this.candles : null);
+    const byName = Object.fromEntries(item.series.map((s) => [s.name, s.data]));
+    const fills = host ? (item.fills || []).map((fill) => {
+      const band = new BandFill(fill, byName);
+      band.setVisible(item.visible !== false);
+      host.attachPrimitive(band);
+      return band;
+    }) : [];
+    const levels = series[0] ? (item.levels || []).map((level) => series[0].api.createPriceLine({
+      price: level.value, color: level.color, lineWidth: 1, lineStyle: LINE_STYLES[level.style] ?? LineStyle.Dotted,
+      axisLabelVisible: false, title: "",
+    })) : [];
+    const markers = host && (item.markers || []).length ? createSeriesMarkers(host, []) : null;
+    const entry = { id: item.id, key: item.key, sig: null, name: item.name, label: item.label, params: item.params,
+      status: item.status, note: item.note, visible: item.visible !== false, series, fills, levels, markers, host,
+      markerData: item.markers || [] };
+    this.applyMarkers(entry);
+    return entry;
+  }
+
+  applyMarkers(entry) {
+    entry.markers?.setMarkers(entry.visible ? entry.markerData.map((m) => ({ time: m.time, position: m.position,
+      shape: m.shape, color: m.color, text: m.text || "" })) : []);
+  }
+
+  removeIndicatorEntry(entry) {
+    entry.fills.forEach((band) => entry.host?.detachPrimitive(band));
+    entry.markers?.detach?.();
+    entry.series.forEach((s) => this.chart.removeSeries(s.api));
+  }
+
+  updateIndicator(entry, item) {
+    item.series.forEach((s, i) => this.applyPoints(entry.series[i], s.data));
+    const byName = Object.fromEntries(item.series.map((s) => [s.name, s.data]));
+    entry.fills.forEach((band) => band.setData(byName));
+    entry.markerData = item.markers || [];
+    Object.assign(entry, { label: item.label, params: item.params, status: item.status, note: item.note });
+    this.applyMarkers(entry);
+    this.setIndicatorVisible(item.id, item.visible !== false, entry);
+  }
+
+  // Show/hide one indicator in place: its series, fills and markers; the instance and its settings stay.
+  setIndicatorVisible(id, visible, known = null) {
+    const entry = known || this.overlays.get(id) || this.panes.find((p) => p.id === id);
+    if (!entry || entry.visible === visible && known) return;
+    entry.visible = visible;
+    entry.series.forEach((s) => s.api.applyOptions({ visible }));
+    entry.fills.forEach((band) => band.setVisible(visible));
+    this.applyMarkers(entry);
+    this.emitSoon();
+  }
+
+  // Remove clicked: gone from the chart at once; Python's next payload removes the instance for good.
+  markRemoving(id) {
+    const entry = this.overlays.get(id) || this.panes.find((p) => p.id === id);
+    if (!entry) return;
+    this.setIndicatorVisible(id, false);
+    entry.removing = true;
+    this.emitSoon();
   }
 
   syncOverlays(overlays, precision) {
     const wanted = new Set(overlays.map((o) => o.id));
-    for (const [id, entry] of this.overlays) {
+    for (const [id, entry] of [...this.overlays]) {
       if (!wanted.has(id)) {
-        entry.series.forEach((s) => this.chart.removeSeries(s.api));
-        this.overlays.delete(id);
+        this.overlays.delete(id);                 // first: a synchronous crosshair callback must not see it
+        this.removeIndicatorEntry(entry);
       }
     }
     for (const item of overlays) {
       const sig = structureSignature(item, precision);
       let entry = this.overlays.get(item.id);
       if (entry && entry.sig === sig) {
-        item.series.forEach((s, i) => this.applyPoints(entry.series[i], s.data));
+        this.updateIndicator(entry, item);
         continue;
       }
-      if (entry) entry.series.forEach((s) => this.chart.removeSeries(s.api));
-      entry = {
-        sig, name: item.name, params: item.params,
-        series: item.series.map((s) => {
-          const api = this.chart.addSeries(LineSeries, {
-            color: s.color, lineWidth: s.name === "value" || s.name === "basis" ? 2 : 1,
-            lineStyle: s.name === "basis" ? LineStyle.Dashed : LineStyle.Solid,
-            priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-            priceFormat: { type: "price", precision, minMove: 10 ** -precision },
-          }, 0);
-          api.setData(s.data);
-          return { name: s.name, api, color: s.color, data: s.data, histogram: false };
-        }),
-      };
+      if (entry) { this.overlays.delete(item.id); this.removeIndicatorEntry(entry); }
+      entry = this.buildIndicator(item, 0, precision);
+      entry.sig = sig;
       this.overlays.set(item.id, entry);
     }
   }
@@ -463,35 +530,25 @@ export class ChartEngine {
   }
 
   panesSignature(panes) {
-    return panes.map((p) => `${p.id}:${structureSignature(p, "")}:${(p.levels || []).join(",")}`).join("|");
+    return panes.map((p) => `${p.id}:${structureSignature(p, "")}`).join("|");
   }
 
   syncPanes(panes) {
     const sig = this.panesSignature(panes);
     if (sig === this.paneSig) {
       // Same panes: update values in place (a rebuild would reset pane layout and scales).
-      panes.forEach((item, index) => item.series.forEach((s, i) => this.applyPoints(this.panes[index].series[i], s.data)));
+      panes.forEach((item, index) => this.updateIndicator(this.panes[index], item));
       return;
     }
     this.paneSig = sig;
-    // Rebuild lower panes. Empty panes are removed by the library automatically.
-    this.panes.forEach((pane) => pane.series.forEach((s) => this.chart.removeSeries(s.api)));
-    this.panes = panes.map((item, index) => {
-      const paneIndex = index + 1;
-      const series = item.series.map((s) => {
-        const isHistogram = s.type === "histogram";
-        const api = this.chart.addSeries(isHistogram ? HistogramSeries : LineSeries, isHistogram
-          ? { priceLineVisible: false, lastValueVisible: false }
-          : { color: s.color, lineWidth: s.name === "value" || s.name === "macd" ? 2 : 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false },
-        paneIndex);
-        api.setData(isHistogram ? histogramData(s.data) : s.data);
-        return { name: s.name, api, color: s.color, data: s.data, histogram: isHistogram };
-      });
-      (item.levels || []).forEach((level) => series[0]?.api.createPriceLine({
-        price: level, color: "#3a4354", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false,
-      }));
-      return { id: item.id, name: item.name, params: item.params, series };
-    });
+    // Rebuild lower panes. Empty panes are removed by the library automatically (a removed indicator gives its
+    // space back); a hidden one keeps its pane and header so it can be shown again.
+    // Removing a series can fire the crosshair callback synchronously: the legend must never see a removed series.
+    const old = this.panes;
+    this.panes = [];
+    old.forEach((pane) => this.removeIndicatorEntry(pane));
+    let next = 1;                       // an indicator with nothing to draw (unavailable) takes no pane
+    this.panes = panes.map((item) => this.buildIndicator(item, item.series.length ? next++ : 0, 2));
     const allPanes = this.chart.panes();
     allPanes.forEach((pane, index) => pane.setStretchFactor(index === 0 ? 3 : 1));
   }
@@ -529,14 +586,18 @@ export class ChartEngine {
       change: bar && previous ? bar.close - previous.close : null,
       changePct: bar && previous && previous.close ? ((bar.close - previous.close) / previous.close) * 100 : null,
       volume: bar ? bar.volume : null,
-      overlays: [...this.overlays.entries()].map(([id, entry]) => ({
-        id, name: entry.name, params: entry.params,
+      overlays: [...this.overlays.entries()].filter(([, entry]) => !entry.removing).map(([id, entry]) => ({
+        id, key: entry.key, name: entry.name, label: entry.label, params: entry.params, visible: entry.visible,
+        status: entry.status, note: entry.note, native: true,
         values: entry.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s) })),
       })).concat(pineLegend.filter((p) => p.pane === 0).map((p) => ({ id: p.id, name: p.name, params: "", values: p.values }))),
-      panes: this.panes.map((pane, i) => {
-        const element = this.chart.panes()[i + 1]?.getHTMLElement();
+      panes: this.panes.filter((pane) => !pane.removing).map((pane) => {
+        let index = null;
+        try { index = pane.series[0] ? pane.series[0].api.getPane().paneIndex() : null; } catch { index = null; }
+        const element = index !== null ? this.chart.panes()[index]?.getHTMLElement() : null;
         return {
-          id: pane.id, name: pane.name, params: pane.params,
+          id: pane.id, key: pane.key, name: pane.name, label: pane.label, params: pane.params, visible: pane.visible,
+          status: pane.status, note: pane.note, native: true,
           top: element ? element.getBoundingClientRect().top - containerTop : null,
           values: pane.series.map((s) => ({ name: s.name, color: s.color, value: valueAt(s) })),
         };

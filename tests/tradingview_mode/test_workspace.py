@@ -16,4 +16,5 @@ def test_watchlist_uses_registered_local_datasets():
 
 
 def test_indicator_registry_remains_intact():
-    assert set(INDICATORS) == {"ema", "sma", "vwap", "bb", "rsi", "macd", "atr", "volume"}
+    assert set(INDICATORS) == {"ema", "sma", "wma", "supertrend", "vwap", "bb", "keltner", "donchian", "pivots",
+                               "rsi", "macd", "stoch", "atr", "volume"}

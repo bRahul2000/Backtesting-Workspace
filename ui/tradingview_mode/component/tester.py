@@ -556,11 +556,14 @@ def build_run_payload(result: UniversalBacktestResult, run: ValidatedRun, *, dur
 # Exports (authoritative content, generated in Python)
 # ---------------------------------------------------------------------------
 
-def trades_csv(result: UniversalBacktestResult) -> str:
+def trades_csv(result: UniversalBacktestResult, meta: dict | None = None) -> str:
     """The complete trade_log, every field unchanged, plus a leading ``segment``
-    column because trade_id repeats across continuous segments."""
+    column because trade_id repeats across continuous segments, and (when given) trailing strategy / symbol /
+    timeframe / test range columns so the file describes itself."""
     frame = pd.DataFrame(result.trade_log)
     frame.insert(0, "segment", trade_segments(result))
+    for key, value in (meta or {}).items():
+        frame[key] = value
     return frame.to_csv(index=False)
 
 

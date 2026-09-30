@@ -6,4 +6,5 @@ $port = if ($values['ZONEFLOW_APP_PORT']) { $values['ZONEFLOW_APP_PORT'] } else 
 Invoke-Supervised -Name 'app' -FilePath $script:Python -WorkingDirectory $script:InstallRoot -Arguments @(
     '-m', 'streamlit', 'run', 'app.py',
     '--server.headless', 'true', '--server.address', '127.0.0.1', '--server.port', $port,
-    '--browser.gatherUsageStats', 'false', '--server.fileWatcherType', 'none', '--global.developmentMode', 'false')
+    '--browser.gatherUsageStats', 'false', '--server.fileWatcherType', 'none', '--global.developmentMode', 'false',
+    '--server.enableWebsocketCompression', 'true')

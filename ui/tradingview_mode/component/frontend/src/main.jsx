@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { withStreamlitConnection } from "streamlit-component-lib";
 import App, { clientLog } from "./App.jsx";
-import { sendEvent } from "./events.js";
+import { isIdle, sendEvent } from "./events.js";
 import "./styles.css";
 
 const reported = new Set();
@@ -15,6 +15,8 @@ function reportError(message) {
 }
 
 window.addEventListener("error", (event) => reportError(event.message));
+// Acceptance/perf harness hook: the same events the UI sends (Python validates every one), plus the idle flag.
+window.__zfTerm = { sendEvent, isIdle };
 window.addEventListener("unhandledrejection", (event) => reportError(event.reason?.message || event.reason));
 
 // A render failure must be visible, never a blank frame.

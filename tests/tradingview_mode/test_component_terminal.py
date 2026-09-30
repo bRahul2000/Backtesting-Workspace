@@ -72,8 +72,9 @@ def test_indicators_are_calculated_in_python_and_routed_to_panes():
     )
     payload = payload_for(indicators=indicators)
     assert [o["id"] for o in payload["overlays"]] == ["ema-1"]
-    assert [p["id"] for p in payload["panes"]] == ["rsi-2"]  # disabled MACD is not drawn
-    assert payload["panes"][0]["levels"] == [70.0, 50.0, 30.0]
+    # a hidden indicator stays computed (showing it again is instant) and says it is hidden
+    assert [(p["id"], p["visible"]) for p in payload["panes"]] == [("rsi-2", True), ("macd-3", False)]
+    assert [level["value"] for level in payload["panes"][0]["levels"]] == [70.0, 50.0, 30.0]
     assert [i["id"] for i in payload["indicators"]] == ["ema-1", "rsi-2", "macd-3"]
     ema = payload["overlays"][0]["series"][0]["data"]
     assert len(ema) == 60 - 4  # warm-up bars omitted, not zero-filled

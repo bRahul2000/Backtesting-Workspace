@@ -74,6 +74,8 @@ def require_login() -> Decision:
         except Exception:  # noqa: BLE001
             pass
 
+    from services import perf
+    perf.event("full_run")
     context = getattr(st, "context", None)
     decision = decide(getattr(context, "headers", {}) or {}, getattr(context, "cookies", {}) or {})
     if not decision.allowed:
@@ -85,6 +87,19 @@ def require_login() -> Decision:
     elif (environment().get("ZONEFLOW_AUTH_MODE") or "").strip().lower() == "off":
         st.sidebar.caption("Login disabled (development mode)")
     return decision
+
+
+def recheck_session() -> None:
+    """For code that reruns without the rest of the app (an st.fragment): the full-app gate does not run then, so
+    re-validate the session here on every run. A revoked or expired session reruns the whole app, whose gate then
+    shows the sign-in notice. Cheap: one session-store read (touch is throttled inside the store)."""
+    import streamlit as st
+
+    context = getattr(st, "context", None)
+    decision = decide(getattr(context, "headers", {}) or {}, getattr(context, "cookies", {}) or {})
+    if not decision.allowed:
+        _log_denial(decision.reason)
+        st.rerun(scope="app")
 
 
 def _log_denial(reason: str) -> None:

@@ -11,7 +11,7 @@ from datetime import date, datetime, timezone
 import math
 from typing import Callable
 
-from ..indicators import INDICATORS
+from ..indicators import CHARTABLE, INDICATORS, validate_params
 from . import replay as replay_model
 from .protocol import FrontendEvent
 from .replay import ReplayError, ReplayState
@@ -24,8 +24,7 @@ DEFAULT_RANGE_DAYS = 30
 MAX_INDICATORS = 12
 INDICATOR_COLORS = ("#f5a623", "#4aa3ff", "#c678dd", "#56d4bc", "#e5c07b", "#ff7a90", "#98c379", "#61afef")
 # Indicators the chart can draw. Volume is a built-in chart setting instead.
-CHARTABLE_INDICATORS = tuple(key for key in INDICATORS if key != "volume")
-_PARAM_BOUNDS = {"length": (1, 1000), "fast": (1, 500), "slow": (1, 1000), "signal": (1, 500), "stddev": (0.1, 10.0)}
+CHARTABLE_INDICATORS = CHARTABLE
 
 
 @dataclass(frozen=True)
@@ -53,6 +52,8 @@ class PineInstance:
     title: str
     enabled: bool = True
     inputs: tuple[tuple[int, object], ...] = ()   # (input index, user value)
+    # Strategy Tester range (UTC 'YYYY-MM-DDTHH:MM' start, end), None = full available history (strategies only)
+    test_range: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -91,31 +92,9 @@ class TerminalContext:
     dataset_instrument: Callable[[str], str | None] | None = None
 
 
-def validate_indicator_params(key: str, params: dict | None) -> dict[str, float | int]:
-    """Return complete, typed params for ``key`` or raise ValueError."""
-    definition = INDICATORS[key]
-    params = dict(params or {})
-    unknown = set(params) - set(definition.defaults)
-    if unknown:
-        raise ValueError(f"{definition.display_name}: unknown parameter(s) {', '.join(sorted(unknown))}.")
-    result: dict[str, float | int] = {}
-    for name, default in definition.defaults.items():
-        value = params.get(name, default)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-            raise ValueError(f"{definition.display_name}: {name} must be a number.")
-        if isinstance(default, int):
-            if float(value) != int(value):
-                raise ValueError(f"{definition.display_name}: {name} must be a whole number.")
-            value = int(value)
-        else:
-            value = float(value)
-        low, high = _PARAM_BOUNDS.get(name, (1, 1000))
-        if not low <= value <= high:
-            raise ValueError(f"{definition.display_name}: {name} must be between {low} and {high}.")
-        result[name] = value
-    if key == "macd" and result["fast"] >= result["slow"]:
-        raise ValueError("MACD: fast length must be shorter than slow length.")
-    return result
+def validate_indicator_params(key: str, params: dict | None) -> dict:
+    """Return complete, typed params for ``key`` or raise ValueError (the indicator's own parameter specs)."""
+    return validate_params(key, params)
 
 
 def default_range_days(timeframe_seconds: int) -> int:
@@ -243,6 +222,8 @@ def apply_event(state: TerminalState, event: FrontendEvent, ctx: TerminalContext
     data = event.data
     kind = event.type
 
+    if kind == "resync":
+        return state, LogEntry("warning", "Frontend re-requested the chart data (a payload file could not be loaded).")
     if kind == "chart_ready":
         return state, LogEntry("info", "Custom frontend ready.")
     if kind == "frontend_error":

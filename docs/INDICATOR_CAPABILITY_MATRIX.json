@@ -1,0 +1,634 @@
+[
+  {
+    "key": "ema",
+    "name": "EMA",
+    "category": "Trend",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 20,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "name": "timeframe",
+        "label": "Timeframe",
+        "kind": "choice",
+        "default": "chart",
+        "choices": [
+          "chart",
+          "15m",
+          "30m",
+          "1h",
+          "4h",
+          "1d"
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "key": "value",
+        "title": "EMA",
+        "type": "line"
+      }
+    ],
+    "fills": 0,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe; optional higher-timeframe input (closed bars only)",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "sma",
+    "name": "SMA",
+    "category": "Trend",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 50,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "name": "timeframe",
+        "label": "Timeframe",
+        "kind": "choice",
+        "default": "chart",
+        "choices": [
+          "chart",
+          "15m",
+          "30m",
+          "1h",
+          "4h",
+          "1d"
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "key": "value",
+        "title": "SMA",
+        "type": "line"
+      }
+    ],
+    "fills": 0,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe; optional higher-timeframe input (closed bars only)",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "wma",
+    "name": "WMA",
+    "category": "Trend",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 20,
+        "min": 1,
+        "max": 1000
+      }
+    ],
+    "outputs": [
+      {
+        "key": "value",
+        "title": "WMA",
+        "type": "line"
+      }
+    ],
+    "fills": 0,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "supertrend",
+    "name": "Supertrend",
+    "category": "Trend",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "atr_length",
+        "label": "ATR length",
+        "kind": "int",
+        "default": 10,
+        "min": 1,
+        "max": 500
+      },
+      {
+        "name": "factor",
+        "label": "Factor",
+        "kind": "float",
+        "default": 3.0,
+        "min": 0.1,
+        "max": 20.0
+      }
+    ],
+    "outputs": [
+      {
+        "key": "value",
+        "title": "Supertrend",
+        "type": "line"
+      },
+      {
+        "key": "markers",
+        "title": "markers",
+        "type": "markers"
+      }
+    ],
+    "fills": 0,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "bb",
+    "name": "Bollinger Bands",
+    "category": "Volatility",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 20,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "name": "stddev",
+        "label": "StdDev",
+        "kind": "float",
+        "default": 2.0,
+        "min": 0.1,
+        "max": 10.0
+      }
+    ],
+    "outputs": [
+      {
+        "key": "basis",
+        "title": "Basis",
+        "type": "line"
+      },
+      {
+        "key": "upper",
+        "title": "Upper",
+        "type": "line"
+      },
+      {
+        "key": "lower",
+        "title": "Lower",
+        "type": "line"
+      }
+    ],
+    "fills": 1,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "keltner",
+    "name": "Keltner Channels",
+    "category": "Volatility",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 20,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "name": "multiplier",
+        "label": "Multiplier",
+        "kind": "float",
+        "default": 2.0,
+        "min": 0.1,
+        "max": 10.0
+      },
+      {
+        "name": "atr_length",
+        "label": "ATR length",
+        "kind": "int",
+        "default": 10,
+        "min": 1,
+        "max": 500
+      }
+    ],
+    "outputs": [
+      {
+        "key": "basis",
+        "title": "Basis",
+        "type": "line"
+      },
+      {
+        "key": "upper",
+        "title": "Upper",
+        "type": "line"
+      },
+      {
+        "key": "lower",
+        "title": "Lower",
+        "type": "line"
+      }
+    ],
+    "fills": 1,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "donchian",
+    "name": "Donchian Channels",
+    "category": "Volatility",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 20,
+        "min": 1,
+        "max": 1000
+      }
+    ],
+    "outputs": [
+      {
+        "key": "upper",
+        "title": "Upper",
+        "type": "line"
+      },
+      {
+        "key": "basis",
+        "title": "Basis",
+        "type": "line"
+      },
+      {
+        "key": "lower",
+        "title": "Lower",
+        "type": "line"
+      }
+    ],
+    "fills": 1,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "vwap",
+    "name": "VWAP",
+    "category": "Volume",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "anchor",
+        "label": "Anchor",
+        "kind": "choice",
+        "default": "day",
+        "choices": [
+          "day",
+          "week",
+          "month"
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "key": "value",
+        "title": "VWAP",
+        "type": "line"
+      }
+    ],
+    "fills": 0,
+    "levels": [],
+    "data_requirements": [
+      "ohlc",
+      "volume"
+    ],
+    "supported_markets": "any series with valid OHLC and bar volume",
+    "volume_note": "tick volume (Exness MT5) -> LIMITED; traded volume (Bitstamp, Binance) -> OK; none -> unavailable",
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "pivots",
+    "name": "Pivots High/Low",
+    "category": "Structure",
+    "placement": "overlay",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "left",
+        "label": "Left bars",
+        "kind": "int",
+        "default": 10,
+        "min": 1,
+        "max": 200
+      },
+      {
+        "name": "right",
+        "label": "Right bars",
+        "kind": "int",
+        "default": 10,
+        "min": 1,
+        "max": 200
+      }
+    ],
+    "outputs": [
+      {
+        "key": "markers",
+        "title": "markers",
+        "type": "markers"
+      }
+    ],
+    "fills": 0,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "rsi",
+    "name": "RSI",
+    "category": "Momentum",
+    "placement": "pane",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 14,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "name": "timeframe",
+        "label": "Timeframe",
+        "kind": "choice",
+        "default": "chart",
+        "choices": [
+          "chart",
+          "15m",
+          "30m",
+          "1h",
+          "4h",
+          "1d"
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "key": "value",
+        "title": "RSI",
+        "type": "line"
+      }
+    ],
+    "fills": 1,
+    "levels": [
+      70,
+      50,
+      30
+    ],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe; optional higher-timeframe input (closed bars only)",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "macd",
+    "name": "MACD",
+    "category": "Momentum",
+    "placement": "pane",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "fast",
+        "label": "Fast",
+        "kind": "int",
+        "default": 12,
+        "min": 1,
+        "max": 500
+      },
+      {
+        "name": "slow",
+        "label": "Slow",
+        "kind": "int",
+        "default": 26,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "name": "signal",
+        "label": "Signal",
+        "kind": "int",
+        "default": 9,
+        "min": 1,
+        "max": 500
+      }
+    ],
+    "outputs": [
+      {
+        "key": "histogram",
+        "title": "Histogram",
+        "type": "histogram"
+      },
+      {
+        "key": "macd",
+        "title": "MACD",
+        "type": "line"
+      },
+      {
+        "key": "signal",
+        "title": "Signal",
+        "type": "line"
+      }
+    ],
+    "fills": 0,
+    "levels": [
+      0
+    ],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "stoch",
+    "name": "Stochastic",
+    "category": "Momentum",
+    "placement": "pane",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "%K length",
+        "kind": "int",
+        "default": 14,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "name": "smooth_k",
+        "label": "%K smoothing",
+        "kind": "int",
+        "default": 1,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "smooth_d",
+        "label": "%D smoothing",
+        "kind": "int",
+        "default": 3,
+        "min": 1,
+        "max": 100
+      }
+    ],
+    "outputs": [
+      {
+        "key": "k",
+        "title": "%K",
+        "type": "line"
+      },
+      {
+        "key": "d",
+        "title": "%D",
+        "type": "line"
+      }
+    ],
+    "fills": 1,
+    "levels": [
+      80,
+      20
+    ],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  },
+  {
+    "key": "atr",
+    "name": "ATR",
+    "category": "Volatility",
+    "placement": "pane",
+    "scale": "price",
+    "inputs": [
+      {
+        "name": "length",
+        "label": "Length",
+        "kind": "int",
+        "default": 14,
+        "min": 1,
+        "max": 1000
+      }
+    ],
+    "outputs": [
+      {
+        "key": "value",
+        "title": "ATR",
+        "type": "line"
+      }
+    ],
+    "fills": 0,
+    "levels": [],
+    "data_requirements": [
+      "ohlc"
+    ],
+    "supported_markets": "any series with valid OHLC",
+    "volume_note": null,
+    "supported_timeframes": "any chart timeframe",
+    "implementation_status": "WORKING",
+    "disabled_reason": null,
+    "test_status": "tests/tradingview_mode/test_indicator_engine.py: BTC, Gold and synthetic OHLC"
+  }
+]

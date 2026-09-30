@@ -21,10 +21,12 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from services import perf
 from services.market_datasets import MarketDataset, all_datasets, dataset
 from strategies.registry import StrategyRegistry, discover_builtin_strategies
 from utils.data_validation import load_ohlcv_csv
-from ..indicators import INDICATORS, calculate_indicator
+from .. import indicators as indicator_engine
+from ..indicators import INDICATORS
 from ..timeframes import (
     TimeframeResolution,
     UnsupportedTimeframeError,
@@ -36,6 +38,8 @@ from ..timeframes import (
 from ..workspace import watchlist_groups
 from . import render_terminal_component
 from . import binance
+from . import blobs
+from . import tester_export
 from . import live as live_model
 from . import providers
 from . import replay as replay_model
@@ -88,8 +92,6 @@ AUTO_REFRESH_KEY = "tv_terminal_auto_refresh"     # symbol family -> last automa
 FRESHNESS_KEY = "tv_terminal_freshness"           # dataset key -> cached data status (throttled)
 AUTO_REFRESH_SECONDS = 180                        # at most one automatic check per symbol every 3 minutes
 MAX_LOGS = 200
-_RSI_LEVELS = (70.0, 50.0, 30.0)
-_SECONDARY_COLORS = {"signal": "#f5a623", "histogram": "#7d8799"}
 
 
 # ---------------------------------------------------------------------------
@@ -177,39 +179,75 @@ def filter_range(frame: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
     return frame.loc[(days >= start) & (days <= end)].reset_index(drop=True)
 
 
-def indicator_payload(frame: pd.DataFrame, times: list[int], instances: tuple[IndicatorInstance, ...]
+def indicator_catalog(ctx: indicator_engine.DataContext) -> list[dict]:
+    """The Indicators menu: every chartable indicator with its parameters and whether it works on this chart."""
+    catalog = []
+    for key in CHARTABLE_INDICATORS:
+        spec = INDICATORS[key]
+        status, note = indicator_engine.availability(spec, ctx)
+        catalog.append({"key": key, "name": spec.display_name, "category": spec.category, "pane": spec.pane,
+                        "defaults": spec.defaults, "status": status, "note": note, "description": spec.description,
+                        "params": [{"name": p.name, "label": p.label, "kind": p.kind, "default": p.default,
+                                    "min": p.minimum, "max": p.maximum, "step": p.step, "choices": list(p.choices)}
+                                   for p in spec.params]})
+    return catalog
+
+
+def volume_kind(source_label: str, frame: pd.DataFrame | None = None) -> str:
+    """What the chart's bar volume is: "tick" (Exness MT5: price-change counts), "traded", or "none"."""
+    if frame is not None and ("volume" not in frame or not len(frame) or not (frame["volume"].fillna(0) > 0).any()):
+        return "none"
+    return "tick" if "exness" in (source_label or "").lower() else "traded"
+
+
+def indicator_payload(frame: pd.DataFrame, times: list[int], instances: tuple[IndicatorInstance, ...],
+                      ctx: indicator_engine.DataContext | None = None
                       ) -> tuple[list[dict], list[dict], list[dict[str, str]]]:
-    """Calculate enabled indicators in Python and convert them to overlays/panes."""
+    """Every active indicator instance (hidden ones too, so showing one again is instant) as generic plot
+    definitions: overlays go on the price pane, panes below it."""
+    ctx = ctx or indicator_engine.DataContext()
     overlays, panes, notices = [], [], []
     for instance in instances:
-        if not instance.enabled:
-            continue
-        definition = INDICATORS[instance.key]
-        try:
-            values = calculate_indicator(frame, instance.key, instance.params)
-        except ValueError as exc:
-            notices.append({"level": "error", "message": f"{instance.id}: {exc}"})
-            continue
-        series = []
-        for name, column in values.items():
-            points = series_points(times, column)
-            if not points:
-                continue
-            series.append({
-                "name": name,
-                "type": "histogram" if name == "histogram" else "line",
-                "color": _SECONDARY_COLORS.get(name, instance.color),
-                "data": points,
-            })
-        if not series:
-            notices.append({"level": "warning", "message": f"{instance.id}: not enough bars to calculate."})
-            continue
-        item = {"id": instance.id, "key": instance.key, "name": definition.display_name,
-                "params": instance.params, "series": series}
-        if definition.pane == "overlay":
-            overlays.append(item)
-        else:
-            panes.append({**item, "levels": list(_RSI_LEVELS) if instance.key == "rsi" else []})
+        spec = INDICATORS[instance.key]
+        status, note = indicator_engine.availability(spec, ctx)
+        item = {"id": instance.id, "key": instance.key, "name": spec.display_name,
+                "label": spec.short_label(instance.params), "params": instance.params, "visible": instance.enabled,
+                "status": status, "note": note, "scale": spec.scale, "series": [], "fills": [], "markers": [],
+                "levels": [{"value": float(level.value), "title": level.title, "color": level.color,
+                            "style": level.style} for level in spec.levels]}
+        if status != "unavailable":
+            try:
+                output = indicator_engine.compute(frame, instance.key, instance.params, ctx)
+            except ValueError as exc:
+                status, note = "unavailable", str(exc)
+                item.update(status=status, note=note)
+            else:
+                for plot in spec.plots:
+                    column = output.series.get(plot.key)
+                    if column is None:
+                        continue
+                    points = series_points(times, column, output.colors.get(plot.key))
+                    if not points:
+                        continue
+                    series = {"name": plot.key, "title": plot.title, "type": plot.type,
+                              "color": plot.color or instance.color, "width": plot.width, "style": plot.style,
+                              "data": points}
+                    if plot.type == "histogram" and plot.key not in output.colors:
+                        up, down = plot.colors or (indicator_engine.UP, indicator_engine.DOWN)
+                        series["data"] = [{**p, "color": up if p["value"] >= 0 else down} for p in points]
+                    item["series"].append(series)
+                names = {series["name"] for series in item["series"]}
+                item["fills"] = [{"upper": fill.upper, "lower": fill.lower, "color": fill.color} for fill in spec.fills
+                                 if all(end in names or isinstance(end, (int, float)) for end in (fill.upper, fill.lower))]
+                item["markers"] = [{"time": int(times[m["index"]]), "position": m["position"], "shape": m["shape"],
+                                    "color": m["color"], "text": m.get("text", "")}
+                                   for m in output.markers if 0 <= m["index"] < len(times)]
+                if not item["series"] and not item["markers"]:
+                    item.update(status="unavailable", note="Not enough bars to calculate yet.")
+        if item["status"] == "unavailable":
+            item.update(series=[], fills=[], markers=[])
+            notices.append({"level": "warning", "message": f"{spec.display_name} ({instance.id}): {item['note']}"})
+        (overlays if spec.placement == "overlay" else panes).append(item)
     return overlays, panes, notices
 
 
@@ -281,10 +319,19 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
                            watchlist: list[dict], ack: str | None = None,
                            tester_payload: dict | None = None, replay_status: dict | None = None,
                            live_status: dict | None = None, sources: dict | None = None,
-                           pine: dict | None = None, data_status: dict | None = None) -> dict:
-    bars = bars_from_frame(frame)
+                           pine: dict | None = None, data_status: dict | None = None,
+                           stages: dict | None = None) -> dict:
+    stages = {} if stages is None else stages
+    with perf.timed(stages, "serialize_bars"):
+        bars = bars_from_frame(frame)
     times = [bar["time"] for bar in bars]
-    overlays, panes, indicator_notices = indicator_payload(frame, times, state.indicators)
+    source_label = (live_status or {}).get("identity", {}).get("source_label") if live_status and live_status.get(
+        "phase") == "streaming" else selected.broker
+    with perf.timed(stages, "indicators"):
+        overlays, panes, indicator_notices = indicator_payload(
+            frame, times, state.indicators,
+            indicator_engine.DataContext(volume=volume_kind(source_label, frame),
+                                         timeframe_seconds=resolution.target_seconds))
     source = resolution.source
     payload = {
         "contract": CONTRACT_VERSION,
@@ -318,11 +365,7 @@ def build_terminal_payload(*, state: TerminalState, selected: MarketDataset, res
              "params": item.params, "pane": INDICATORS[item.key].pane, "color": item.color}
             for item in state.indicators
         ],
-        "indicator_catalog": [
-            {"key": key, "name": INDICATORS[key].display_name, "category": INDICATORS[key].category,
-             "pane": INDICATORS[key].pane, "defaults": INDICATORS[key].defaults}
-            for key in CHARTABLE_INDICATORS
-        ],
+        "indicator_catalog": indicator_catalog(indicator_engine.DataContext(volume=volume_kind(source_label, frame))),
         "datasets": [
             {"dataset_key": entry.key, "label": entry.label, "symbol": entry.symbol, "provider": entry.broker,
              "timeframe": entry.timeframe, "available": entry.exists}
@@ -469,8 +512,15 @@ def handle_tester_event(event: FrontendEvent, session: dict, runs: dict, *, regi
                                                      "backtest result). Exit Replay to export."), None)
         base = f"{stored['payload']['run_id']}_{stored['run'].descriptor.metadata.strategy_id}_{stored['run'].ledger_mode}"
         if event.data["kind"] == "trades_csv":
-            export = {"filename": f"{base}_trades.csv", "mime": "text/csv",
-                      "content": tester.trades_csv(stored["result"])}
+            request = stored["run"].request
+            entry = dataset(request["dataset_key"])
+            meta = {"strategy": stored["run"].descriptor.metadata.strategy_id, "symbol": entry.symbol,
+                    "timeframe": entry.timeframe, "test_start": request["start"], "test_end": request["end"]}
+            export = {"filename": tester_export.filename(
+                          meta["strategy"], entry.symbol, entry.timeframe,
+                          int(pd.Timestamp(request["start"], tz="UTC").timestamp()),
+                          int(pd.Timestamp(request["end"], tz="UTC").timestamp())),
+                      "mime": "text/csv;charset=utf-8", "content": tester.trades_csv(stored["result"], meta)}
         else:
             export = {"filename": f"{base}_summary.json", "mime": "application/json",
                       "content": json.dumps(tester.summary_export(stored["result"], stored["run"]),
@@ -754,11 +804,14 @@ def _live_frame(state: TerminalState, notices: list[dict[str, str]], selected: M
 
 def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketDataset, live_status: dict | None,
                  replay_status: dict | None, seconds: int, notices: list[dict[str, str]],
-                 calc_frame: pd.DataFrame | None = None) -> dict:
-    """Run the chart's Pine scripts. Replay and Live: exactly the bars this payload shows. Historical: on
-    ``calc_frame`` (all available history up to the chart's last bar), with outputs for the rendered bars only - a
-    strategy backtest is not limited to the visible window."""
-    display_from = None
+                 calc_frame: pd.DataFrame | None = None, full_frame: pd.DataFrame | None = None) -> dict:
+    """Run the chart's Pine scripts. Replay and Live: exactly the bars this payload shows. Historical: indicators on
+    ``calc_frame`` (all available history up to the chart's last bar); a STRATEGY on its own test range of
+    ``full_frame`` (all available history, or the Strategy Tester's custom range) - never on the chart's visible
+    window. Outputs are sent for the rendered bars only."""
+    display_times = [int(t) for t in ((frame["timestamp"] - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(seconds=1))]
+    display_to = display_times[-1] if display_times and full_frame is not None else None
+    display_from = display_times[0] if display_times and full_frame is not None else None
     if calc_frame is not None and len(frame) and len(calc_frame) > len(frame):
         display_from = int(frame["timestamp"].iloc[0].timestamp())
         frame = calc_frame
@@ -791,7 +844,9 @@ def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketData
         tickerid=f"{provider.split(' ')[0].upper()}:{symbol}", mintick=10.0 ** -digits, forming_last=streaming,
         kind="cfd" if provider.startswith("Exness") else "crypto",
         currency="USDT" if symbol.upper().endswith("USDT") else "USD", chart_family=family, mode=mode,
-        knowable_until=knowable_until, display_from=display_from,
+        knowable_until=knowable_until, display_from=display_from, display_to=display_to,
+        display_times=display_times if full_frame is not None else None, full_frame=full_frame,
+        export_meta={"symbol": symbol, "timeframe": state.timeframe, "provider": provider},
         provider=security_data.provider_for(family, binance_provider=binance_provider, received=received))
     for script in section["scripts"]:
         if script["error"] and script["enabled"]:
@@ -801,12 +856,25 @@ def pine_section(state: TerminalState, frame: pd.DataFrame, selected: MarketData
 
 
 def render_custom_terminal() -> None:
+    started = time.perf_counter()
+    stages: dict[str, float] = {}
+    raw = st.session_state.get(COMPONENT_KEY)
+    event_type = raw.get("type") if isinstance(raw, dict) and raw.get("id") != st.session_state.get(LAST_EVENT_KEY) else None
+    try:
+        _render_custom_terminal(stages)
+    finally:
+        perf.event("terminal_run", event=event_type, total_ms=round((time.perf_counter() - started) * 1000, 2),
+                   **stages)
+
+
+def _render_custom_terminal(stages: dict) -> None:
     state: TerminalState = st.session_state.get(STATE_KEY) or _initial_state()
     notices: list[dict[str, str]] = []
 
     # 1-2. Apply the pending frontend event before building this run's payload.
     try:
-        _, _, current_frame = _load(state)
+        with perf.timed(stages, "load_before_event"):
+            _, _, current_frame = _load(state)
         bounds = _bounds(current_frame)
         current_times = replay_model.frame_times(current_frame)
     except Exception:  # bounds only sharpen validation; replay events then report no bars
@@ -827,11 +895,20 @@ def render_custom_terminal() -> None:
         before = len(state.pine)
         state, entry = pine_bridge.handle_pine_event(tester_event, state, st.session_state)
         added = tester_event.type == "pine_add" and len(state.pine) > before
+        if added and state.date_range is not None and bounds is not None \
+                and pine_bridge.compiled(state.pine[-1].source).meta.get("kind") == "strategy":
+            # a new strategy starts with an explicit test range: the dataset's first bar to the end of the chart's
+            # selected date range (what the chart asked for when it was added). It is shown and editable in the
+            # Strategy Tester and never follows later chart window changes.
+            state = pine_bridge._replace(state, replace(state.pine[-1], test_range=(
+                f"{bounds[0].isoformat()}T00:00", f"{state.date_range[1].isoformat()}T23:59")))
         if added and not tester_event.data.get("keep_editor"):
             # after a successful Add to chart the editor makes room: a strategy opens the Strategy Tester, an
             # indicator collapses the dock (unless the editor is pinned open)
             strategy = pine_bridge.compiled(state.pine[-1].source).meta.get("kind") == "strategy"
             state = replace(state, bottom_panel="strategy_tester" if strategy else "pine", bottom_open=strategy)
+        elif tester_event.type in ("pine_set_range", "pine_export"):
+            state = replace(state, bottom_panel="strategy_tester", bottom_open=True)   # stay in the Strategy Tester
         else:
             state = replace(state, bottom_panel="pine", bottom_open=True)
     elif tester_event is not None:
@@ -864,7 +941,8 @@ def render_custom_terminal() -> None:
 
     # 3. Resolve and load exactly what the state names. No fallback substitution.
     try:
-        selected, resolution, frame = _load(state)
+        with perf.timed(stages, "load"):
+            selected, resolution, frame = _load(state)
     except (UnsupportedTimeframeError, KeyError, FileNotFoundError, ValueError) as exc:
         st.error(f"TradingView Mode could not load {state.dataset_key} @ {state.timeframe}: {exc}")
         return
@@ -900,6 +978,7 @@ def render_custom_terminal() -> None:
     streaming = state.live is not None and state.live.streaming
     if state.live is not None and not streaming:
         live_status = live_setup_status(state.live, selected)
+    full = None                                          # the whole available history (Historical only)
     if streaming:
         frame, live_status, resolution = _live_frame(state, notices, selected)
         rows = live_rows(state, st.session_state, time.time())
@@ -919,24 +998,51 @@ def render_custom_terminal() -> None:
     elif replay_status is None:
         notices.append({"level": "warning", "message": "The selected dataset contains no bars."})
 
-    pine = pine_section(state, frame, selected, live_status, replay_status, resolution.target_seconds, notices,
-                        calc_frame=calc_frame)
+    # strategy test ranges: pure Historical only (not Replay, not Live - including the Live setup screen)
+    full_history = full if (replay_status is None and state.live is None and bounds is not None) else None
+    if full_history is not None:
+        # a strategy's own test range survives symbol / timeframe changes unless it has no bars on the new chart
+        for instance in state.pine:
+            if instance.test_range and not len(pine_bridge.strategy_frame(full_history, instance.test_range)):
+                state = pine_bridge._replace(state, replace(instance, test_range=None))
+                message = (f"`{instance.title}`: test range {instance.test_range[0]} → {instance.test_range[1]} UTC "
+                           f"has no {selected.symbol} {state.timeframe} bars; reset to the full history.")
+                notices.append({"level": "warning", "message": message})
+                _log(LogEntry("warning", message))
+        st.session_state[STATE_KEY] = state
+    with perf.timed(stages, "pine"):
+        pine = pine_section(state, frame, selected, live_status, replay_status, resolution.target_seconds, notices,
+                            calc_frame=calc_frame, full_frame=full_history)
 
     # 4. Build, validate, render.
     try:
-        payload = build_terminal_payload(
-            state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
-            logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, rows),
-            replay_status=replay_status, live_status=live_status, sources=sources, pine=pine, ack=last_id,
-            data_status=None if streaming else data_status(resolution.source, st.session_state),
-            tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds))
+        with perf.timed(stages, "build_payload"):
+            payload = build_terminal_payload(
+                state=state, selected=selected, resolution=resolution, frame=frame, bounds=bounds, shown=shown,
+                logs=st.session_state.get(LOGS_KEY, []), notices=notices, watchlist=watchlist_payload(selected, rows),
+                replay_status=replay_status, live_status=live_status, sources=sources, pine=pine, ack=last_id,
+                data_status=None if streaming else data_status(resolution.source, st.session_state),
+                tester_payload=tester_presentation(tester_session, registry, replay_status, resolution.target_seconds),
+                stages=stages)
     except ValueError as exc:
         st.error(f"TradingView Mode payload rejected: {exc}")
         return
     if not st.session_state.get(READY_KEY):
         st.caption("Waiting for the TradingView Mode frontend… If this persists, the component failed to load "
                    "(check the browser console).")
-    render_terminal_component(payload, key=COMPONENT_KEY)
+    if perf.enabled():
+        stages["payload_bytes"] = len(json.dumps(payload, separators=(",", ":")))
+        stages["payload_parts"] = {key: len(json.dumps(value, separators=(",", ":"), default=str))
+                                   for key, value in payload.items() if key not in ("contract", "ack")}
+        stages["bar_count"] = len(payload["bars"])
+    with perf.timed(stages, "externalize"):
+        sent = blobs.externalize(payload)          # large arrays travel once, as content-addressed data files
+    if perf.enabled():
+        stages["sent_bytes"] = len(json.dumps(sent, separators=(",", ":")))
+        stages["sent_parts"] = {key: len(json.dumps(value, separators=(",", ":"), default=str))
+                                for key, value in sent.items() if key not in ("contract", "ack")}
+    with perf.timed(stages, "render"):
+        render_terminal_component(sent, key=COMPONENT_KEY)
     if tester_session.get("export"):
         # Delivered once; the frontend downloads it by event id.
         st.session_state[TESTER_KEY] = {**tester_session, "export": None}

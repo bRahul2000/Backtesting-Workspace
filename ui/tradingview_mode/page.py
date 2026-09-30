@@ -42,6 +42,10 @@ _TERMINAL_CSS = f"""<style>
 [data-testid="stElementContainer"]:has(style):not(:has(.zf-account)),
 [data-testid="element-container"]:has(style):not(:has(.zf-account)) {{ display: none; }}
 [data-testid="stElementContainer"]:has(.zf-account), [data-testid="element-container"]:has(.zf-account) {{ height: 0; margin: 0; }}
+/* The terminal reruns alone (an st.fragment) and is never dimmed or faded while it runs; Streamlit's own
+   "Running... / Stop" status never overlays the terminal (terminal activity shows in its own status bar). */
+[data-stale="true"] {{ opacity: 1 !important; transition: none !important; }}
+[data-testid="stStatusWidget"] {{ visibility: hidden !important; }}
 /* an inline iframe adds a baseline gap under it (page overflow -> a scrollbar eating the right edge) */
 iframe[title*="tradingview_terminal"] {{ display: block !important; vertical-align: top; }}
 [data-testid="stElementContainer"]:has(> iframe), [data-testid="element-container"]:has(> iframe) {{ line-height: 0; }}
@@ -64,9 +68,18 @@ iframe[title*="tradingview_terminal"] {{ display: block !important; vertical-ali
 
 
 def render_tradingview_mode():
+    st.markdown(_TERMINAL_CSS, unsafe_allow_html=True)
+    _terminal_fragment()
+
+
+# The terminal reruns on its own: every terminal event (a click, a live poll, a tab) reruns only this fragment, never
+# the whole app - so the sidebar, the account control and this page's CSS are built once and stay put.
+@st.fragment
+def _terminal_fragment():
+    from services.auth.gate import recheck_session
     from .component.terminal import render_custom_terminal
 
-    st.markdown(_TERMINAL_CSS, unsafe_allow_html=True)
+    recheck_session()                 # the app-level login gate does not run for a fragment-only rerun
     try:
         render_custom_terminal()
     except Exception as exc:  # Streamlit's rerun/stop signals are BaseException and pass through

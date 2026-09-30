@@ -89,6 +89,9 @@ def test_price_precision_is_display_only_and_bounded():
 
 VALID_EVENTS = {
     "chart_ready": {},
+    "pine_set_range": {"id": "pine-1", "start": "2025-01-01T00:00", "end": "2025-12-31T23:59"},
+    "pine_export": {"id": "pine-1"},
+    "resync": {},
     "frontend_error": {"message": "boom"},
     "select_dataset": {"dataset_key": "EXNESS_BTCUSDM_M15"},
     "select_watchlist_item": {"dataset_key": "EXNESS_XAUUSDM_M15"},

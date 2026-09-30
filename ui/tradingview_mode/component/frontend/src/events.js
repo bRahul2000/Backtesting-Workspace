@@ -8,6 +8,7 @@ import { Streamlit } from "streamlit-component-lib";
 const nonce = Math.random().toString(36).slice(2, 8);
 let seq = 0;
 let inFlight = null;
+let hydrating = false;               // a payload's data files are still loading: nothing new is sent meanwhile
 let inFlightTimer = null;
 const queue = [];
 const listeners = new Set();
@@ -61,5 +62,9 @@ export function onPendingChange(listener) {
 // True when no event is waiting for Python; replay playback only steps then,
 // so it can never queue up more steps than the server has processed.
 export function isIdle() {
-  return inFlight === null && queue.length === 0;
+  return inFlight === null && queue.length === 0 && !hydrating;
+}
+
+export function setHydrating(value) {
+  hydrating = !!value;
 }

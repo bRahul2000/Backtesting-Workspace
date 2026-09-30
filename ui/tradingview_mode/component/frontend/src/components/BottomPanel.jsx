@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { sendEvent } from "../events.js";
 import { Icon } from "./icons.jsx";
+import { ParamField } from "./IndicatorControls.jsx";
 import { StrategyTester } from "./tester/StrategyTester.jsx";
 import { TradesWorkspace } from "./tester/TradesTable.jsx";
 import { PineEditor } from "./PineEditor.jsx";
@@ -29,25 +30,7 @@ const TABS = [
   ["logs", "Logs"],
 ];
 
-function ParamInput({ indicator, name, value, revision }) {
-  const [draft, setDraft] = useState(String(value));
-  // Re-sync on every Python payload so a rejected edit reverts to Python's value.
-  useEffect(() => setDraft(String(value)), [value, revision]);
-  const commit = () => {
-    const number = Number(draft);
-    if (draft.trim() === "" || !Number.isFinite(number)) { setDraft(String(value)); return; }
-    if (number !== value) sendEvent("update_indicator", { id: indicator.id, params: { [name]: number } });
-  };
-  return (
-    <label className="param">
-      <span>{name}</span>
-      <input className="mono" value={draft} inputMode="decimal" onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") setDraft(String(value)); }} />
-    </label>
-  );
-}
-
-function IndicatorsTab({ indicators, revision }) {
+function IndicatorsTab({ indicators, catalog }) {
   if (!indicators.length) {
     return <div className="empty">No indicators. Use <b>Indicators</b> in the top bar to add one — values are calculated in Python.</div>;
   }
@@ -61,11 +44,13 @@ function IndicatorsTab({ indicators, revision }) {
             <td>{item.name}</td>
             <td className="mono muted">{item.id}</td>
             <td className="muted">{item.pane === "overlay" ? "Price" : "Lower"}</td>
-            <td className="params">
-              {Object.entries(item.params).length
-                ? Object.entries(item.params).map(([name, value]) => <ParamInput key={name} indicator={item} name={name} value={value} revision={revision} />)
+            <td className="params"><div className="params-wrap">
+              {(catalog.find((c) => c.key === item.key)?.params || []).length
+                ? catalog.find((c) => c.key === item.key).params.map((spec) => (
+                  <ParamField key={spec.name} spec={spec} value={item.params[spec.name]}
+                    onChange={(value) => sendEvent("update_indicator", { id: item.id, params: { [spec.name]: value } })} />))
                 : <span className="muted">—</span>}
-            </td>
+            </div></td>
             <td className="row-actions">
               <button type="button" className="icon-btn" title={item.enabled ? "Hide" : "Show"}
                 onClick={() => sendEvent("toggle_indicator", { id: item.id, enabled: !item.enabled })}>
@@ -221,12 +206,12 @@ export function BottomPanel({ payload, clientLogs, pending, selectedKey, onSelec
       </div>
       {open && (
         <div className="bottom-body">
-          {tab === "indicators" && <IndicatorsTab indicators={payload.indicators} revision={payload.ack} />}
+          {tab === "indicators" && <IndicatorsTab indicators={payload.indicators} catalog={payload.indicator_catalog} />}
           {tab === "strategy_tester" && (
             <div className="tester unified-tester">
               <SourceSwitch source={tester.source} setSource={tester.setSource} hasPine={hasPine} hasPython={!!payload.tester.run} />
               {tester.source === "pine"
-                ? <PineTester pine={payload.pine} precision={payload.price_precision ?? 2} strategyId={tester.strategyId}
+                ? <PineTester pine={payload.pine} payload={payload} pending={pending} precision={payload.price_precision ?? 2} strategyId={tester.strategyId}
                     onStrategy={tester.setStrategyId} selectedKey={pineFocus.selectedKey} onSelectTrade={pineFocus.select}
                     note={pineFocus.note} />
                 : <StrategyTester payload={payload} pending={pending} selectedKey={selectedKey}

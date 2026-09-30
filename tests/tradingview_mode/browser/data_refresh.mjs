@@ -168,8 +168,8 @@ async function main() {
   // the dock opens the Strategy Tester after Add to chart; clicking the active tab would collapse it
   if (!(await evaluate("!!__tv.find('.bottom-tab.is-active', 'Strategy Tester')"))) { await click("Strategy Tester tab", ".bottom-tab", "Strategy Tester"); await settle(); }
   await shot("refresh_after");
-  check("after: Pine Strategy report present", /Net profit/.test(await evaluate("__tv.reportText()") || ""));
-  await click("Trades section", ".subtab", "Trades"); await settle();
+  check("after: Pine Strategy report present", /Net P&L/i.test(await evaluate("__tv.reportText()") || ""));
+  await click("Trades section", ".subtab", "List of Trades"); await settle();
   // Trade-row navigation: an older trade's row brings it into view.
   const entry = await evaluate("__tv.rowEntry(12)");
   await evaluate("__tv.doc().querySelectorAll('.pine-trades tbody tr')[12].scrollIntoView({ block: 'center' })"); await sleep(200);

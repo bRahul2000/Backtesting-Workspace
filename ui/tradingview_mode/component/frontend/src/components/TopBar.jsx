@@ -36,17 +36,23 @@ function IndicatorMenu({ payload, onClose }) {
       {groups.map(([category, items]) => (
         <React.Fragment key={category}>
           <div className="menu-heading">{category}</div>
-          {items.map((item) => (
-            <button key={item.key} type="button" className="menu-row"
-              onClick={() => { sendEvent("add_indicator", { key: item.key }); onClose(); }}>
-              <span className="menu-row-main">{item.name}</span>
-              <span className="menu-row-tag">{item.pane === "overlay" ? "overlay" : "pane"}</span>
-              <span className="menu-row-sub">{Object.entries(item.defaults).map(([k, v]) => `${k} ${v}`).join(" · ") || "no parameters"}</span>
-            </button>
-          ))}
+          {items.map((item) => {
+            const unavailable = item.status === "unavailable";
+            return (
+              <button key={item.key} type="button" className={`menu-row ${unavailable ? "is-unavailable" : ""}`}
+                disabled={unavailable} title={item.note || item.description} aria-label={`Add ${item.name}`}
+                onClick={() => { if (!unavailable) { sendEvent("add_indicator", { key: item.key }); onClose(); } }}>
+                <span className="menu-row-main">{item.name}</span>
+                <span className={`menu-row-tag ${item.status === "limited" ? "warn" : ""}`}>
+                  {unavailable ? "unavailable" : item.status === "limited" ? "limited data" : item.pane === "overlay" ? "overlay" : "pane"}</span>
+                <span className="menu-row-sub">{unavailable || item.status === "limited" ? item.note
+                  : item.params.map((p) => `${p.label} ${p.default}`).join(" · ") || "no parameters"}</span>
+              </button>
+            );
+          })}
         </React.Fragment>
       ))}
-      <div className="menu-foot">Calculated in Python. Edit parameters in the Indicators panel.</div>
+      <div className="menu-foot">Calculated in Python on the chart's data. Hide, edit or remove each one from its legend on the chart.</div>
     </div>
   );
 }

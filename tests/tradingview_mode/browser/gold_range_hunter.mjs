@@ -71,7 +71,8 @@ const HELPERS = `window.__tv = {
   setDate(i, value) { const el = this.doc().querySelectorAll('.popover input[type=date]')[i]; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return el.value; },
   tradeRows() { return [...this.doc().querySelectorAll('.pine-trades tbody tr')].length; },
-  metric(name) { const m = [...this.doc().querySelectorAll('.pine-metric')].find((e) => e.children[0].innerText.trim() === name); return m ? m.children[1].innerText.trim() : null; },
+  // Strategy Tester metrics: overview cards and performance rows (label -> value text)
+  metric(name) { const m = [...this.doc().querySelectorAll('.st-card, .st-row')].find((e) => e.children[0].textContent.trim() === name); return m ? m.children[1].textContent.trim() : null; },
   logs() { return [...this.doc().querySelectorAll('.log-msg')].map((d) => d.innerText.trim()); },
   sidebarHidden() { const s = document.querySelector('[data-testid="stSidebar"]'); return !s || getComputedStyle(s).display === 'none'; },
   has(sel) { return !!this.doc().querySelector(sel); },
@@ -135,7 +136,10 @@ async function main() {
     JSON.stringify([await evaluate("__tv.text('.bottom-tab.is-active')"), await evaluate("__tv.text('.source-badge')")]));
   check("exact trade count (full calculation range, not the visible window)", await waitFor(`__tv.metric('Total trades') === '${EXPECTED.trades}'`, 30000),
     `${await evaluate("__tv.metric('Total trades')")} vs ${EXPECTED.trades}`);
-  const metrics = {}; for (const name of ["Net profit", "Win rate", "Profit factor", "Max drawdown", "Max run-up", "Avg bars in trade"]) metrics[name] = await evaluate(`__tv.metric(${JSON.stringify(name)})`);
+  const metrics = {}; for (const name of ["Net P&L", "Winning trades", "Profit factor", "Max drawdown", "Average trade", "Largest loser"]) metrics[name] = await evaluate(`__tv.metric(${JSON.stringify(name)})`);
+  // the strategy's test range: fixed when it was added (the chart's range end), shown in the tester header
+  check("test range in the header ends 2026-06-02 (never the sealed windows)", /Custom · \d{4}-\d{2}-\d{2} → 2026-06-02/.test(await evaluate("__tv.text('.st-range')") || ""),
+    await evaluate("__tv.text('.st-range')"));
   note("overview", JSON.stringify(metrics));
 
   // Fill -> marker reconciliation on the loaded bars.
@@ -159,11 +163,11 @@ async function main() {
 
   // Trades: the oldest trade (January, far before the loaded May bars) -> older bars load, chart moves, highlight.
   await click("Strategy Tester tab", ".bottom-tab", "Strategy Tester"); await settle();
-  await click("Trades section", ".subtab", "Trades"); await settle();
+  await click("Trades section", ".subtab", "List of Trades"); await settle();
   check("trades table lists every trade", (await evaluate("__tv.tradeRows()")) === EXPECTED.trades, String(await evaluate("__tv.tradeRows()")));
-  const header = await evaluate("[...__tv.doc().querySelectorAll('.pine-trades thead th')].map((t) => t.innerText.trim())");
-  check("trades table columns", JSON.stringify(header) === JSON.stringify(["#", "Direction", "Entry time", "Entry price", "Exit time", "Exit price",
-    "Entry comment", "Exit comment", "Qty", "P&L", "P&L %", "Run-up", "Drawdown", "Bars"]), JSON.stringify(header));
+  const header = await evaluate("[...__tv.doc().querySelectorAll('.pine-trades thead th')].map((t) => t.innerText.replace(/[▲▼]/g, '').trim())");
+  check("trades table columns", JSON.stringify(header) === JSON.stringify(["#", "Type", "Entry time", "Entry price", "Exit time", "Exit price",
+    "Qty", "P&L", "P&L %", "Exit reason", "Bars"]), JSON.stringify(header));
   await evaluate("[...__tv.doc().querySelectorAll('.pine-trades tbody tr')].at(-1).scrollIntoView({ block: 'center' })"); await sleep(200);
   await click("oldest trade row", ".pine-trades tbody tr", "1\t");
   check("older bars lazy-load and the chart moves to the trade", await waitFor(`(() => { const v = __tv.visible(); const b = __tv.bars();

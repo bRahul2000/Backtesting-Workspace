@@ -5,6 +5,7 @@ import { ChartEngine } from "../chart/ChartEngine.js";
 import { LiveBar } from "./LiveBar.jsx";
 import { ReplayBar } from "./ReplayBar.jsx";
 import { SourceStrip } from "./SourceStrip.jsx";
+import { IndicatorControls } from "./IndicatorControls.jsx";
 import { describeFill } from "../chart/strategyMarkers.js";
 import { formatPrice, formatSigned, formatUtc, formatVolume, paramsLabel, providerShort, timeframeLabel } from "../format.js";
 
@@ -14,6 +15,21 @@ function Values({ values, precision }) {
       {v.value === undefined ? "—" : formatPrice(v.value, precision)}
     </span>
   ));
+}
+
+// One indicator in the chart legend (overlays) or at the top of its pane: name, settings summary, values under the
+// crosshair, a LIMITED / unavailable note when its data requirement is not met, and eye / gear / X.
+function IndicatorRow({ item, engine, catalog, precision }) {
+  const hidden = item.visible === false;
+  return (
+    <div className={`lg-ind ${hidden ? "is-hidden" : ""} ${item.native ? "is-native" : ""}`} data-indicator={item.id}>
+      <span className="lg-ind-name">{item.native ? (item.label || item.name) : <>{item.name} <span className="muted">{paramsLabel(item.params)}</span></>}</span>
+      {item.status === "limited" && <span className="lg-badge warn" title={item.note}>LIMITED</span>}
+      {item.status === "unavailable" && <span className="lg-badge bad" title={item.note}>unavailable: {item.note}</span>}
+      {!hidden && <Values values={item.values} precision={precision} />}
+      {item.native && <IndicatorControls item={item} engine={engine} catalog={catalog} />}
+    </div>
+  );
 }
 
 function Legend({ engine, payload }) {
@@ -43,19 +59,13 @@ function Legend({ engine, payload }) {
             {payload.ui.show_volume && <span><i>Vol</i>{formatVolume(legend.volume)}</span>}
           </div>
         )}
-        {legend?.overlays.map((o) => (
-          <div key={o.id} className="lg-ind">
-            <span className="lg-ind-name">{o.name} <span className="muted">{paramsLabel(o.params)}</span></span>
-            <Values values={o.values} precision={precision} />
-          </div>
+        {legend && [...legend.overlays, ...legend.panes.filter((p) => p.top === null)].map((o) => (
+          <IndicatorRow key={o.id} item={o} engine={engine} catalog={payload.indicator_catalog} precision={precision} />
         ))}
       </div>
       {legend?.panes.map((p) => p.top !== null && (
         <div key={p.id} className="legend pane-legend" style={{ top: p.top + 4 }}>
-          <div className="lg-ind">
-            <span className="lg-ind-name">{p.name} <span className="muted">{paramsLabel(p.params)}</span></span>
-            <Values values={p.values} precision={2} />
-          </div>
+          <IndicatorRow item={p} engine={engine} catalog={payload.indicator_catalog} precision={2} />
         </div>
       ))}
     </>

@@ -53,8 +53,9 @@ def test_rsi_macd_atr_and_warmup():
 
 
 def test_registry_classifies_overlay_and_lower_indicators():
-    assert {key for key, value in INDICATORS.items() if value.pane == "overlay"} == {"ema", "sma", "vwap", "bb"}
-    assert {key for key, value in INDICATORS.items() if value.pane == "lower"} == {"rsi", "macd", "atr", "volume"}
+    assert {key for key, value in INDICATORS.items() if value.pane == "overlay"} == {
+        "ema", "sma", "wma", "supertrend", "vwap", "bb", "keltner", "donchian", "pivots"}
+    assert {key for key, value in INDICATORS.items() if value.pane == "lower"} == {"rsi", "macd", "stoch", "atr", "volume"}
 
 
 def test_calculation_preserves_source_and_utc():

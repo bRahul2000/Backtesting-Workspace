@@ -9,7 +9,7 @@ import { Properties } from "./Properties.jsx";
 import { TradesWorkspace } from "./TradesTable.jsx";
 import { useTesterForm } from "./useTesterForm.js";
 
-const SUBTABS = [["overview", "Overview"], ["performance", "Performance"], ["trades", "Trades"],
+const SUBTABS = [["overview", "Overview"], ["performance", "Performance"], ["trades", "List of Trades"],
   ["execution", "Execution"], ["properties", "Properties"], ["runs", "Runs"]];
 
 function Status({ tester, running }) {
@@ -76,6 +76,11 @@ export function StrategyTester({ payload, pending, selectedKey, onSelectTrade, f
         <button type="button" className="btn primary" disabled={!canRun} onClick={run}>{running ? "Running…" : "Run backtest"}</button>
         <Status tester={tester} running={running} />
         <div className="spacer" />
+        {tester.run && !running && tester.active_history_id !== null && tester.active_history_id !== undefined && (
+          <button type="button" className="btn small st-export" disabled={pending?.type === "export_run"}
+            title="Download this run's complete trade list (raw values, UTF-8 CSV)"
+            onClick={() => sendEvent("export_run", { history_id: tester.active_history_id, kind: "trades_csv" })}>Export Trades CSV</button>
+        )}
         {tester.run && !running && (
           <button type="button" className="btn ghost small" onClick={() => sendEvent("clear_backtest")} title="Clear the displayed result (session runs are kept)">Clear</button>
         )}

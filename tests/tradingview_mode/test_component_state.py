@@ -92,10 +92,11 @@ def test_default_range_scales_with_timeframe():
 def test_add_update_toggle_remove_indicator_lifecycle():
     current, _ = apply(state(), "add_indicator", key="ema")
     current, _ = apply(current, "add_indicator", key="ema", params={"length": 50})
-    assert [(i.id, i.params) for i in current.indicators] == [("ema-1", {"length": 20}), ("ema-2", {"length": 50})]
+    assert [(i.id, i.params) for i in current.indicators] == [("ema-1", {"length": 20, "timeframe": "chart"}),
+                                                              ("ema-2", {"length": 50, "timeframe": "chart"})]
     assert current.indicators[0].color != current.indicators[1].color
     current, _ = apply(current, "update_indicator", id="ema-1", params={"length": 9})
-    assert current.indicators[0].params == {"length": 9}
+    assert current.indicators[0].params == {"length": 9, "timeframe": "chart"}
     current, _ = apply(current, "toggle_indicator", id="ema-2", enabled=False)
     assert current.indicators[1].enabled is False
     current, _ = apply(current, "remove_indicator", id="ema-1")

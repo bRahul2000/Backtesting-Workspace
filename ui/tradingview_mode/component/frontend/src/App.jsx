@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamlit } from "streamlit-component-lib";
-import { acknowledge, isIdle, onPendingChange, sendEvent } from "./events.js";
+import { acknowledge, isIdle, onPendingChange, sendEvent, setHydrating } from "./events.js";
+import { hydrate } from "./blobs.js";
 import { intervalMs, tickAction } from "./replayControls.js";
 import { POLL_MS, pollAction } from "./liveControls.js";
 import { formatUtc } from "./format.js";
@@ -329,6 +330,7 @@ function Terminal({ payload, fallbackHeight }) {
   const focus = useTradeFocus(payload, engine);
   const pineFocus = usePineTradeFocus(payload, engine);
   useExportDownload(payload.tester.export);
+  useExportDownload(payload.pine?.export);
   useReplayPlayback(payload.replay);
   useLivePolling(payload.live);
   const engineActions = useMemo(() => ({
@@ -368,10 +370,32 @@ function Terminal({ payload, fallbackHeight }) {
   );
 }
 
+// Python sends large arrays as data files (blobs.js); render only complete payloads, newest first. A payload whose
+// files cannot be loaded keeps the previous view on screen and asks Python for a fresh one.
+function useHydratedPayload(raw) {
+  const [state, setState] = useState({ payload: null, error: null });
+  const latest = useRef(0);
+  useEffect(() => {
+    if (!raw) return;
+    const n = ++latest.current;
+    setHydrating(true);
+    hydrate(raw).then((payload) => {
+      if (n === latest.current) setState({ payload, error: null });
+    }).catch((error) => {
+      if (n !== latest.current) return;
+      setState((prev) => ({ ...prev, error }));
+      window.dispatchEvent(new CustomEvent("tvterm:log", { detail: { level: "warning", message: String(error.message || error) } }));
+      if (raw.ack) acknowledge(raw.ack);
+      setTimeout(() => sendEvent("resync"), 250);
+    }).finally(() => { if (n === latest.current) setHydrating(false); });
+  }, [raw]);
+  return state;
+}
+
 export default function App({ args }) {
-  const payload = args?.payload;
+  const { payload, error } = useHydratedPayload(args?.payload);
   if (!payload) {
-    return <div className="boot">Waiting for the Python payload…</div>;
+    return <div className="boot">{error ? `Loading chart data failed (${error.message}); retrying…` : "Waiting for the Python payload…"}</div>;
   }
   if (payload.contract !== 1) {
     return <div className="fatal"><b>Unsupported contract version {String(payload.contract)}.</b> Rebuild the frontend.</div>;

@@ -77,14 +77,20 @@ def bars_from_frame(data: pd.DataFrame) -> list[dict[str, float | int]]:
     ]
 
 
-def series_points(times: list[int], values: pd.Series) -> list[dict[str, float | int]]:
-    """Pair indicator values with bar times, omitting warm-up NaNs."""
+def series_points(times: list[int], values: pd.Series, colors: pd.Series | None = None) -> list[dict[str, Any]]:
+    """Pair indicator values with bar times, omitting warm-up NaNs. ``colors`` (conditional colouring) adds a
+    per-point colour where it is set."""
     array = values.to_numpy(dtype=float)
     if len(array) != len(times):
         raise ValueError("Indicator series length does not match bars.")
     if np.isinf(array).any():
         raise ValueError("Indicator values must be finite.")
-    return [{"time": int(times[i]), "value": float(array[i])}
+    if colors is None:
+        return [{"time": int(times[i]), "value": float(array[i])}
+                for i in range(len(times)) if not math.isnan(array[i])]
+    shades = colors.to_numpy(dtype=object)
+    return [{"time": int(times[i]), "value": float(array[i]),
+             **({"color": shades[i]} if isinstance(shades[i], str) else {})}
             for i in range(len(times)) if not math.isnan(array[i])]
 
 
@@ -121,22 +127,58 @@ def _validate_points(points: Any, where: str, bar_times: set[int]) -> None:
     _require(isinstance(points, list), f"{where}.data must be a list.")
     previous = None
     for point in points:
-        _require(isinstance(point, dict) and set(point) == {"time", "value"}, f"{where}: bad point {point!r}.")
+        _require(isinstance(point, dict) and set(point) in ({"time", "value"}, {"time", "value", "color"}),
+                 f"{where}: bad point {point!r}.")
+        _require(isinstance(point.get("color", ""), str), f"{where}: point colour must be text.")
         _require(type(point["time"]) is int and point["time"] in bar_times, f"{where}: time {point['time']!r} is not a bar time.")
         _require(isinstance(point["value"], float) and math.isfinite(point["value"]), f"{where}: value must be a finite float.")
         _require(previous is None or point["time"] > previous, f"{where}: times must increase.")
         previous = point["time"]
 
 
+INDICATOR_STATUSES = ("ok", "limited", "unavailable")
+MARKER_POSITIONS = ("aboveBar", "belowBar", "inBar")
+MARKER_SHAPES = ("circle", "square", "arrowUp", "arrowDown")
+LINE_STYLES = ("solid", "dashed", "dotted")
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
 def _validate_series_list(series_list: Any, where: str, bar_times: set[int]) -> None:
-    _require(isinstance(series_list, list) and series_list, f"{where}.series must be a non-empty list.")
+    _require(isinstance(series_list, list), f"{where}.series must be a list.")
     for index, series in enumerate(series_list):
         label = f"{where}.series[{index}]"
         _require(isinstance(series, dict), f"{label} must be an object.")
         _require(series.get("type") in ("line", "histogram"), f"{label}.type must be line or histogram.")
         _require(isinstance(series.get("name"), str) and series["name"], f"{label}.name is required.")
         _require(isinstance(series.get("color"), str), f"{label}.color is required.")
+        _require(series.get("style", "solid") in LINE_STYLES, f"{label}.style must be one of {LINE_STYLES}.")
+        _require(isinstance(series.get("width", 1), int) and 1 <= series.get("width", 1) <= 4, f"{label}.width 1-4.")
         _validate_points(series.get("data"), label, bar_times)
+
+
+def _validate_indicator_item(item: dict, where: str, bar_times: set[int]) -> None:
+    """Generic plot definitions (ui/tradingview_mode/indicators.py): series, fills, levels, markers."""
+    _validate_series_list(item.get("series"), where, bar_times)
+    names = {series["name"] for series in item["series"]}
+    _require(item.get("status", "ok") in INDICATOR_STATUSES, f"{where}.status must be one of {INDICATOR_STATUSES}.")
+    _require(isinstance(item.get("visible", True), bool), f"{where}.visible must be a boolean.")
+    _require(item.get("status", "ok") == "unavailable" or item["series"] or item.get("markers"),
+             f"{where} has nothing to draw.")
+    for fill in item.get("fills", []):
+        _require(isinstance(fill, dict) and isinstance(fill.get("color"), str), f"{where}: bad fill {fill!r}.")
+        for end in ("upper", "lower"):
+            _require(fill.get(end) in names or _is_number(fill.get(end)), f"{where}: fill.{end} must be an output or a level.")
+    for level in item.get("levels", []):
+        _require(isinstance(level, dict) and _is_number(level.get("value")) and isinstance(level.get("color"), str)
+                 and level.get("style", "dotted") in LINE_STYLES, f"{where}: bad level {level!r}.")
+    for marker in item.get("markers", []):
+        _require(isinstance(marker, dict) and marker.get("time") in bar_times
+                 and marker.get("position") in MARKER_POSITIONS and marker.get("shape") in MARKER_SHAPES
+                 and isinstance(marker.get("color"), str) and isinstance(marker.get("text", ""), str),
+                 f"{where}: bad marker {marker!r}.")
 
 
 def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -177,7 +219,7 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
             _require(isinstance(item, dict) and isinstance(item.get("id"), str), f"{group} item needs an id.")
             _require(item["id"] not in ids, f"Duplicate indicator id {item['id']!r}.")
             ids.add(item["id"])
-            _validate_series_list(item.get("series"), f"{group}[{item['id']}]", bar_times)
+            _validate_indicator_item(item, f"{group}[{item['id']}]", bar_times)
 
     status = payload.get("data_status")
     if status is not None:
@@ -471,6 +513,8 @@ def _validate_replay(payload: dict[str, Any], bar_times: set[int]) -> None:
             for series in item["series"]:
                 _require(all(point["time"] <= cursor for point in series["data"]),
                          f"{group}[{item['id']}] has values after the replay cursor.")
+            _require(all(marker["time"] <= cursor for marker in item.get("markers", [])),
+                     f"{group}[{item['id']}] has markers after the replay cursor.")
     for item in payload.get("trade_overlay", {}).get("trades", []):
         _require(item["exit_bar"] <= cursor and item["entry_bar"] <= cursor, "trade marker after the replay cursor.")
     tester_payload = payload.get("tester") or {}
@@ -561,8 +605,11 @@ def _is_iso_date(value: Any) -> bool:
 
 
 def _is_params(value: Any) -> bool:
+    """Indicator parameters: numbers, or short choice text (e.g. a VWAP anchor, an input timeframe). Each
+    indicator's own spec then validates names, bounds and choices."""
     return isinstance(value, dict) and len(value) <= 8 and all(
-        _is_str(k) and isinstance(v, (int, float)) and not isinstance(v, bool) for k, v in value.items())
+        _is_str(k) and ((isinstance(v, (int, float)) and not isinstance(v, bool)) or (_is_str(v) and len(v) <= 16))
+        for k, v in value.items())
 
 
 EXPORT_KINDS = ("trades_csv", "summary_json")
@@ -582,6 +629,7 @@ def _is_scalar_map(value: Any, limit: int) -> bool:
 # field -> (required, validator). Unknown fields are rejected.
 EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "chart_ready": {},
+    "resync": {},     # the frontend could not load a payload file: send a fresh payload (no state change)
     "frontend_error": {"message": (True, lambda v: isinstance(v, str))},
     "select_dataset": {"dataset_key": (True, _is_str)},
     "select_watchlist_item": {"dataset_key": (True, _is_str)},
@@ -626,6 +674,11 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
     "pine_toggle": {"id": (True, _is_str), "enabled": (True, lambda v: isinstance(v, bool))},
     "pine_set_input": {"id": (True, _is_str), "index": (True, lambda v: type(v) is int and 0 <= v < 500),
                        "value": (True, _is_input_value)},
+    # Strategy test range (UTC 'YYYY-MM-DDTHH:MM', both inclusive on bar open time; both null = full history)
+    "pine_set_range": {"id": (True, _is_str), "start": (True, lambda v: v is None or _is_utc_text(v)),
+                       "end": (True, lambda v: v is None or _is_utc_text(v))},
+    # Trade list CSV of a Pine strategy's current result (Python builds it; the frontend downloads it once)
+    "pine_export": {"id": (True, _is_str)},
     # Strategy Tester. Semantics (registry, dataset, broker, parameters) are
     # validated in tester.py against the authoritative configuration model.
     "run_backtest": {"strategy_id": (True, _is_str), "dataset_key": (True, _is_str),
@@ -643,7 +696,8 @@ EVENT_SCHEMAS: dict[str, dict[str, tuple[bool, Any]]] = {
 TESTER_EVENTS = ("run_backtest", "clear_backtest", "restore_run", "export_run")
 DATA_EVENTS = ("refresh_data",)
 DATA_STATUSES = ("CURRENT", "STALE", "UNKNOWN")
-PINE_EVENTS = ("pine_compile", "pine_add", "pine_update", "pine_remove", "pine_toggle", "pine_set_input")
+PINE_EVENTS = ("pine_compile", "pine_add", "pine_update", "pine_remove", "pine_toggle", "pine_set_input",
+               "pine_set_range", "pine_export")
 TESTER_STATUSES = ("idle", "completed", "failed")
 
 
